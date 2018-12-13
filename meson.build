@@ -25,6 +25,7 @@ executable(
 	'xdg-desktop-portal-wlr',
 	files([
 		'main.c',
+		'request.c',
 		'screenshot.c',
 	]),
 	dependencies: [
