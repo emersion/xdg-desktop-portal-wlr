@@ -22,6 +22,19 @@ Make sure `XDG_CURRENT_DESKTOP=sway` is set.
 xdg-desktop-portal-wlr
 ```
 
+## Tooling
+
+Useful tools include `dbus-monitor` to watch requests being made,
+and `dbus-send` and the similar `busctl call` for manual dbus calls.
+
+Additionally you can test the integration with the provided helper scripts in the tools directory.
+
+To trigger a screenshot and open it you can run the following:
+
+```sh
+python3 ./tools/triger-screen-shot.py | xargs xdg-open
+```
+
 ## License
 
 MIT
