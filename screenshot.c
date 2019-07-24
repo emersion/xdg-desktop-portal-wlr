@@ -54,37 +54,6 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 		return -ENOMEM;
 	}
 
-	sd_bus_message *reply = NULL;
-	ret = sd_bus_message_new_method_return(msg, &reply);
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_append(reply, "u", 0);
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_open_container(reply, 'a', "{sv}");
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_open_container(reply, 'e', "sv");
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_append_basic(reply, 's', "uri");
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_open_container(reply, 'v', "s");
-	if (ret < 0) {
-		return ret;
-	}
-
 	// TODO: choose a better path
 	const char path[] = "/tmp/out.png";
 	if (!exec_screenshooter(path)) {
@@ -95,22 +64,13 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 	char uri[strlen(path) + strlen(uri_prefix) + 1];
 	snprintf(uri, sizeof(uri), "%s%s", uri_prefix, path);
 
-	ret = sd_bus_message_append_basic(reply, 's', uri);
+	sd_bus_message *reply = NULL;
+	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
 
-	ret = sd_bus_message_close_container(reply);
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_close_container(reply);
-	if (ret < 0) {
-		return ret;
-	}
-
-	ret = sd_bus_message_close_container(reply);
+	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1, "uri", "s", uri);
 	if (ret < 0) {
 		return ret;
 	}
