@@ -8,6 +8,12 @@ struct xdpw_request {
 	sd_bus_slot *slot;
 };
 
+enum {
+	PORTAL_RESPONSE_SUCCESS = 0,
+	PORTAL_RESPONSE_CANCELLED = 1,
+	PORTAL_RESPONSE_ENDED = 2
+};
+
 int init_screenshot(sd_bus *bus);
 
 struct xdpw_request *request_create(sd_bus *bus, const char *object_path);
