@@ -26,6 +26,7 @@ executable(
 	files([
 		'main.c',
 		'request.c',
+		'session.c',
 		'screenshot.c',
 	]),
 	dependencies: [
