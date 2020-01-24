@@ -8,9 +8,25 @@ static const char interface_name[] = "org.freedesktop.impl.portal.Request";
 
 static int method_close(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
+	
+	int ret = 0; 
 	// struct xdpw_request *req = data;
 	// TODO
 	printf("Request.Close\n");
+
+	sd_bus_message *reply = NULL;
+	ret = sd_bus_message_new_method_return(msg, &reply);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_send(NULL, reply, NULL);
+	if (ret < 0) {
+		return ret;
+	}
+
+	sd_bus_message_unref(reply);	
+
 	return 0;
 }
 

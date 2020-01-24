@@ -15,6 +15,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	init_screenshot(bus);
+	init_screencast(bus);
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {
