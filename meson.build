@@ -3,11 +3,12 @@ project(
 	'c',
 	version: '0.0.0',
 	license: 'MIT',
-	meson_version: '>=0.43.0',
+	meson_version: '>=0.46.0',
 	default_options: [
 		'c_std=c11',
 		'warning_level=2',
 		'werror=true',
+		'debug=true',
 	],
 )
 
@@ -19,27 +20,40 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Wno-unused-parameter',
 ]), language: 'c')
 
-xdpw_inc = include_directories('include')
+inc = include_directories('include')
 
+threads = dependency('threads')
+rt = cc.find_library('rt')
+pipewire = dependency('libpipewire-0.2')
+spa = dependency('libspa-0.1')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 systemd = dependency('libsystemd')
 
-# subdir('protocol')
+subdir('protocols')
 
 executable(
 	'xdg-desktop-portal-wlr',
 	files([
-		'main.c',
-		'request.c',
-		'session.c',
-		'screenshot.c',
+		'src/core/main.c',
+		'src/core/request.c',
+		'src/core/session.c',
+		'src/screenshot/screenshot.c',
+		'src/screencast/screencast.c',
+		'src/screencast/screencast_common.c',
+		'src/screencast/wlr_screencast.c',
+		'src/screencast/pipewire_screencast.c',
 	]),
 	dependencies: [
 		wayland_client,
+		wlr_protos,
 		systemd,
+		pipewire,
+		spa,
+		threads,
+		rt
 	],
-	include_directories: [xdpw_inc],
+	include_directories: [inc],
 	install: true,
 )
 
