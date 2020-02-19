@@ -7,23 +7,30 @@ static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
 int setup_outputs(struct screencast_context *ctx) {
 
-	int output_id;
-
 	struct wayland_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
-		printf("Capturable output: %s Model: %s: ID: %i\n", output->make,
-					 output->model, output->id);
-		output_id = output->id;
+		printf("Capturable output: %s Model: %s: ID: %i Name: %s\n", output->make,
+					 output->model, output->id, output->name);
 	}
 
-	output = wlr_find_output(ctx, NULL, output_id);
-	if (!output) {
-		printf("Unable to find output with ID %i!\n", output_id);
-		return 1;
+	struct wayland_output *out;
+	if (ctx->output_name) {
+		out = wlr_output_find_by_name(&ctx->output_list, ctx->output_name);
+		if (!out) {
+			printf("No such output\n");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		out = wlr_output_first(&ctx->output_list);
+		if (!out) {
+			printf("No output found\n");
+			exit(EXIT_FAILURE);
+		}
 	}
+	printf("here %s\n", out->name);
 
-	ctx->target_output = output;
-	ctx->framerate = output->framerate;
+	ctx->target_output = out;
+	ctx->framerate = out->framerate;
 	ctx->with_cursor = true;
 
 	printf("wl_display fd: %d\n", wl_display_get_fd(ctx->display));
@@ -300,12 +307,13 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int init_screencast(sd_bus *bus, const char *forced_pixelformat) {
+int init_screencast(sd_bus *bus, const char *output_name, const char *forced_pixelformat) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 
 	//struct screencast_context ctx = (struct screencast_context){0};
 	ctx.forced_pixelformat = forced_pixelformat;
+	ctx.output_name = output_name;
 	ctx.simple_frame = (struct simple_frame){0};
 	ctx.simple_frame.damage = &(struct damage){0};
 
