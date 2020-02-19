@@ -45,7 +45,6 @@ struct screencast_context {
 
 	// pipewire
 	struct pwr_type type;
-
 	struct pw_main_loop *loop;
 	struct spa_source *event;
 	struct pw_core *core;
@@ -57,13 +56,10 @@ struct screencast_context {
 	struct spa_video_info_raw pwr_format;
 	uint32_t seq;
 	uint32_t node_id;
-
 	bool stream_state;
-
 	pthread_t pwr_thread;
 
 	// wlroots
-
 	struct wl_display *display;
 	struct wl_list output_list;
 	struct wl_registry *registry;
@@ -84,6 +80,9 @@ struct screencast_context {
 
 	// frame mutex
 	pthread_mutex_t lock;
+
+	// cli options
+	const char *forced_pixelformat;
 
 	// if something happens during capture
 	int err;
