@@ -300,11 +300,12 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int init_screencast(sd_bus *bus) {
+int init_screencast(sd_bus *bus, const char *forced_pixelformat) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 
 	//struct screencast_context ctx = (struct screencast_context){0};
+	ctx.forced_pixelformat = forced_pixelformat;
 	ctx.simple_frame = (struct simple_frame){0};
 	ctx.simple_frame.damage = &(struct damage){0};
 

@@ -161,7 +161,7 @@ static void wlr_output_handle_mode(void *data, struct wl_output *wl_output,
 																	 int32_t height, int32_t refresh) {
 	if (flags & WL_OUTPUT_MODE_CURRENT) {
 		struct wayland_output *output = data;
-		output->framerate = (float)refresh * 1000;
+		output->framerate = (float)refresh/1000;
 	}
 }
 

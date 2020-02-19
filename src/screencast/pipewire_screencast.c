@@ -174,6 +174,10 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 				&SPA_RECTANGLE(ctx->simple_frame.width, ctx->simple_frame.height),
 				SPA_POD_PROP_MIN_MAX(&SPA_RECTANGLE(1, 1), &SPA_RECTANGLE(4096, 4096)),
 				":", ctx->type.format_video.framerate, "F",
+				// specify variable framerate
+				&SPA_FRACTION(0, 1),
+				":", ctx->type.format_video.max_framerate, "F",
+				// with a maximum at the wlroots specified hardware framerate
 				&SPA_FRACTION(ctx->framerate, 1));
 
 		pw_stream_add_listener(ctx->stream, &ctx->stream_listener,
