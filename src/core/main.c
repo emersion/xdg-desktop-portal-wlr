@@ -10,6 +10,7 @@ int xdpw_usage(FILE* stream, int rc)
 	static const char* usage =
 "Usage: xdg-desktop-portal-wlr [options]\n"
 "\n"
+"    -o, --output=<name>                       Select output to capture.\n"
 "    -p,--pixelformat=BGRx|RGBx                Force a pixelformat in pipewire\n"
 "                                              metadata (performs no conversion).\n"
 "    -h,--help                                 Get help (this text).\n"
@@ -22,10 +23,12 @@ int xdpw_usage(FILE* stream, int rc)
 
 int main(int argc, char *argv[]) {
 
+	const char* output_name = NULL;
 	const char* forced_pixelformat = NULL;
 
-	static const char* shortopts = "p:h";
+	static const char* shortopts = "o:p:h";
 	static const struct option longopts[] = {
+		{ "output", required_argument, NULL, 'o' },
 		{ "pixelformat", required_argument, NULL, 'p' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
@@ -37,6 +40,9 @@ int main(int argc, char *argv[]) {
 			break;
 
 		switch (c) {
+		case 'o':
+			output_name = optarg;
+			break;
 		case 'p':
 			forced_pixelformat = optarg;
 			break;
@@ -57,7 +63,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	init_screenshot(bus);
-	init_screencast(bus, forced_pixelformat);
+	init_screencast(bus, output_name, forced_pixelformat);
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {

@@ -19,7 +19,7 @@ enum {
 };
 
 int init_screenshot(sd_bus *bus);
-int init_screencast(sd_bus *bus, const char *forced_pixelformat);
+int init_screencast(sd_bus *bus, const char *output_name, const char *forced_pixelformat);
 
 struct xdpw_request *request_create(sd_bus *bus, const char *object_path);
 void request_destroy(struct xdpw_request *req);

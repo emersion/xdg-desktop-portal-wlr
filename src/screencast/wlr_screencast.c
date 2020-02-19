@@ -181,7 +181,62 @@ static const struct wl_output_listener wlr_output_listener = {
 		.scale = wlr_output_handle_scale,
 };
 
-struct wayland_output *wlr_find_output(struct screencast_context *ctx,
+static void wlr_xdg_output_name(void* data, struct zxdg_output_v1* xdg_output,
+												const char* name){
+	struct wayland_output *output = data;
+
+	output->name = strdup(name);
+};
+
+static void dontcare(){
+}
+
+static const struct zxdg_output_v1_listener wlr_xdg_output_listener = {
+	.logical_position = dontcare,
+	.logical_size = dontcare,
+	.done = NULL, /* Deprecated */
+	.description = dontcare,
+	.name = wlr_xdg_output_name,
+};
+
+void wlr_add_xdg_output_listener(struct wayland_output *output,
+																struct zxdg_output_v1* xdg_output){
+	output->xdg_output = xdg_output;
+	zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener,
+															output);
+}
+
+static void wlr_init_xdg_outputs(struct screencast_context *ctx){
+	struct wayland_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
+		struct zxdg_output_v1 *xdg_output =
+			zxdg_output_manager_v1_get_xdg_output(
+				ctx->xdg_output_manager, output->output);
+
+		wlr_add_xdg_output_listener(output, xdg_output);
+	}
+}
+
+struct wayland_output *wlr_output_first(struct wl_list *output_list) {
+	struct wayland_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, output_list, link) {
+		return output;
+	}
+	return NULL;
+}
+
+struct wayland_output *wlr_output_find_by_name(struct wl_list *output_list, const char* name) {
+	struct wayland_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, output_list, link){
+		if (strcmp(output->name, name) == 0){
+			return output;
+		}
+	}
+	return NULL;
+}
+
+
+struct wayland_output *wlr_output_find(struct screencast_context *ctx,
 																			 struct wl_output *out, uint32_t id) {
 	struct wayland_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
@@ -219,12 +274,17 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
 		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, 1);
 	}
+
+	if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
+		ctx->xdg_output_manager =
+			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, 3);
+	}
 }
 
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 																			 uint32_t id) {
 	wlr_remove_output(
-			wlr_find_output((struct screencast_context *)data, NULL, id));
+			wlr_output_find((struct screencast_context *)data, NULL, id));
 }
 
 static const struct wl_registry_listener wlr_registry_listener = {
@@ -247,8 +307,13 @@ int wlr_screencopy_init(struct screencast_context *ctx) {
 	ctx->registry = wl_display_get_registry(ctx->display);
 	wl_registry_add_listener(ctx->registry, &wlr_registry_listener, ctx);
 
-	wl_display_roundtrip(ctx->display);
 	wl_display_dispatch(ctx->display);
+	wl_display_roundtrip(ctx->display);
+
+	wlr_init_xdg_outputs(ctx);
+
+	wl_display_dispatch(ctx->display);
+	wl_display_roundtrip(ctx->display);
 
 	// make sure our wlroots supports screencopy protocol
 	if (!ctx->shm) {
@@ -270,6 +335,8 @@ void wlr_screencopy_uninit(struct screencast_context *ctx) {
 	struct wayland_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
+		zxdg_output_v1_destroy(output->xdg_output);
+		wl_output_destroy(output->output);
 	}
 
 	if (ctx->screencopy_manager) {

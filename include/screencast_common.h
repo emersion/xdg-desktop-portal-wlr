@@ -64,6 +64,7 @@ struct screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
+	struct zxdg_output_manager_v1* xdg_output_manager;
 	struct wl_shm *shm;
 
 	// main frame callback
@@ -82,6 +83,7 @@ struct screencast_context {
 	pthread_mutex_t lock;
 
 	// cli options
+	const char *output_name;
 	const char *forced_pixelformat;
 
 	// if something happens during capture
@@ -93,8 +95,10 @@ struct wayland_output {
 	struct wl_list link;
 	uint32_t id;
 	struct wl_output *output;
+	struct zxdg_output_v1 *xdg_output;
 	char *make;
 	char *model;
+	char *name;
 	int width;
 	int height;
 	float framerate;
