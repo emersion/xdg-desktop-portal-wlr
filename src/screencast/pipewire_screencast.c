@@ -36,10 +36,11 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 		return;
 	}
 
-	logger("pw event fired\n");
+	logprint(TRACE, "********************");
+	logprint(TRACE, "pipewire: event fired");
 
 	if ((pw_buf = pw_stream_dequeue_buffer(ctx->stream)) == NULL) {
-		printf("out of buffers\n");
+		logprint(WARN, "pipewire: out of buffers");
 		return;
 	}
 
@@ -67,14 +68,13 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 	writeFrameData(d[0].data, ctx->simple_frame.data, ctx->simple_frame.height,
 								 ctx->simple_frame.stride, ctx->simple_frame.y_invert);
 
-	logger("************** \n");
-	logger("pointer: %p\n", d[0].data);
-	logger("size: %d\n", d[0].maxsize);
-	logger("stride: %d\n", d[0].chunk->stride);
-	logger("width: %d\n", ctx->simple_frame.width);
-	logger("height: %d\n", ctx->simple_frame.height);
-	logger("y_invert: %d\n", ctx->simple_frame.y_invert);
-	logger("************** \n");
+	logprint(TRACE, "pipewire: pointer %p", d[0].data);
+	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
+	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
+	logprint(TRACE, "pipewire: width %d", ctx->simple_frame.width);
+	logprint(TRACE, "pipewire: height %d", ctx->simple_frame.height);
+	logprint(TRACE, "pipewire: y_invert %d", ctx->simple_frame.y_invert);
+	logprint(TRACE, "********************");
 
 	pw_stream_queue_buffer(ctx->stream, pw_buf);
 
@@ -88,8 +88,8 @@ static void pwr_handle_stream_state_changed(void *data,
 	struct screencast_context *ctx = data;
 	ctx->node_id = pw_stream_get_node_id(ctx->stream);
 
-	printf("stream state: \"%s\"\n", pw_stream_state_as_string(state));
-	printf("node id: %d\n", ctx->node_id);
+	logprint(INFO, "pipewire: stream state changed to \"%s\"", pw_stream_state_as_string(state));
+	logprint(INFO, "pipewire: node id is %d", ctx->node_id);
 
 	switch (state) {
 	case PW_STREAM_STATE_PAUSED:
@@ -149,7 +149,9 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 
 	switch (state) {
 	case PW_REMOTE_STATE_ERROR:
-		printf("remote error: %s\n", error);
+		logprint(INFO, "pipewire: remote state changed to \"%s\"",
+						pw_remote_state_as_string(state));
+		logprint(ERROR, "pipewire: remote error: %s", error);
 		pw_main_loop_quit(ctx->loop);
 		break;
 
@@ -158,7 +160,8 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 		uint8_t buffer[1024];
 		struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
-		logger("remote state: \"%s\"\n", pw_remote_state_as_string(state));
+		logprint(INFO, "pipewire: remote state changed to \"%s\"",
+						pw_remote_state_as_string(state));
 
 		ctx->stream = pw_stream_new(
 				remote, "wlr_screeencopy",
@@ -190,7 +193,8 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 		break;
 	}
 	default:
-		logger("remote state: \"%s\"\n", pw_remote_state_as_string(state));
+		logprint(INFO, "pipewire: remote state changed to \"%s\"",
+						pw_remote_state_as_string(state));
 		break;
 	}
 }

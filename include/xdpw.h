@@ -3,6 +3,7 @@
 
 #include <wayland-client.h>
 #include <systemd/sd-bus.h>
+#include "logger.h"
 
 struct xdpw_request {
 	sd_bus_slot *slot;

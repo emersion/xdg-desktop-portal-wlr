@@ -6,10 +6,7 @@
 #include <spa/param/video/format-utils.h>
 #include <libdrm/drm_fourcc.h>
 #include <wayland-client-protocol.h>
-
-// Disableable logger
-//#define logger(...) printf(__VA_ARGS__)
-#define logger(...)
+#include "logger.h"
 
 struct damage {
 	uint32_t x;

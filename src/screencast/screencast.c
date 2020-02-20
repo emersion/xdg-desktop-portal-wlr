@@ -9,7 +9,7 @@ int setup_outputs(struct screencast_context *ctx) {
 
 	struct wayland_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
-		printf("Capturable output: %s Model: %s: ID: %i Name: %s\n", output->make,
+		logprint(INFO, "wlroots: capturable output: %s model: %s: id: %i name: %s", output->make,
 					 output->model, output->id, output->name);
 	}
 
@@ -17,23 +17,22 @@ int setup_outputs(struct screencast_context *ctx) {
 	if (ctx->output_name) {
 		out = wlr_output_find_by_name(&ctx->output_list, ctx->output_name);
 		if (!out) {
-			printf("No such output\n");
+			logprint(ERROR, "wlroots: no such output");
 			exit(EXIT_FAILURE);
 		}
 	} else {
 		out = wlr_output_first(&ctx->output_list);
 		if (!out) {
-			printf("No output found\n");
+			logprint(ERROR, "wlroots: no output found");
 			exit(EXIT_FAILURE);
 		}
 	}
-	printf("here %s\n", out->name);
 
 	ctx->target_output = out;
 	ctx->framerate = out->framerate;
 	ctx->with_cursor = true;
 
-	printf("wl_display fd: %d\n", wl_display_get_fd(ctx->display));
+	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(ctx->display));
 	
 	return 0;
 
@@ -62,7 +61,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	int ret = 0;
 
-	printf("=== CREATE SESSION\n");
+	logprint(INFO, "dbus: create session method invoked");
 
 	char *request_handle, *session_handle, *app_id;
 	ret = sd_bus_message_read(msg, "oos", &request_handle, &session_handle, &app_id);
@@ -75,9 +74,9 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	printf("request_handle: %s\n", request_handle);
-	printf("session_handle: %s\n", session_handle);
-	printf("app_id: %s\n", app_id);
+	logprint(INFO, "dbus: request_handle: %s", request_handle);
+	logprint(INFO, "dbus: session_handle: %s", session_handle);
+	logprint(INFO, "dbus: app_id: %s", app_id);
 
 	char* key;
 	int innerRet = 0;
@@ -90,9 +89,9 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		if(strcmp(key, "session_handle_token") == 0) {
 			char* token;
 			sd_bus_message_read(msg, "v", "s", &token);
-			printf("Option token = %s\n", token);
+			logprint(INFO, "dbus: option token: %s", token);
 		} else {
-			printf("Unknown option %s\n", key);
+			logprint(WARN, "dbus: unknown option: %s", key);
 			sd_bus_message_skip(msg, "v");
 		}
 
@@ -149,7 +148,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_
 
 	int ret = 0;
 
-	printf("=== SELECT SOURCES\n");
+	logprint(INFO, "dbus: select sources method invoked");
 
 	setup_outputs(ctx);
 
@@ -163,9 +162,9 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_
 		return ret;
 	}
 
-	printf("request_handle: %s\n", request_handle);
-	printf("session_handle: %s\n", session_handle);
-	printf("app_id: %s\n", app_id);
+	logprint(INFO, "dbus: request_handle: %s", request_handle);
+	logprint(INFO, "dbus: session_handle: %s", session_handle);
+	logprint(INFO, "dbus: app_id: %s", app_id);
 	
 	char* key;
 	int innerRet = 0;
@@ -178,13 +177,13 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_
 		if(strcmp(key, "multiple") == 0) {
 			bool multiple;
 			sd_bus_message_read(msg, "v", "b", &multiple);
-			printf("Option multiple, val %x\n", multiple);
+			logprint(INFO, "dbus: option multiple: %x", multiple);
 		} else if(strcmp(key, "types") == 0) {
 			uint32_t mask;
 			sd_bus_message_read(msg, "v", "u", &mask);
-			printf("Option types, mask %x\n", mask);
+			logprint(INFO, "dbus: option types:  %x", mask);
 		} else {
-			printf("Unknown option %s\n", key);
+			logprint(WARN, "dbus: unknown option %s", key);
 			sd_bus_message_skip(msg, "v");
 		}
 
@@ -226,7 +225,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 
 	int ret = 0;
 	
-	printf("=== START\n");
+	logprint(INFO, "dbus: start method invoked");
 
 	pthread_t screencast_thread;
 	pthread_create(&screencast_thread, NULL, start_screencast, ctx);
@@ -241,10 +240,10 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 		return ret;
 	}
 
-	printf("request_handle: %s\n", request_handle);
-	printf("session_handle: %s\n", session_handle);
-	printf("app_id: %s\n", app_id);
-	printf("parent_window: %s\n", parent_window);
+	logprint(INFO, "dbus: request_handle: %s", request_handle);
+	logprint(INFO, "dbus: session_handle: %s", session_handle);
+	logprint(INFO, "dbus: app_id: %s", app_id);
+	logprint(INFO, "dbus: parent_window: %s", parent_window);
 	
 	char* key;
 	int innerRet = 0;
@@ -254,7 +253,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 			return innerRet;
 		}
 
-		printf("Unknown option %s\n", key);
+		logprint(WARN, "dbus: unknown option: %s", key);
 		sd_bus_message_skip(msg, "v");
 
 		innerRet = sd_bus_message_exit_container(msg);

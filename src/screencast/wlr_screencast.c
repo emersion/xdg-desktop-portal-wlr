@@ -5,7 +5,7 @@ void wlr_frame_free(struct screencast_context *ctx) {
 	zwlr_screencopy_frame_v1_destroy(ctx->wlr_frame);
 	munmap(ctx->simple_frame.data, ctx->simple_frame.size);
 	wl_buffer_destroy(ctx->simple_frame.buffer);
-	logger("wlr frame destroyed\n");
+	logprint(TRACE, "wlroots: frame destroyed");
 	pthread_mutex_unlock(&ctx->lock);
 
 }
@@ -19,7 +19,7 @@ static struct wl_buffer *create_shm_buffer(struct screencast_context *ctx,
 	const char shm_name[] = "/wlroots-screencopy";
 	int fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
 	if (fd < 0) {
-		fprintf(stderr, "shm_open failed\n");
+		logprint(ERROR, "wlroots: shm_open failed");
 		return NULL;
 	}
 	shm_unlink(shm_name);
@@ -30,13 +30,13 @@ static struct wl_buffer *create_shm_buffer(struct screencast_context *ctx,
 	}
 	if (ret < 0) {
 		close(fd);
-		fprintf(stderr, "ftruncate failed\n");
+		logprint(ERROR, "wlroots: ftruncate failed");
 		return NULL;
 	}
 
 	void *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (data == MAP_FAILED) {
-		fprintf(stderr, "mmap failed: %m\n");
+		logprint(ERROR, "wlroots: mmap failed: %m");
 		close(fd);
 		return NULL;
 	}
@@ -58,7 +58,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	pthread_mutex_lock(&ctx->lock);
 
-	logger("wlr buffer event handler\n");
+	logprint(TRACE, "wlroots: buffer event handler");
 	ctx->wlr_frame = frame;
 	ctx->simple_frame.width = width;
 	ctx->simple_frame.height = height;
@@ -68,7 +68,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	ctx->simple_frame.buffer = create_shm_buffer(ctx, format, width, height,
 																							 stride, &ctx->simple_frame.data);
 	if (ctx->simple_frame.buffer == NULL) {
-		fprintf(stderr, "failed to create buffer\n");
+		logprint(ERROR, "wlroots: failed to create buffer");
 		exit(EXIT_FAILURE);
 	}
 
@@ -83,7 +83,7 @@ static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	pthread_mutex_lock(&ctx->lock);
 
-	logger("wlr flags event handler\n");
+	logprint(TRACE, "wlroots: flags event handler");
 	ctx->simple_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 
 	pthread_mutex_unlock(&ctx->lock);
@@ -96,7 +96,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	pthread_mutex_lock(&ctx->lock);
 
-	logger("wlr ready event handler\n");
+	logprint(TRACE, "wlroots: ready event handler");
 
 	ctx->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	ctx->simple_frame.tv_nsec = tv_nsec;
@@ -112,7 +112,7 @@ static void wlr_frame_failed(void *data,
 														 struct zwlr_screencopy_frame_v1 *frame) {
 	struct screencast_context *ctx = data;
 
-	logger("wlr failed event handler\n");
+	logprint(TRACE, "wlroots: failed event handler");
 
 	wlr_frame_free(ctx);
 	ctx->err = true;
@@ -143,7 +143,7 @@ void wlr_register_cb(struct screencast_context *ctx) {
 
 	zwlr_screencopy_frame_v1_add_listener(ctx->frame_callback,
 																				&wlr_frame_listener, ctx);
-	logger("wlr callbacks registered\n");
+	logprint(TRACE, "wlroots: callbacks registered");
 }
 
 static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
@@ -296,7 +296,7 @@ int wlr_screencopy_init(struct screencast_context *ctx) {
 	// connect to wayland display WAYLAND_DISPLAY or 'wayland-0' if not set
 	ctx->display = wl_display_connect(NULL);
 	if (!ctx->display) {
-		printf("Failed to connect to display!\n");
+		logprint(ERROR, "Failed to connect to display!");
 		return -1;
 	}
 
@@ -317,13 +317,13 @@ int wlr_screencopy_init(struct screencast_context *ctx) {
 
 	// make sure our wlroots supports screencopy protocol
 	if (!ctx->shm) {
-		printf("Compositor doesn't support %s!\n", "wl_shm");
+		logprint(ERROR, "Compositor doesn't support %s!", "wl_shm");
 		return -1;
 	}
 
 	// make sure our wlroots supports screencopy protocol
 	if (!ctx->screencopy_manager) {
-		printf("Compositor doesn't support %s!\n",
+		logprint(ERROR, "Compositor doesn't support %s!",
 					 zwlr_screencopy_manager_v1_interface.name);
 		return -1;
 	}
