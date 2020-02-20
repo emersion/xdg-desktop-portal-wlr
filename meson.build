@@ -36,6 +36,7 @@ executable(
 	'xdg-desktop-portal-wlr',
 	files([
 		'src/core/main.c',
+		'src/core/logger.c',
 		'src/core/request.c',
 		'src/core/session.c',
 		'src/screenshot/screenshot.c',

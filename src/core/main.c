@@ -10,10 +10,12 @@ int xdpw_usage(FILE* stream, int rc)
 	static const char* usage =
 "Usage: xdg-desktop-portal-wlr [options]\n"
 "\n"
-"    -o, --output=<name>                       Select output to capture.\n"
-"    -p,--pixelformat=BGRx|RGBx                Force a pixelformat in pipewire\n"
-"                                              metadata (performs no conversion).\n"
-"    -h,--help                                 Get help (this text).\n"
+"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
+"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
+"    -o, --output=<name>              Select output to capture.\n"
+"    -p,--pixelformat=BGRx|RGBx       Force a pixelformat in pipewire\n"
+"                                     metadata (performs no conversion).\n"
+"    -h,--help                        Get help (this text).\n"
 "\n";
 
 	fprintf(stream, "%s", usage);
@@ -25,9 +27,11 @@ int main(int argc, char *argv[]) {
 
 	const char* output_name = NULL;
 	const char* forced_pixelformat = NULL;
+	enum LOGLEVEL loglevel = ERROR;
 
-	static const char* shortopts = "o:p:h";
+	static const char* shortopts = "l:o:p:h";
 	static const struct option longopts[] = {
+		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
 		{ "pixelformat", required_argument, NULL, 'p' },
 		{ "help", no_argument, NULL, 'h' },
@@ -40,6 +44,9 @@ int main(int argc, char *argv[]) {
 			break;
 
 		switch (c) {
+		case 'l':
+			loglevel = get_loglevel(optarg);
+			break;
 		case 'o':
 			output_name = optarg;
 			break;
@@ -53,12 +60,14 @@ int main(int argc, char *argv[]) {
 		}
 	}
 
+	init_logger(stderr, loglevel);
+
 	int ret = 0;
 
 	sd_bus *bus = NULL;
 	ret = sd_bus_open_user(&bus);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to connect to user bus: %s\n", strerror(-ret));
+		logprint(ERROR, "dbus: failed to connect to user bus: %s", strerror(-ret));
 		goto error;
 	}
 
@@ -67,14 +76,15 @@ int main(int argc, char *argv[]) {
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {
-		fprintf(stderr, "Failed to acquire service name: %s\n", strerror(-ret));
+		logprint(ERROR, "dbus: failed to acquire service name: %s", strerror(-ret));
 		goto error;
 	}
 
 	while (1) {
 		ret = sd_bus_process(bus, NULL);
 		if (ret < 0) {
-			fprintf(stderr, "sd_bus_process failed: %s\n", strerror(-ret));
+			logprint(ERROR, "dbus: sd_bus_process failed: %s", strerror(-ret));
+			goto error;
 		} else if (ret > 0) {
 			// We processed a request, try to process another one, right-away
 			continue;
@@ -82,7 +92,7 @@ int main(int argc, char *argv[]) {
 
 		ret = sd_bus_wait(bus, (uint64_t)-1);
 		if (ret < 0) {
-			fprintf(stderr, "sd_bus_wait failed: %s\n", strerror(-ret));
+			logprint(ERROR, "dbus: sd_bus_wait failed: %s", strerror(-ret));
 			goto error;
 		}
 	}

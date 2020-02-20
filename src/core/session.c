@@ -12,7 +12,7 @@ static int method_close(sd_bus_message *msg, void *data,
 	int ret = 0;
 	// struct xdpw_session *session = data;
 	// TODO
-	printf("Session.Close\n");
+	logprint(INFO, "dbus: session closed");
 
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
@@ -42,7 +42,7 @@ struct xdpw_session *session_create(sd_bus *bus, const char *object_path) {
 	if (sd_bus_add_object_vtable(bus, &req->slot, object_path, interface_name,
 			session_vtable, NULL) < 0) {
 		free(req);
-		fprintf(stderr, "sd_bus_add_object_vtable failed: %s\n",
+		logprint(ERROR, "dbus: sd_bus_add_object_vtable failed: %s",
 			strerror(-errno));
 		return NULL;
 	}
