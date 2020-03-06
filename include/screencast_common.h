@@ -1,7 +1,6 @@
 #ifndef SCREENCAST_COMMON_H
 #define SCREENCAST_COMMON_H
 
-#include <pthread.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <libdrm/drm_fourcc.h>
@@ -42,7 +41,7 @@ struct screencast_context {
 
 	// pipewire
 	struct pwr_type type;
-	struct pw_main_loop *loop;
+	struct pw_loop *loop;
 	struct spa_source *event;
 	struct pw_core *core;
 	struct pw_type *t;
@@ -54,7 +53,6 @@ struct screencast_context {
 	uint32_t seq;
 	uint32_t node_id;
 	bool stream_state;
-	pthread_t pwr_thread;
 
 	// wlroots
 	struct wl_display *display;
@@ -75,9 +73,6 @@ struct screencast_context {
 	// frame
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 	struct simple_frame simple_frame;
-
-	// frame mutex
-	pthread_mutex_t lock;
 
 	// cli options
 	const char *output_name;

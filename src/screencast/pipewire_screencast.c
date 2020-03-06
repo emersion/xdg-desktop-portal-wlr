@@ -57,7 +57,6 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	d[0].type = ctx->t->data.MemPtr;
 	d[0].maxsize = ctx->simple_frame.size;
-	// d[0].data = ctx->simple_frame.data;
 	d[0].mapoffset = 0;
 	d[0].chunk->size = ctx->simple_frame.size;
 	d[0].chunk->stride = ctx->simple_frame.stride;
@@ -152,7 +151,8 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 		logprint(INFO, "pipewire: remote state changed to \"%s\"",
 						pw_remote_state_as_string(state));
 		logprint(ERROR, "pipewire: remote error: %s", error);
-		pw_main_loop_quit(ctx->loop);
+		pw_loop_leave(ctx->loop);
+		pw_loop_destroy(ctx->loop);
 		break;
 
 	case PW_REMOTE_STATE_CONNECTED: {
@@ -210,9 +210,12 @@ void *pwr_start(void *data) {
 
 	pw_init(NULL, NULL);
 
-	/* create a main loop */
-	ctx->loop = pw_main_loop_new(NULL);
-	ctx->core = pw_core_new(pw_main_loop_get_loop(ctx->loop), NULL);
+	/* create a loop */
+	ctx->loop = pw_loop_new(NULL);
+	pw_loop_enter(ctx->loop);
+
+	/* create a core, a remote, and initialize types */
+	ctx->core = pw_core_new(ctx->loop, NULL);
 	ctx->t = pw_core_get_type(ctx->core);
 	ctx->remote = pw_remote_new(ctx->core, NULL, 0);
 
@@ -220,16 +223,22 @@ void *pwr_start(void *data) {
 
 	/* make an event to signal frame ready */
 	ctx->event =
-			pw_loop_add_event(pw_main_loop_get_loop(ctx->loop), pwr_on_event, ctx);
+			pw_loop_add_event(ctx->loop, pwr_on_event, ctx);
 
 	pw_remote_add_listener(ctx->remote, &ctx->remote_listener, &pwr_remote_events,
 												 ctx);
 	pw_remote_connect(ctx->remote);
 
-	/* run the loop, this will trigger the callbacks */
-	pw_main_loop_run(ctx->loop);
-
-	pw_core_destroy(ctx->core);
-	pw_main_loop_destroy(ctx->loop);
 	return NULL;
+}
+
+int pwr_dispatch(struct pw_loop *loop) {
+
+	logprint(TRACE, "pipewire: dispatch");
+	int res;
+  res = pw_loop_iterate(loop, 0);
+  if (res < 0)
+    logprint(ERROR, "pw_loop_iterate failed: %s", spa_strerror(res));
+  return res;
+
 }

@@ -2,7 +2,11 @@
 #define XDPW_H
 
 #include <wayland-client.h>
+#ifdef HAVE_SYSTEMD
 #include <systemd/sd-bus.h>
+#elif HAVE_ELOGIND
+#include <elogind/sd-bus.h>
+#endif
 #include "logger.h"
 
 struct xdpw_request {

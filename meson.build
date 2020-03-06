@@ -28,7 +28,14 @@ pipewire = dependency('libpipewire-0.2')
 spa = dependency('libspa-0.1')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
-systemd = dependency('libsystemd')
+
+logind = dependency('libsystemd', required: false)
+if logind.found()
+	add_project_arguments('-DHAVE_SYSTEMD=1', language: 'c')
+else
+	logind = dependency('libelogind')
+	add_project_arguments('-DHAVE_ELOGIND=1', language: 'c')
+endif
 
 subdir('protocols')
 
@@ -48,7 +55,7 @@ executable(
 	dependencies: [
 		wayland_client,
 		wlr_protos,
-		systemd,
+		logind,
 		pipewire,
 		spa,
 		threads,

@@ -14,5 +14,6 @@
 #define ALIGN 16
 
 void *pwr_start(void *data);
+int pwr_dispatch(struct pw_loop *loop);
 
 #endif

@@ -42,16 +42,12 @@ void *start_screencast(void *data){
 
 	struct screencast_context *ctx = data;
 
-	pthread_mutex_init(&ctx->lock, NULL);
-
 	wlr_register_cb(ctx);
 
-	pthread_create(&ctx->pwr_thread, NULL, pwr_start, ctx);
+	pwr_start((void *) ctx);
 
 	/* Run capture */
 	while (wl_display_dispatch(ctx->display) != -1 && !ctx->err && !ctx->quit);
-
-	pthread_join(ctx->pwr_thread, NULL);
 
 	return NULL;
 
@@ -310,7 +306,6 @@ int init_screencast(sd_bus *bus, const char *output_name, const char *forced_pix
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 
-	//struct screencast_context ctx = (struct screencast_context){0};
 	ctx.forced_pixelformat = forced_pixelformat;
 	ctx.output_name = output_name;
 	ctx.simple_frame = (struct simple_frame){0};
