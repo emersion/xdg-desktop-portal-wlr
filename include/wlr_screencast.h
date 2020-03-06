@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <wayland-client-protocol.h>
 
+#include "pipewire_screencast.h"
 #include "screencast_common.h"
 
 #define SC_MANAGER_VERSION 2

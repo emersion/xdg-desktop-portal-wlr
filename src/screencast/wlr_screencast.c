@@ -6,7 +6,6 @@ void wlr_frame_free(struct screencast_context *ctx) {
 	munmap(ctx->simple_frame.data, ctx->simple_frame.size);
 	wl_buffer_destroy(ctx->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame destroyed");
-	pthread_mutex_unlock(&ctx->lock);
 
 }
 
@@ -56,8 +55,6 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 														 uint32_t stride) {
 	struct screencast_context *ctx = data;
 
-	pthread_mutex_lock(&ctx->lock);
-
 	logprint(TRACE, "wlroots: buffer event handler");
 	ctx->wlr_frame = frame;
 	ctx->simple_frame.width = width;
@@ -72,21 +69,16 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		exit(EXIT_FAILURE);
 	}
 
-	// zwlr_screencopy_frame_v1_copy(frame, ctx->simple_frame.buffer);
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, ctx->simple_frame.buffer);
-	pthread_mutex_unlock(&ctx->lock);
 }
 
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 														uint32_t flags) {
 	struct screencast_context *ctx = data;
 
-	pthread_mutex_lock(&ctx->lock);
-
 	logprint(TRACE, "wlroots: flags event handler");
 	ctx->simple_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 
-	pthread_mutex_unlock(&ctx->lock);
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -94,16 +86,17 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 														uint32_t tv_nsec) {
 	struct screencast_context *ctx = data;
 
-	pthread_mutex_lock(&ctx->lock);
-
 	logprint(TRACE, "wlroots: ready event handler");
 
 	ctx->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	ctx->simple_frame.tv_nsec = tv_nsec;
 
 	if (!ctx->quit && !ctx->err) {
-		pw_loop_signal_event(pw_main_loop_get_loop(ctx->loop), ctx->event);
-		// sleep(1);
+		pw_loop_signal_event(ctx->loop, ctx->event);
+
+		if(ctx->loop)
+			if(pwr_dispatch(ctx->loop) < 0) ctx->err = true;
+
 		wlr_register_cb(ctx);
 	}
 }
