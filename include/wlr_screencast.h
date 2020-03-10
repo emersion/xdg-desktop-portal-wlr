@@ -21,8 +21,10 @@
 
 #define SC_MANAGER_VERSION 2
 
-void wlr_frame_free(struct screencast_context *ctx);
-int wlr_screencopy_init(struct screencast_context *ctx);
+struct xdpw_state;
+
+void wlr_frame_free(struct xdpw_state *state);
+int wlr_screencopy_init(struct xdpw_state *state);
 void wlr_screencopy_uninit(struct screencast_context *ctx);
 
 struct wayland_output *wlr_output_find_by_name(struct wl_list *output_list, const char* name);
@@ -30,6 +32,6 @@ struct wayland_output *wlr_output_find(struct screencast_context *ctx,
 																			 struct wl_output *out, uint32_t id);
 struct wayland_output *wlr_output_first(struct wl_list *output_list);
 
-void wlr_register_cb(struct screencast_context *ctx);
+void wlr_register_cb(struct xdpw_state *state);
 
 #endif

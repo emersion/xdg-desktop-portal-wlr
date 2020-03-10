@@ -22,7 +22,6 @@ add_project_arguments(cc.get_supported_arguments([
 
 inc = include_directories('include')
 
-threads = dependency('threads')
 rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.2')
 spa = dependency('libspa-0.1')
@@ -58,7 +57,6 @@ executable(
 		logind,
 		pipewire,
 		spa,
-		threads,
 		rt
 	],
 	include_directories: [inc],

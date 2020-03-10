@@ -1,7 +1,16 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <getopt.h>
+#include <poll.h>
+#include <pipewire/pipewire.h>
 #include "xdpw.h"
+
+enum event_loop_fd {
+	EVENT_LOOP_DBUS,
+	EVENT_LOOP_WAYLAND,
+	EVENT_LOOP_PIPEWIRE,
+};
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
 
@@ -71,8 +80,27 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}
 
-	init_screenshot(bus);
-	init_screencast(bus, output_name, forced_pixelformat);
+	struct wl_display *wl_display = wl_display_connect(NULL);
+	if (!wl_display) {
+		logprint(ERROR, "wayland: failed to connect to display");
+		goto error;
+	}
+
+	pw_init(NULL, NULL);
+	struct pw_loop *pw_loop = pw_loop_new(NULL);
+	if (!pw_loop) {
+		logprint(ERROR, "pipewire: failed to create loop");
+		goto error;
+	}
+
+	struct xdpw_state state = {
+		.bus = bus,
+		.wl_display = wl_display,
+		.pw_loop = pw_loop,
+	};
+
+	init_screenshot(&state);
+	init_screencast(&state, output_name, forced_pixelformat);
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {
@@ -80,21 +108,63 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}
 
+	struct pollfd pollfds[] = {
+		[EVENT_LOOP_DBUS] = {
+			.fd = sd_bus_get_fd(state.bus),
+			.events = POLLIN,
+		},
+		[EVENT_LOOP_WAYLAND] = {
+			.fd = wl_display_get_fd(state.wl_display),
+			.events = POLLIN,
+		},
+		[EVENT_LOOP_PIPEWIRE] = {
+			.fd = pw_loop_get_fd(state.pw_loop),
+			.events = POLLIN,
+		},
+	};
+
 	while (1) {
-		ret = sd_bus_process(bus, NULL);
+		ret = poll(pollfds, sizeof(pollfds) / sizeof(pollfds[0]), -1);
 		if (ret < 0) {
-			logprint(ERROR, "dbus: sd_bus_process failed: %s", strerror(-ret));
+			logprint(ERROR, "poll failed: %s", strerror(errno));
 			goto error;
-		} else if (ret > 0) {
-			// We processed a request, try to process another one, right-away
-			continue;
 		}
 
-		ret = sd_bus_wait(bus, (uint64_t)-1);
-		if (ret < 0) {
-			logprint(ERROR, "dbus: sd_bus_wait failed: %s", strerror(-ret));
-			goto error;
+		if (pollfds[EVENT_LOOP_DBUS].revents & POLLIN) {
+			logprint(TRACE, "event-loop: got dbus event");
+			do {
+				ret = sd_bus_process(state.bus, NULL);
+			} while (ret > 0);
+			if (ret < 0) {
+				logprint(ERROR, "sd_bus_process failed: %s", strerror(-ret));
+				goto error;
+			}
 		}
+
+		if (pollfds[EVENT_LOOP_WAYLAND].revents & POLLIN) {
+			logprint(TRACE, "event-loop: got wayland event");
+			ret = wl_display_dispatch(state.wl_display);
+			if (ret < 0) {
+				logprint(ERROR, "wl_display_dispatch failed: %s", strerror(errno));
+				goto error;
+			}
+		}
+
+		if (pollfds[EVENT_LOOP_PIPEWIRE].revents & POLLIN) {
+			logprint(TRACE, "event-loop: got pipewire event");
+			ret = pw_loop_iterate(state.pw_loop, 0);
+			if (ret < 0) {
+				logprint(ERROR, "pw_loop_iterate failed: %s", spa_strerror(ret));
+				goto error;
+			}
+		}
+
+		do {
+			ret = wl_display_dispatch_pending(state.wl_display);
+			wl_display_flush(state.wl_display);
+		} while (ret > 0);
+
+		sd_bus_flush(state.bus);
 	}
 
 	// TODO: cleanup
@@ -103,5 +173,7 @@ int main(int argc, char *argv[]) {
 
 error:
 	sd_bus_unref(bus);
+	pw_loop_leave(state.pw_loop);
+	pw_loop_destroy(state.pw_loop);
 	return EXIT_FAILURE;
 }

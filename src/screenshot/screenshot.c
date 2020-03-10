@@ -90,9 +90,9 @@ static const sd_bus_vtable screenshot_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int init_screenshot(sd_bus *bus) {
+int init_screenshot(struct xdpw_state *state) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
-	return sd_bus_add_object_vtable(bus, &slot, object_path, interface_name,
+	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
 		screenshot_vtable, NULL);
 }

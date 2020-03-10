@@ -9,11 +9,11 @@
 #include <spa/support/type-map.h>
 #include "wlr_screencast.h"
 #include "screencast_common.h"
+#include "xdpw.h"
 
 #define BUFFERS 1
 #define ALIGN 16
 
-void *pwr_start(void *data);
-int pwr_dispatch(struct pw_loop *loop);
+void *pwr_start(struct xdpw_state *state);
 
 #endif

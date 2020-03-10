@@ -1,11 +1,11 @@
 #include "screencast.h"
 
-static struct screencast_context ctx;
-
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
-int setup_outputs(struct screencast_context *ctx) {
+int setup_outputs(struct xdpw_state *state) {
+
+	struct screencast_context *ctx = &state->screencast;
 
 	struct wayland_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -32,22 +32,26 @@ int setup_outputs(struct screencast_context *ctx) {
 	ctx->framerate = out->framerate;
 	ctx->with_cursor = true;
 
-	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(ctx->display));
-	
+	logprint(INFO, "wlroots: output: %s", ctx->target_output->name);
+	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(state->wl_display));
+
 	return 0;
 
 }
 
 void *start_screencast(void *data){
 
-	struct screencast_context *ctx = data;
+	struct xdpw_state *state = data;
 
-	wlr_register_cb(ctx);
+	wlr_register_cb(state);
+	
+	// process at least one frame so that we know
+	// some of the metadata required for the pipewire
+	// remote state connected event
+	wl_display_dispatch(state->wl_display);
+	wl_display_roundtrip(state->wl_display);
 
-	pwr_start((void *) ctx);
-
-	/* Run capture */
-	while (wl_display_dispatch(ctx->display) != -1 && !ctx->err && !ctx->quit);
+	pwr_start(state);
 
 	return NULL;
 
@@ -140,13 +144,13 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 
 static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
 
-	struct screencast_context *ctx = data;
+	struct xdpw_state *state = data;
 
 	int ret = 0;
 
 	logprint(INFO, "dbus: select sources method invoked");
 
-	setup_outputs(ctx);
+	setup_outputs(state);
 
 	char *request_handle, *session_handle, *app_id;
 	ret = sd_bus_message_read(msg, "oos", &request_handle, &session_handle, &app_id);
@@ -161,7 +165,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_
 	logprint(INFO, "dbus: request_handle: %s", request_handle);
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
-	
+
 	char* key;
 	int innerRet = 0;
 	while((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
@@ -217,14 +221,14 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data, sd_
 
 static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
 
-	struct screencast_context *ctx = data;
+	struct xdpw_state *state = data;
+	struct screencast_context *ctx = &state->screencast;
 
 	int ret = 0;
-	
+
 	logprint(INFO, "dbus: start method invoked");
 
-	pthread_t screencast_thread;
-	pthread_create(&screencast_thread, NULL, start_screencast, ctx);
+	start_screencast(state);
 
 	char *request_handle, *session_handle, *app_id, *parent_window;
 	ret = sd_bus_message_read(msg, "ooss", &request_handle, &session_handle, &app_id, &parent_window);
@@ -240,7 +244,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
 	logprint(INFO, "dbus: parent_window: %s", parent_window);
-	
+
 	char* key;
 	int innerRet = 0;
 	while((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
@@ -271,7 +275,13 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 		return ret;
 	}
 
-	while(ctx->node_id == 0);
+	while(ctx->node_id == 0){
+		int ret = pw_loop_iterate(state->pw_loop, 0);
+		if (ret < 0) {
+			logprint(ERROR, "pipewire_loop_iterate failed: %s",
+				   spa_strerror(ret));
+		}
+	}
 
 	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
 															"streams", "a(ua{sv})", 1,
@@ -288,9 +298,6 @@ static int method_screencast_start(sd_bus_message *msg, void *data, sd_bus_error
 	}
 	sd_bus_message_unref(reply);
 
-	while (wl_display_dispatch(ctx->display) != -1 && !ctx->err && !ctx->quit);
-	pthread_join(screencast_thread, NULL);
-
 	return 0;
 }
 
@@ -302,25 +309,26 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int init_screencast(sd_bus *bus, const char *output_name, const char *forced_pixelformat) {
+int init_screencast(struct xdpw_state *state, const char *output_name, const char *forced_pixelformat) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 
-	ctx.forced_pixelformat = forced_pixelformat;
-	ctx.output_name = output_name;
-	ctx.simple_frame = (struct simple_frame){0};
-	ctx.simple_frame.damage = &(struct damage){0};
+	state->screencast = (struct screencast_context) { 0 };
+	state->screencast.forced_pixelformat = forced_pixelformat;
+	state->screencast.output_name = output_name;
+	state->screencast.simple_frame = (struct simple_frame){0};
+	state->screencast.simple_frame.damage = &(struct damage){0};
 
 	int err;
-	err = wlr_screencopy_init(&ctx);
+	err = wlr_screencopy_init(state);
 	if (err) {
 		goto end;
 	}
 
-	return sd_bus_add_object_vtable(bus, &slot, object_path, interface_name,
-		screencast_vtable, &ctx);
+	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
+		screencast_vtable, state);
 
 	end:
-		wlr_screencopy_uninit(&ctx);
+		wlr_screencopy_uninit(&state->screencast);
 		return err;
 }

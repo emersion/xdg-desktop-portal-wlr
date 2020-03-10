@@ -8,6 +8,15 @@
 #include <elogind/sd-bus.h>
 #endif
 #include "logger.h"
+#include "screencast.h"
+
+struct xdpw_state {
+	sd_bus *bus;
+	struct wl_display *wl_display;
+	struct pw_loop *pw_loop;
+
+	struct screencast_context screencast;
+};
 
 struct xdpw_request {
 	sd_bus_slot *slot;
@@ -23,8 +32,9 @@ enum {
 	PORTAL_RESPONSE_ENDED = 2
 };
 
-int init_screenshot(sd_bus *bus);
-int init_screencast(sd_bus *bus, const char *output_name, const char *forced_pixelformat);
+int init_screenshot(struct xdpw_state *state);
+int init_screencast(struct xdpw_state *state, const char *output_name,
+	const char *forced_pixelformat);
 
 struct xdpw_request *request_create(sd_bus *bus, const char *object_path);
 void request_destroy(struct xdpw_request *req);
