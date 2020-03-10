@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
-#include <pthread.h>
 
 #include "pipewire_screencast.h"
 #include "screencast_common.h"

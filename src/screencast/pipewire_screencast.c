@@ -25,16 +25,12 @@ static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
 }
 
 static void pwr_on_event(void *data, uint64_t expirations) {
-	struct screencast_context *ctx = data;
+	struct xdpw_state *state = data;
+	struct screencast_context *ctx = &state->screencast;
 	struct pw_buffer *pw_buf;
 	struct spa_buffer *spa_buf;
 	struct spa_meta_header *h;
 	struct spa_data *d;
-
-	if (!ctx->stream_state) {
-		wlr_frame_free(ctx);
-		return;
-	}
 
 	logprint(TRACE, "********************");
 	logprint(TRACE, "pipewire: event fired");
@@ -46,8 +42,10 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	spa_buf = pw_buf->buffer;
 	d = spa_buf->datas;
-	if ((d[0].data) == NULL)
+	if ((d[0].data) == NULL) {
+		logprint(TRACE, "pipewire: data pointer undefined");
 		return;
+	}
 	if ((h = spa_buffer_find_meta(spa_buf, ctx->t->meta.Header))) {
 		h->pts = -1;
 		h->flags = 0;
@@ -77,7 +75,8 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	pw_stream_queue_buffer(ctx->stream, pw_buf);
 
-	wlr_frame_free(ctx);
+	wlr_frame_free(state);
+
 }
 
 static void pwr_handle_stream_state_changed(void *data,
@@ -91,9 +90,6 @@ static void pwr_handle_stream_state_changed(void *data,
 	logprint(INFO, "pipewire: node id is %d", ctx->node_id);
 
 	switch (state) {
-	case PW_STREAM_STATE_PAUSED:
-		ctx->stream_state = false;
-		break;
 	case PW_STREAM_STATE_STREAMING:
 		ctx->stream_state = true;
 		break;
@@ -141,18 +137,20 @@ static const struct pw_stream_events pwr_stream_events = {
 };
 
 static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
-																		 enum pw_remote_state state,
+																		 enum pw_remote_state pwr_remote_state,
 																		 const char *error) {
-	struct screencast_context *ctx = data;
+	struct xdpw_state *state = data;
+	struct screencast_context *ctx = &state->screencast;
 	struct pw_remote *remote = ctx->remote;
 
-	switch (state) {
+	switch (pwr_remote_state) {
 	case PW_REMOTE_STATE_ERROR:
 		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-						pw_remote_state_as_string(state));
+						pw_remote_state_as_string(pwr_remote_state));
 		logprint(ERROR, "pipewire: remote error: %s", error);
-		pw_loop_leave(ctx->loop);
-		pw_loop_destroy(ctx->loop);
+		pw_loop_leave(state->pw_loop);
+		pw_loop_destroy(state->pw_loop);
+		ctx->err = true;
 		break;
 
 	case PW_REMOTE_STATE_CONNECTED: {
@@ -161,7 +159,7 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 		struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
 		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-						pw_remote_state_as_string(state));
+						pw_remote_state_as_string(pwr_remote_state));
 
 		ctx->stream = pw_stream_new(
 				remote, "wlr_screeencopy",
@@ -194,7 +192,7 @@ static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
 	}
 	default:
 		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-						pw_remote_state_as_string(state));
+						pw_remote_state_as_string(pwr_remote_state));
 		break;
 	}
 }
@@ -204,18 +202,13 @@ static const struct pw_remote_events pwr_remote_events = {
 		.state_changed = pwr_handle_state_changed,
 };
 
-void *pwr_start(void *data) {
+void *pwr_start(struct xdpw_state *state) {
 
-	struct screencast_context *ctx = data;
-
-	pw_init(NULL, NULL);
-
-	/* create a loop */
-	ctx->loop = pw_loop_new(NULL);
-	pw_loop_enter(ctx->loop);
+	struct screencast_context *ctx = &state->screencast;
+	pw_loop_enter(state->pw_loop);
 
 	/* create a core, a remote, and initialize types */
-	ctx->core = pw_core_new(ctx->loop, NULL);
+	ctx->core = pw_core_new(state->pw_loop, NULL);
 	ctx->t = pw_core_get_type(ctx->core);
 	ctx->remote = pw_remote_new(ctx->core, NULL, 0);
 
@@ -223,22 +216,11 @@ void *pwr_start(void *data) {
 
 	/* make an event to signal frame ready */
 	ctx->event =
-			pw_loop_add_event(ctx->loop, pwr_on_event, ctx);
+			pw_loop_add_event(state->pw_loop, pwr_on_event, state);
 
 	pw_remote_add_listener(ctx->remote, &ctx->remote_listener, &pwr_remote_events,
-												 ctx);
+												 state);
 	pw_remote_connect(ctx->remote);
 
 	return NULL;
-}
-
-int pwr_dispatch(struct pw_loop *loop) {
-
-	logprint(TRACE, "pipewire: dispatch");
-	int res;
-  res = pw_loop_iterate(loop, 0);
-  if (res < 0)
-    logprint(ERROR, "pw_loop_iterate failed: %s", spa_strerror(res));
-  return res;
-
 }
