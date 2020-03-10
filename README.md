@@ -1,5 +1,7 @@
 # xdg-desktop-portal-wlr
 
+[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr?)
+
 [xdg-desktop-portal] backend for wlroots
 
 ## Building
