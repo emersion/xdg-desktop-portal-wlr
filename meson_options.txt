@@ -1,0 +1,1 @@
+option('systemd', type: 'feature', value: 'auto', description: 'Install systemd user service unit')

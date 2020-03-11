@@ -1,0 +1,7 @@
+[Unit]
+Description=Portal service (wlroots implementation)
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.impl.portal.desktop.wlr
+ExecStart=@bindir@/xdg-desktop-portal-wlr

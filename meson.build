@@ -3,7 +3,7 @@ project(
 	'c',
 	version: '0.0.0',
 	license: 'MIT',
-	meson_version: '>=0.46.0',
+	meson_version: '>=0.47.0',
 	default_options: [
 		'c_std=c11',
 		'warning_level=2',
@@ -61,6 +61,33 @@ executable(
 	],
 	include_directories: [inc],
 	install: true,
+)
+
+conf_data = configuration_data()
+conf_data.set('bindir',
+	join_paths(get_option('prefix'), get_option('bindir')))
+conf_data.set('systemd_service', '')
+
+systemd = dependency('systemd', required: get_option('systemd'))
+
+if systemd.found()
+	systemd_service_file = 'xdg-desktop-portal-wlr.service'
+	user_unit_dir = systemd.get_pkgconfig_variable('systemduserunitdir')
+	conf_data.set('systemd_service', 'SystemdService=' + systemd_service_file)
+
+	configure_file(
+		configuration: conf_data,
+		input: 'contrib/systemd/' + systemd_service_file + '.in',
+		output: '@BASENAME@',
+		install_dir: user_unit_dir,
+	)
+endif
+
+configure_file(
+	configuration: conf_data,
+	input: 'org.freedesktop.impl.portal.desktop.wlr.service.in',
+	output: '@BASENAME@',
+	install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'),
 )
 
 install_data(
