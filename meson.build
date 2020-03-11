@@ -61,11 +61,12 @@ executable(
 	],
 	include_directories: [inc],
 	install: true,
+	install_dir: get_option('libexecdir'),
 )
 
 conf_data = configuration_data()
-conf_data.set('bindir',
-	join_paths(get_option('prefix'), get_option('bindir')))
+conf_data.set('libexecdir',
+	join_paths(get_option('prefix'), get_option('libexecdir')))
 conf_data.set('systemd_service', '')
 
 systemd = dependency('systemd', required: get_option('systemd'))

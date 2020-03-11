@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=org.freedesktop.impl.portal.desktop.wlr
-Exec=@bindir@/xdg-desktop-portal-wlr
+Exec=@libexecdir@/xdg-desktop-portal-wlr
 @systemd_service@
