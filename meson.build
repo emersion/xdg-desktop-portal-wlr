@@ -11,7 +11,13 @@ project(
 	],
 )
 
-add_project_arguments('-Wno-unused-parameter', language: 'c')
+cc = meson.get_compiler('c')
+
+add_project_arguments(cc.get_supported_arguments([
+	'-Wno-missing-braces',
+	'-Wno-missing-field-initializers',
+	'-Wno-unused-parameter',
+]), language: 'c')
 
 xdpw_inc = include_directories('include')
 
