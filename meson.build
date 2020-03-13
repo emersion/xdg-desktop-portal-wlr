@@ -14,6 +14,7 @@ project(
 cc = meson.get_compiler('c')
 
 add_project_arguments(cc.get_supported_arguments([
+	'-Wno-type-limits',
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',
@@ -22,8 +23,7 @@ add_project_arguments(cc.get_supported_arguments([
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
-pipewire = dependency('libpipewire-0.2')
-spa = dependency('libspa-0.1')
+pipewire = dependency('libpipewire-0.3', version: '>= 0.2.9')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 
@@ -55,7 +55,6 @@ executable(
 		wlr_protos,
 		logind,
 		pipewire,
-		spa,
 		rt
 	],
 	include_directories: [inc],

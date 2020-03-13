@@ -5,7 +5,7 @@ packages:
   - meson
   - wayland
   - wayland-protocols
-  - libpipewire02
+  - pipewire
   - libdrm
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
