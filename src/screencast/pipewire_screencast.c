@@ -1,13 +1,5 @@
 #include "pipewire_screencast.h"
 
-static void init_type(struct pwr_type *type, struct pw_type *map) {
-	pw_type_get(map, SPA_TYPE__MediaType, &type->media_type);
-	pw_type_get(map, SPA_TYPE__MediaSubtype, &type->media_subtype);
-	pw_type_get(map, SPA_TYPE_FORMAT__Video, &type->format_video);
-	pw_type_get(map, SPA_TYPE__VideoFormat, &type->video_format);
-	pw_type_get(map, SPA_TYPE_META__Cursor, &type->meta_cursor);
-};
-
 static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
 		uint32_t height, uint32_t stride, bool inverted) {
 	if (!inverted) {
@@ -46,14 +38,14 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 		logprint(TRACE, "pipewire: data pointer undefined");
 		return;
 	}
-	if ((h = spa_buffer_find_meta(spa_buf, ctx->t->meta.Header))) {
+	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
 		h->pts = -1;
 		h->flags = 0;
 		h->seq = ctx->seq++;
 		h->dts_offset = 0;
 	}
 
-	d[0].type = ctx->t->data.MemPtr;
+	d[0].type = SPA_DATA_MemPtr;
 	d[0].maxsize = ctx->simple_frame.size;
 	d[0].mapoffset = 0;
 	d[0].chunk->size = ctx->simple_frame.size;
@@ -80,7 +72,8 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
-	struct screencast_context *ctx = data;
+	struct xdpw_state *xdpw_state = data;
+	struct screencast_context *ctx = &xdpw_state->screencast;
 	ctx->node_id = pw_stream_get_node_id(ctx->stream);
 
 	logprint(INFO, "pipewire: stream state changed to \"%s\"",
@@ -97,129 +90,104 @@ static void pwr_handle_stream_state_changed(void *data,
 	}
 }
 
-static void pwr_handle_stream_format_changed(void *data,
-		const struct spa_pod *format) {
-	struct screencast_context *ctx = data;
+static void pwr_handle_stream_param_changed(void *data, uint32_t id,
+		const struct spa_pod *param) {
+	struct xdpw_state *xdpw_state = data;
+	struct screencast_context *ctx = &xdpw_state->screencast;
 	struct pw_stream *stream = ctx->stream;
-	struct pw_type *t = ctx->t;
 	uint8_t params_buffer[1024];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[2];
 
-	if (format == NULL) {
-		pw_stream_finish_format(stream, 0, NULL, 0);
+	if (!param || id != SPA_PARAM_Format) {
 		return;
 	}
 
-	spa_format_video_raw_parse(format, &ctx->pwr_format, &ctx->type.format_video);
+	spa_format_video_raw_parse(param, &ctx->pwr_format);
 
-	params[0] = spa_pod_builder_object(
-		&b, t->param.idBuffers, t->param_buffers.Buffers, ":",
-		t->param_buffers.size, "i", ctx->simple_frame.size, ":",
-		t->param_buffers.stride, "i", ctx->simple_frame.stride, ":",
-		t->param_buffers.buffers, "iru", BUFFERS, SPA_POD_PROP_MIN_MAX(1, 32),
-		":", t->param_buffers.align, "i", ALIGN);
+	params[0] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
+		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(BUFFERS, 1, 32),
+		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
+		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(ctx->simple_frame.size),
+		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(ctx->simple_frame.stride),
+		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(ALIGN));
 
-	params[1] = spa_pod_builder_object(&b,
-		t->param.idMeta, t->param_meta.Meta,
-		":", t->param_meta.type, "I",
-		t->meta.Header, ":", t->param_meta.size,
-		"i", sizeof(struct spa_meta_header));
+	params[1] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
+		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	pw_stream_finish_format(stream, 0, params, 2);
+	pw_stream_update_params(stream, params, 2);
 }
 
 static const struct pw_stream_events pwr_stream_events = {
 	PW_VERSION_STREAM_EVENTS,
 	.state_changed = pwr_handle_stream_state_changed,
-	.format_changed = pwr_handle_stream_format_changed,
-};
-
-static void pwr_handle_state_changed(void *data, enum pw_remote_state old,
-		enum pw_remote_state pwr_remote_state, const char *error) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
-	struct pw_remote *remote = ctx->remote;
-
-	switch (pwr_remote_state) {
-	case PW_REMOTE_STATE_ERROR:
-		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-			pw_remote_state_as_string(pwr_remote_state));
-		logprint(ERROR, "pipewire: remote error: %s", error);
-		pw_loop_leave(state->pw_loop);
-		pw_loop_destroy(state->pw_loop);
-		ctx->err = true;
-		break;
-
-	case PW_REMOTE_STATE_CONNECTED: {
-		const struct spa_pod *params[1];
-		uint8_t buffer[1024];
-		struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-
-		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-			pw_remote_state_as_string(pwr_remote_state));
-
-		ctx->stream = pw_stream_new(
-			remote, "wlr_screeencopy",
-			pw_properties_new("media.class",
-				"Video/Source", PW_NODE_PROP_MEDIA,
-				"Video", PW_NODE_PROP_CATEGORY, "Source",
-				PW_NODE_PROP_ROLE, "Screen", NULL));
-
-		params[0] = spa_pod_builder_object(
-			&b, ctx->t->param.idEnumFormat, ctx->t->spa_format, "I",
-			ctx->type.media_type.video, "I", ctx->type.media_subtype.raw, ":",
-			ctx->type.format_video.format, "I", pipewire_from_wl_shm(ctx), ":",
-			ctx->type.format_video.size, "Rru",
-			&SPA_RECTANGLE(ctx->simple_frame.width, ctx->simple_frame.height),
-			SPA_POD_PROP_MIN_MAX(&SPA_RECTANGLE(1, 1), &SPA_RECTANGLE(4096, 4096)),
-			":", ctx->type.format_video.framerate, "F",
-			// specify variable framerate
-			&SPA_FRACTION(0, 1),
-			":", ctx->type.format_video.max_framerate, "F",
-			// with a maximum at the wlroots specified hardware framerate
-			&SPA_FRACTION(ctx->framerate, 1));
-
-		pw_stream_add_listener(ctx->stream, &ctx->stream_listener,
-			&pwr_stream_events, ctx);
-
-		pw_stream_connect(ctx->stream, PW_DIRECTION_OUTPUT, NULL,
-			PW_STREAM_FLAG_DRIVER | PW_STREAM_FLAG_MAP_BUFFERS, params, 1);
-
-		break;
-	}
-	default:
-		logprint(INFO, "pipewire: remote state changed to \"%s\"",
-			pw_remote_state_as_string(pwr_remote_state));
-		break;
-	}
-}
-
-static const struct pw_remote_events pwr_remote_events = {
-	PW_VERSION_REMOTE_EVENTS,
-	.state_changed = pwr_handle_state_changed,
+	.param_changed = pwr_handle_stream_param_changed,
 };
 
 void *pwr_start(struct xdpw_state *state) {
-
 	struct screencast_context *ctx = &state->screencast;
 	pw_loop_enter(state->pw_loop);
 
-	/* create a core, a remote, and initialize types */
-	ctx->core = pw_core_new(state->pw_loop, NULL);
-	ctx->t = pw_core_get_type(ctx->core);
-	ctx->remote = pw_remote_new(ctx->core, NULL, 0);
+	const struct spa_pod *params[1];
+	uint8_t buffer[1024];
+	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
-	init_type(&ctx->type, ctx->t);
+	ctx->pwr_context = pw_context_new(state->pw_loop, NULL, 0);
+	if (!ctx->pwr_context) {
+		logprint(ERROR, "pipewire: failed to create context");
+		abort();
+	}
+
+	ctx->core = pw_context_connect(ctx->pwr_context, NULL, 0);
+	if (!ctx->core) {
+		logprint(ERROR, "pipewire: couldn't connect to context");
+		abort();
+	}
+
+	ctx->stream = pw_stream_new(ctx->core, "xdg-desktop-portal-wlr",
+		pw_properties_new(
+			PW_KEY_MEDIA_CLASS, "Video/Source",
+			NULL));
+
+	if (!ctx->stream) {
+		logprint(ERROR, "pipewire: failed to create stream");
+		abort();
+	}
+	ctx->stream_state = false;
 
 	/* make an event to signal frame ready */
 	ctx->event =
 		pw_loop_add_event(state->pw_loop, pwr_on_event, state);
 
-	pw_remote_add_listener(ctx->remote, &ctx->remote_listener, &pwr_remote_events,
-		state);
-	pw_remote_connect(ctx->remote);
+	params[0] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
+		SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
+		SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
+		SPA_FORMAT_VIDEO_format,    SPA_POD_Id(pipewire_from_wl_shm(ctx)),
+		SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
+			&SPA_RECTANGLE(ctx->simple_frame.width, ctx->simple_frame.height),
+			&SPA_RECTANGLE(1, 1),
+			&SPA_RECTANGLE(4096, 4096)),
+		// variable framerate
+		SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION(0, 1)),
+		SPA_FORMAT_VIDEO_maxFramerate, SPA_POD_CHOICE_RANGE_Fraction(
+			&SPA_FRACTION(ctx->framerate, 1),
+			&SPA_FRACTION(1, 1),
+			&SPA_FRACTION(ctx->framerate, 1)));
+
+	 pw_stream_add_listener (ctx->stream, &ctx->stream_listener,
+	 	&pwr_stream_events, state);
+
+	pw_stream_connect(ctx->stream,
+		PW_DIRECTION_OUTPUT,
+		PW_ID_ANY,
+		(PW_STREAM_FLAG_DRIVER |
+			PW_STREAM_FLAG_MAP_BUFFERS),
+		params, 1);
 
 	return NULL;
 }

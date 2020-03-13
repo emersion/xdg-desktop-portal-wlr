@@ -2,6 +2,7 @@
 #define SCREENCAST_COMMON_H
 
 #include <string.h>
+#include <sys/types.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <libdrm/drm_fourcc.h>
@@ -29,23 +30,11 @@ struct simple_frame {
 	void *data;
 };
 
-struct pwr_type {
-	struct spa_type_media_type media_type;
-	struct spa_type_media_subtype media_subtype;
-	struct spa_type_format_video format_video;
-	struct spa_type_video_format video_format;
-	uint32_t meta_cursor;
-};
-
 struct screencast_context {
 	// pipewire
-	struct pwr_type type;
-	struct pw_loop *loop;
-	struct spa_source *event;
+	struct pw_context *pwr_context;
 	struct pw_core *core;
-	struct pw_type *t;
-	struct pw_remote *remote;
-	struct spa_hook remote_listener;
+	struct spa_source *event;
 	struct pw_stream *stream;
 	struct spa_hook stream_listener;
 	struct spa_video_info_raw pwr_format;

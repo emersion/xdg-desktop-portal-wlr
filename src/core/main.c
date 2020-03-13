@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <poll.h>
+#include <sys/types.h>
 #include <pipewire/pipewire.h>
+#include <spa/utils/result.h>
 #include "xdpw.h"
 
 enum event_loop_fd {
