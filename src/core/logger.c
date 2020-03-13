@@ -13,29 +13,31 @@ static const char *loglevels[] = {
 
 static struct logger_properties logprops;
 
-void init_logger(FILE *__restrict__ dst, enum LOGLEVEL level){
+void init_logger(FILE *dst, enum LOGLEVEL level) {
 	logprops.dst = dst;
 	logprops.level = level;
 }
 
-enum LOGLEVEL get_loglevel(const char *level){
+enum LOGLEVEL get_loglevel(const char *level) {
 	int i;
-	for(i = 0; i < NUM_LEVELS; i++){
-		if(!strcmp(level, loglevels[i])) return (enum LOGLEVEL) i;
+	for (i = 0; i < NUM_LEVELS; i++) {
+		if (!strcmp(level, loglevels[i])) {
+			return (enum LOGLEVEL) i;
+		}
 	}
 	fprintf(stderr, "Could not understand log level %s\n", level);
-	exit(EXIT_FAILURE);
+	abort();
 }
 
-void logprint(enum LOGLEVEL level, char *msg, ...){
-	
-	if(!logprops.dst){
+void logprint(enum LOGLEVEL level, char *msg, ...) {
+	if (!logprops.dst) {
 		fprintf(stderr, "Logger has been called, but was not initialized\n");
-		exit(EXIT_FAILURE);
+		abort();
 	}
 
-	if(level > logprops.level || level == QUIET) return ;
-
+	if (level > logprops.level || level == QUIET) {
+		return;
+	}
 	va_list args;
 
 	char timestr[200];
@@ -44,15 +46,12 @@ void logprint(enum LOGLEVEL level, char *msg, ...){
 
 	if (strftime(timestr, sizeof(timestr), "%Y/%m/%d %H:%M:%S", tmp) == 0) {
 		fprintf(stderr, "strftime returned 0");
-		exit(EXIT_FAILURE);
+		abort();
 	}
 
 	fprintf(logprops.dst, "%s", timestr);
-
 	fprintf(logprops.dst, " ");
-
 	fprintf(logprops.dst, "[%s]", loglevels[level]);
-
 	fprintf(logprops.dst, " - ");
 
 	va_start(args, msg);
@@ -62,5 +61,4 @@ void logprint(enum LOGLEVEL level, char *msg, ...){
 
 	fprintf(logprops.dst, "\n");
 	fflush(logprops.dst);
-
 }

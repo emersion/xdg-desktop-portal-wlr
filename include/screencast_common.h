@@ -1,6 +1,7 @@
 #ifndef SCREENCAST_COMMON_H
 #define SCREENCAST_COMMON_H
 
+#include <string.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <libdrm/drm_fourcc.h>
@@ -24,7 +25,6 @@ struct simple_frame {
 	uint32_t tv_nsec;
 	enum wl_shm_format format;
 	struct damage *damage;
-
 	struct wl_buffer *buffer;
 	void *data;
 };
@@ -38,7 +38,6 @@ struct pwr_type {
 };
 
 struct screencast_context {
-
 	// pipewire
 	struct pwr_type type;
 	struct pw_loop *loop;
@@ -97,6 +96,5 @@ struct wayland_output {
 };
 
 uint32_t pipewire_from_wl_shm(void *data);
-char *strdup(const char *src);
 
 #endif /* SCREENCAST_COMMON_H */
