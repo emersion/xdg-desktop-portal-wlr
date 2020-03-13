@@ -8,7 +8,6 @@ project(
 		'c_std=c11',
 		'warning_level=2',
 		'werror=true',
-		'debug=true',
 	],
 )
 

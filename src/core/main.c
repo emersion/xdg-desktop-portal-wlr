@@ -14,26 +14,23 @@ enum event_loop_fd {
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
 
-int xdpw_usage(FILE* stream, int rc)
-{
+int xdpw_usage(FILE* stream, int rc) {
 	static const char* usage =
-"Usage: xdg-desktop-portal-wlr [options]\n"
-"\n"
-"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
-"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
-"    -o, --output=<name>              Select output to capture.\n"
-"    -p,--pixelformat=BGRx|RGBx       Force a pixelformat in pipewire\n"
-"                                     metadata (performs no conversion).\n"
-"    -h,--help                        Get help (this text).\n"
-"\n";
+		"Usage: xdg-desktop-portal-wlr [options]\n"
+		"\n"
+		"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
+		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
+		"    -o, --output=<name>              Select output to capture.\n"
+		"    -p,--pixelformat=BGRx|RGBx       Force a pixelformat in pipewire\n"
+		"                                     metadata (performs no conversion).\n"
+		"    -h,--help                        Get help (this text).\n"
+		"\n";
 
 	fprintf(stream, "%s", usage);
-
 	return rc;
 }
 
 int main(int argc, char *argv[]) {
-
 	const char* output_name = NULL;
 	const char* forced_pixelformat = NULL;
 	enum LOGLEVEL loglevel = ERROR;
