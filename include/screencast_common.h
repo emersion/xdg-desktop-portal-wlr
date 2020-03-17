@@ -2,7 +2,6 @@
 #define SCREENCAST_COMMON_H
 
 #include <string.h>
-#include <sys/types.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <libdrm/drm_fourcc.h>
