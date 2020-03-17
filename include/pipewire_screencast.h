@@ -2,7 +2,6 @@
 #define PIPEWIRE_SCREENCAST_H
 
 #include <stdio.h>
-#include <sys/types.h>
 #include <pipewire/pipewire.h>
 #include <spa/utils/result.h>
 #include <spa/param/props.h>

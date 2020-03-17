@@ -14,7 +14,6 @@ project(
 cc = meson.get_compiler('c')
 
 add_project_arguments(cc.get_supported_arguments([
-	'-Wno-type-limits',
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',
