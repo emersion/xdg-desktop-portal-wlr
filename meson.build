@@ -57,7 +57,7 @@ executable(
 		logind,
 		pipewire,
 		rt,
-        drm
+		drm
 	],
 	include_directories: [inc],
 	install: true,
