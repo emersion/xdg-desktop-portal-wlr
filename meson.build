@@ -26,6 +26,7 @@ rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.2.9')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
+drm = dependency('libdrm').partial_dependency(includes: true)
 
 logind = dependency('libsystemd', required: false)
 if logind.found()
@@ -55,7 +56,8 @@ executable(
 		wlr_protos,
 		logind,
 		pipewire,
-		rt
+		rt,
+		drm
 	],
 	include_directories: [inc],
 	install: true,
