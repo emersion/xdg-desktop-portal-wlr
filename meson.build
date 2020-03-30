@@ -73,7 +73,8 @@ systemd = dependency('systemd', required: get_option('systemd'))
 
 if systemd.found()
 	systemd_service_file = 'xdg-desktop-portal-wlr.service'
-	user_unit_dir = systemd.get_pkgconfig_variable('systemduserunitdir')
+	user_unit_dir = systemd.get_pkgconfig_variable('systemduserunitdir',
+		define_variable: ['prefix', get_option('prefix')])
 	conf_data.set('systemd_service', 'SystemdService=' + systemd_service_file)
 
 	configure_file(
