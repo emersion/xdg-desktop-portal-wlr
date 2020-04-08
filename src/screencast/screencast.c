@@ -1,61 +1,111 @@
 #include "screencast.h"
 
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/mman.h>
+#include <spa/utils/result.h>
+
+#include "pipewire_screencast.h"
+#include "wlr_screencast.h"
+#include "xdpw.h"
+#include "logger.h"
+
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
-int setup_outputs(struct xdpw_state *state) {
+void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
+		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor){
+	cast->ctx = ctx;
+	cast->target_output = out;
+	cast->framerate = out->framerate;
+	cast->with_cursor = with_cursor;
+	cast->refcount = 1;
+	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
+	wl_list_insert(&ctx->screencast_instances, &cast->link);
+	logprint(INFO, "xdpw: %d active screencast instances",
+		wl_list_length(&ctx->screencast_instances));
+}
 
-	struct screencast_context *ctx = &state->screencast;
+void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast){
+	logprint(TRACE, "xdpw: destroying cast instance");
+	wl_list_remove(&cast->link);
+	xdpw_pwr_stream_destroy(cast);
+	free(cast);
+}
 
-	struct wayland_output *output, *tmp_o;
+int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
+
+	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
 		logprint(INFO, "wlroots: capturable output: %s model: %s: id: %i name: %s",
 			output->make, output->model, output->id, output->name);
 	}
 
-	struct wayland_output *out;
+	struct xdpw_wlr_output *out;
 	if (ctx->output_name) {
-		out = wlr_output_find_by_name(&ctx->output_list, ctx->output_name);
+		out = xdpw_wlr_output_find_by_name(&ctx->output_list, ctx->output_name);
 		if (!out) {
 			logprint(ERROR, "wlroots: no such output");
 			abort();
 		}
 	} else {
-		out = wlr_output_first(&ctx->output_list);
+		out = xdpw_wlr_output_first(&ctx->output_list);
 		if (!out) {
 			logprint(ERROR, "wlroots: no output found");
 			abort();
 		}
 	}
 
-	ctx->target_output = out;
-	ctx->framerate = out->framerate;
-	ctx->with_cursor = true;
+	struct xdpw_screencast_instance *cast, *tmp_c;
+	wl_list_for_each_reverse_safe(cast, tmp_c, &ctx->screencast_instances, link) {
+		logprint(INFO, "xdpw: existing screencast instance: %d %s cursor",
+			cast->target_output->id,
+			cast->with_cursor ? "with" : "without");
 
-	logprint(INFO, "wlroots: output: %s", ctx->target_output->name);
-	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(state->wl_display));
+		if(cast->target_output->id == out->id && cast->with_cursor == with_cursor){
+			sess->screencast_instance = cast;
+			++cast->refcount;
+			logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
+		}
+	}
+
+	if(!sess->screencast_instance){
+		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
+		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
+			out, with_cursor);
+	}
+	logprint(INFO, "wlroots: output: %s",
+		sess->screencast_instance->target_output->name);
 
 	return 0;
 
 }
 
-void *start_screencast(void *data) {
-	struct xdpw_state *state = data;
+static int start_screencast(void *data) {
+	struct xdpw_screencast_instance *cast = data;
 
-	wlr_register_cb(state);
+	xdpw_wlr_register_cb(cast);
+
 	// process at least one frame so that we know
 	// some of the metadata required for the pipewire
 	// remote state connected event
-	wl_display_dispatch(state->wl_display);
-	wl_display_roundtrip(state->wl_display);
+	wl_display_dispatch(cast->ctx->state->wl_display);
+	wl_display_roundtrip(cast->ctx->state->wl_display);
 
-	pwr_start(state);
+	xdpw_pwr_stream_init(cast);
 
-	return NULL;
+	cast->initialized = true;
+	return 0;
 }
 
 static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
+	struct xdpw_state *state = data;
+
 	int ret = 0;
 
 	logprint(INFO, "dbus: create session method invoked");
@@ -106,16 +156,14 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	// TODO: cleanup this
 	struct xdpw_request *req =
-		request_create(sd_bus_message_get_bus(msg), request_handle);
+		xdpw_request_create(sd_bus_message_get_bus(msg), request_handle);
 	if (req == NULL) {
 		return -ENOMEM;
 	}
 
-	// TODO: cleanup this
 	struct xdpw_session *sess =
-		session_create(sd_bus_message_get_bus(msg), session_handle);
+		xdpw_session_create(state, sd_bus_message_get_bus(msg), session_handle);
 	if (sess == NULL) {
 		return -ENOMEM;
 	}
@@ -138,16 +186,17 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 	return 0;
 }
 
-
 static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	struct xdpw_state *state = data;
+	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	int ret = 0;
 
 	logprint(INFO, "dbus: select sources method invoked");
 
-	setup_outputs(state);
+	// default to embedded cursor mode if not specified
+	bool cursor_embedded = true;
 
 	char *request_handle, *session_handle, *app_id;
 	ret = sd_bus_message_read(msg, "oos", &request_handle, &session_handle, &app_id);
@@ -178,7 +227,22 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		} else if (strcmp(key, "types") == 0) {
 			uint32_t mask;
 			sd_bus_message_read(msg, "v", "u", &mask);
+			if(mask & (1<<WINDOW)){
+				logprint(INFO, "dbus: non-monitor cast requested, not replying");
+				return -1;
+			}
 			logprint(INFO, "dbus: option types:%x", mask);
+		} else if (strcmp(key, "cursor_mode") == 0) {
+			uint32_t cursor_mode;
+			sd_bus_message_read(msg, "v", "u", &cursor_mode);
+			if (cursor_mode & (1<<HIDDEN)){
+				cursor_embedded = false;
+			}
+			if (cursor_mode & (1<<METADATA)){
+				logprint(ERROR, "dbus: unsupported cursor mode requested, exiting");
+				abort();
+			}
+			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
 		} else {
 			logprint(WARN, "dbus: unknown option %s", key);
 			sd_bus_message_skip(msg, "v");
@@ -197,6 +261,17 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
+	ret = -1;
+	struct xdpw_session *sess, *tmp_s;
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link){
+		if(strcmp(sess->session_handle, session_handle) == 0){
+				logprint(TRACE, "dbus: select sources: found matching session %s", sess->session_handle);
+				ret = setup_outputs(ctx, sess, cursor_embedded);
+		}
+	}
+	if (ret < 0) {
+		return ret;
+	}
 
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
@@ -219,13 +294,10 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 static int method_screencast_start(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
 
 	int ret = 0;
 
 	logprint(INFO, "dbus: start method invoked");
-
-	start_screencast(state);
 
 	char *request_handle, *session_handle, *app_id, *parent_window;
 	ret = sd_bus_message_read(msg, "ooss", &request_handle, &session_handle, &app_id, &parent_window);
@@ -249,10 +321,8 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		if (innerRet < 0) {
 			return innerRet;
 		}
-
 		logprint(WARN, "dbus: unknown option: %s", key);
 		sd_bus_message_skip(msg, "v");
-
 		innerRet = sd_bus_message_exit_container(msg);
 		if (innerRet < 0) {
 			return innerRet;
@@ -266,24 +336,40 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
+	struct xdpw_screencast_instance *cast;
+	struct xdpw_session *sess, *tmp_s;
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link){
+		if(strcmp(sess->session_handle, session_handle) == 0){
+				logprint(TRACE, "dbus: start: found matching session %s", sess->session_handle);
+				cast = sess->screencast_instance;
+		}
+	}
+	if (!cast) {
+		return -1;
+	}
+
+	if(!cast->initialized){
+		start_screencast(cast);
+	}
+
+	while (cast->node_id == 0) {
+		int ret = pw_loop_iterate(state->pw_loop, 0);
+		if (ret != 0) {
+			logprint(ERROR, "pipewire_loop_iterate failed: %s", spa_strerror(ret));
+		}
+	}
+
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
 
-	while (ctx->node_id == 0) {
-		int ret = pw_loop_iterate(state->pw_loop, 0);
-		if (ret < 0) {
-			logprint(ERROR, "pipewire_loop_iterate failed: %s", spa_strerror(ret));
-		}
-	}
-
 	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
 		"streams", "a(ua{sv})", 1,
-		ctx->node_id, 2,
+		cast->node_id, 2,
 		"position", "(ii)", 0, 0,
-		"size", "(ii)", ctx->simple_frame.width, ctx->simple_frame.height);
+		"size", "(ii)", cast->simple_frame.width, cast->simple_frame.height);
 
 	if (ret < 0) {
 		return ret;
@@ -306,20 +392,26 @@ static const sd_bus_vtable screencast_vtable[] = {
 		method_screencast_select_sources, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("Start", "oossa{sv}", "ua{sv}",
 		method_screencast_start, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_PROPERTY("AvailableSourceTypes", "u", NULL,
+		offsetof(struct xdpw_state, screencast_source_types),
+		SD_BUS_VTABLE_PROPERTY_CONST),
+	SD_BUS_PROPERTY("AvailableCursorModes", "u", NULL,
+		offsetof(struct xdpw_state, screencast_cursor_modes),
+		SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_VTABLE_END
 };
 
-int init_screencast(struct xdpw_state *state, const char *output_name, const char *forced_pixelformat) {
-	// TODO: cleanup
+int xdpw_screencast_init(struct xdpw_state *state, const char *output_name, const char *forced_pixelformat) {
 	sd_bus_slot *slot = NULL;
 
-	state->screencast = (struct screencast_context) { 0 };
+	state->screencast = (struct xdpw_screencast_context) { 0 };
+	state->screencast.state = state;
 	state->screencast.forced_pixelformat = forced_pixelformat;
 	state->screencast.output_name = output_name;
-	state->screencast.simple_frame = (struct simple_frame) { 0 };
-	state->screencast.simple_frame.damage = &(struct damage) { 0 };
 
-	int err = wlr_screencopy_init(state);
+	xdpw_pwr_core_connect(state);
+
+	int err = xdpw_wlr_screencopy_init(state);
 	if (err) {
 		goto end;
 	}
@@ -328,6 +420,6 @@ int init_screencast(struct xdpw_state *state, const char *output_name, const cha
 		screencast_vtable, state);
 
 end:
-	wlr_screencopy_uninit(&state->screencast);
+	xdpw_wlr_screencopy_finish(&state->screencast);
 	return err;
 }

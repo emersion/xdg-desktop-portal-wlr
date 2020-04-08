@@ -6,6 +6,8 @@
 #include <pipewire/pipewire.h>
 #include <spa/utils/result.h>
 #include "xdpw.h"
+#include "screencast_common.h"
+#include "logger.h"
 
 enum event_loop_fd {
 	EVENT_LOOP_DBUS,
@@ -83,6 +85,7 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "wayland: failed to connect to display");
 		goto error;
 	}
+	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(wl_display));
 
 	pw_init(NULL, NULL);
 	struct pw_loop *pw_loop = pw_loop_new(NULL);
@@ -92,13 +95,18 @@ int main(int argc, char *argv[]) {
 	}
 
 	struct xdpw_state state = {
+		.xdpw_sessions = (struct wl_list) { 0 },
 		.bus = bus,
 		.wl_display = wl_display,
 		.pw_loop = pw_loop,
+		.screencast_source_types = MONITOR,
+		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 	};
 
-	init_screenshot(&state);
-	init_screencast(&state, output_name, forced_pixelformat);
+	wl_list_init(&state.xdpw_sessions);
+
+	xdpw_screenshot_init(&state);
+	xdpw_screencast_init(&state, output_name, forced_pixelformat);
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {

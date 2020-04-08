@@ -49,7 +49,7 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 
 	// TODO: cleanup this
 	struct xdpw_request *req =
-		request_create(sd_bus_message_get_bus(msg), handle);
+		xdpw_request_create(sd_bus_message_get_bus(msg), handle);
 	if (req == NULL) {
 		return -ENOMEM;
 	}
@@ -90,7 +90,7 @@ static const sd_bus_vtable screenshot_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int init_screenshot(struct xdpw_state *state) {
+int xdpw_screenshot_init(struct xdpw_state *state) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,

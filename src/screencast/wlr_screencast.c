@@ -1,31 +1,73 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "wlr_screencast.h"
-#include "xdpw.h"
 
-void wlr_frame_free(struct xdpw_state *state) {
-	zwlr_screencopy_frame_v1_destroy(state->screencast.wlr_frame);
-	munmap(state->screencast.simple_frame.data, state->screencast.simple_frame.size);
-	wl_buffer_destroy(state->screencast.simple_frame.buffer);
+#include "wlr-screencopy-unstable-v1-client-protocol.h"
+#include "xdg-output-unstable-v1-client-protocol.h"
+#include <fcntl.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <wayland-client-protocol.h>
+
+#include "screencast.h"
+#include "screencast_common.h"
+#include "pipewire_screencast.h"
+#include "xdpw.h"
+#include "logger.h"
+
+void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
+	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
+	munmap(cast->simple_frame.data, cast->simple_frame.size);
+	// TODO: reuse this buffer unless we quit or error out
+	wl_buffer_destroy(cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame destroyed");
 
-	if (!state->screencast.quit && !state->screencast.err) {
-		wlr_register_cb(state);
+	if (cast->quit || cast->err) {
+		xdpw_screencast_instance_destroy(cast);
+		return ;
 	}
+
+	xdpw_wlr_register_cb(cast);
+
 }
 
-static struct wl_buffer *create_shm_buffer(struct screencast_context *ctx,
+static int anonymous_shm_open(void) {
+	char name[] = "/xdpw-shm-XXXXXX";
+	int retries = 100;
+
+	do {
+		randname(name + strlen(name) - 6);
+
+		--retries;
+		// shm_open guarantees that O_CLOEXEC is set
+		int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+		if (fd >= 0) {
+			shm_unlink(name);
+			return fd;
+		}
+	} while (retries > 0 && errno == EEXIST);
+
+	return -1;
+}
+
+static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast,
 		enum wl_shm_format fmt, int width, int height, int stride,
 		void **data_out) {
+	struct xdpw_screencast_context *ctx = cast->ctx;
 	int size = stride * height;
 
-	const char shm_name[] = "/wlroots-screencopy";
-	int fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+	int fd = anonymous_shm_open();
 	if (fd < 0) {
 		logprint(ERROR, "wlroots: shm_open failed");
 		return NULL;
 	}
-	shm_unlink(shm_name);
 
 	int ret;
 	while ((ret = ftruncate(fd, size)) == EINTR);
@@ -55,77 +97,72 @@ static struct wl_buffer *create_shm_buffer(struct screencast_context *ctx,
 
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer event handler");
-	ctx->wlr_frame = frame;
-	ctx->simple_frame.width = width;
-	ctx->simple_frame.height = height;
-	ctx->simple_frame.stride = stride;
-	ctx->simple_frame.size = stride * height;
-	ctx->simple_frame.format = format;
-	ctx->simple_frame.buffer = create_shm_buffer(ctx, format, width, height,
-		stride, &ctx->simple_frame.data);
+	cast->wlr_frame = frame;
+	cast->simple_frame.width = width;
+	cast->simple_frame.height = height;
+	cast->simple_frame.stride = stride;
+	cast->simple_frame.size = stride * height;
+	cast->simple_frame.format = format;
+	cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
+		stride, &cast->simple_frame.data);
 
-	if (ctx->simple_frame.buffer == NULL) {
+	if (cast->simple_frame.buffer == NULL) {
 		logprint(ERROR, "wlroots: failed to create buffer");
 		abort();
 	}
 
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, ctx->simple_frame.buffer);
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
 }
 
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t flags) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: flags event handler");
-	ctx->simple_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
+	cast->simple_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: ready event handler");
 
-	ctx->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
-	ctx->simple_frame.tv_nsec = tv_nsec;
+	cast->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
+	cast->simple_frame.tv_nsec = tv_nsec;
 
-	if (!ctx->quit && !ctx->err && ctx->stream_state) {
-		pw_loop_signal_event(state->pw_loop, ctx->event);
+	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
+		pw_loop_signal_event(cast->ctx->state->pw_loop, cast->event);
 		return ;
 	}
 
-	wlr_frame_free(state);
+	xdpw_wlr_frame_free(cast);
 }
 
 static void wlr_frame_failed(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: failed event handler");
-	ctx->err = true;
+	cast->err = true;
 
-	wlr_frame_free(state);
+	xdpw_wlr_frame_free(cast);
 }
 
 static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-	struct xdpw_state *state = data;
-	struct screencast_context *ctx = &state->screencast;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: damage event handler");
 
-	ctx->simple_frame.damage->x = x;
-	ctx->simple_frame.damage->y = y;
-	ctx->simple_frame.damage->width = width;
-	ctx->simple_frame.damage->height = height;
+	cast->simple_frame.damage.x = x;
+	cast->simple_frame.damage.y = y;
+	cast->simple_frame.damage.width = width;
+	cast->simple_frame.damage.height = height;
 }
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
@@ -136,21 +173,20 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 	.damage = wlr_frame_damage,
 };
 
-void wlr_register_cb(struct xdpw_state *state) {
-	struct screencast_context *ctx = &state->screencast;
+void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
 
-	ctx->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-		ctx->screencopy_manager, ctx->with_cursor, ctx->target_output->output);
+	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
+		cast->ctx->screencopy_manager, cast->with_cursor, cast->target_output->output);
 
-	zwlr_screencopy_frame_v1_add_listener(ctx->frame_callback,
-		&wlr_frame_listener, state);
+	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
+		&wlr_frame_listener, cast);
 	logprint(TRACE, "wlroots: callbacks registered");
 }
 
 static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
 		int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
 		int32_t subpixel, const char *make, const char *model, int32_t transform) {
-	struct wayland_output *output = data;
+	struct xdpw_wlr_output *output = data;
 	output->make = strdup(make);
 	output->model = strdup(model);
 }
@@ -158,7 +194,7 @@ static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
 static void wlr_output_handle_mode(void *data, struct wl_output *wl_output,
 		uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
 	if (flags & WL_OUTPUT_MODE_CURRENT) {
-		struct wayland_output *output = data;
+		struct xdpw_wlr_output *output = data;
 		output->framerate = (float)refresh/1000;
 	}
 }
@@ -181,7 +217,7 @@ static const struct wl_output_listener wlr_output_listener = {
 
 static void wlr_xdg_output_name(void* data, struct zxdg_output_v1* xdg_output,
 		const char* name) {
-	struct wayland_output *output = data;
+	struct xdpw_wlr_output *output = data;
 
 	output->name = strdup(name);
 };
@@ -198,34 +234,34 @@ static const struct zxdg_output_v1_listener wlr_xdg_output_listener = {
 	.name = wlr_xdg_output_name,
 };
 
-void wlr_add_xdg_output_listener(struct wayland_output *output,
+static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output,
 		struct zxdg_output_v1* xdg_output) {
 	output->xdg_output = xdg_output;
 	zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener,
 		output);
 }
 
-static void wlr_init_xdg_outputs(struct screencast_context *ctx) {
-	struct wayland_output *output, *tmp;
+static void wlr_init_xdg_outputs(struct xdpw_screencast_context *ctx) {
+	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
 		struct zxdg_output_v1 *xdg_output =
-			zxdg_output_manager_v1_get_xdg_output( ctx->xdg_output_manager,
+			zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
 				output->output);
 		wlr_add_xdg_output_listener(output, xdg_output);
 	}
 }
 
-struct wayland_output *wlr_output_first(struct wl_list *output_list) {
-	struct wayland_output *output, *tmp;
+struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
+	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, output_list, link) {
 		return output;
 	}
 	return NULL;
 }
 
-struct wayland_output *wlr_output_find_by_name(struct wl_list *output_list,
+struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
 		const char* name) {
-	struct wayland_output *output, *tmp;
+	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, output_list, link) {
 		if (strcmp(output->name, name) == 0) {
 			return output;
@@ -234,9 +270,9 @@ struct wayland_output *wlr_output_find_by_name(struct wl_list *output_list,
 	return NULL;
 }
 
-struct wayland_output *wlr_output_find(struct screencast_context *ctx,
+struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx,
 		struct wl_output *out, uint32_t id) {
-	struct wayland_output *output, *tmp;
+	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
 		if ((output->output == out) || (output->id == id)) {
 			return output;
@@ -245,16 +281,16 @@ struct wayland_output *wlr_output_find(struct screencast_context *ctx,
 	return NULL;
 }
 
-static void wlr_remove_output(struct wayland_output *out) {
+static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	wl_list_remove(&out->link);
 }
 
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
-	struct screencast_context *ctx = data;
+	struct xdpw_screencast_context *ctx = data;
 
 	if (!strcmp(interface, wl_output_interface.name)) {
-		struct wayland_output *output = malloc(sizeof(*output));
+		struct xdpw_wlr_output *output = malloc(sizeof(*output));
 
 		output->id = id;
 		output->output = wl_registry_bind(reg, id, &wl_output_interface, 1);
@@ -281,7 +317,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		uint32_t id) {
 	wlr_remove_output(
-		wlr_output_find((struct screencast_context *)data, NULL, id));
+		xdpw_wlr_output_find((struct xdpw_screencast_context *)data, NULL, id));
 }
 
 static const struct wl_registry_listener wlr_registry_listener = {
@@ -289,11 +325,14 @@ static const struct wl_registry_listener wlr_registry_listener = {
 	.global_remove = wlr_registry_handle_remove,
 };
 
-int wlr_screencopy_init(struct xdpw_state *state) {
-	struct screencast_context *ctx = &state->screencast;
+int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
+	struct xdpw_screencast_context *ctx = &state->screencast;
 
-	// retrieve list of outputs
+	// initialize a list of outputs
 	wl_list_init(&ctx->output_list);
+
+	// initialize a list of active screencast instances
+	wl_list_init(&ctx->screencast_instances);
 
 	// retrieve registry
 	ctx->registry = wl_display_get_registry(state->wl_display);
@@ -327,15 +366,30 @@ int wlr_screencopy_init(struct xdpw_state *state) {
 	return 0;
 }
 
-void wlr_screencopy_uninit(struct screencast_context *ctx) {
-	struct wayland_output *output, *tmp_o;
+void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
+	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
 		zxdg_output_v1_destroy(output->xdg_output);
 		wl_output_destroy(output->output);
 	}
 
+	struct xdpw_screencast_instance *cast, *tmp_c;
+	wl_list_for_each_safe(cast, tmp_c, &ctx->screencast_instances, link) {
+		cast->quit = true;
+		//xdpw_screencast_instance_destroy(cast);
+	}
+
 	if (ctx->screencopy_manager) {
 		zwlr_screencopy_manager_v1_destroy(ctx->screencopy_manager);
+	}
+	if (ctx->shm) {
+		wl_shm_destroy(ctx->shm);
+	}
+	if (ctx->xdg_output_manager){
+		zxdg_output_manager_v1_destroy(ctx->xdg_output_manager);
+	}
+	if (ctx->registry){
+		wl_registry_destroy(ctx->registry);
 	}
 }
