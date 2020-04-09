@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200809L
+
 #include "screencast.h"
 
 #include <errno.h>
@@ -5,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <assert.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <spa/utils/result.h>
@@ -18,7 +21,7 @@ static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
-		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor){
+		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
 	cast->ctx = ctx;
 	cast->target_output = out;
 	cast->framerate = out->framerate;
@@ -30,7 +33,8 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 		wl_list_length(&ctx->screencast_instances));
 }
 
-void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast){
+void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
+	assert(cast->refcount == 0);
 	logprint(TRACE, "xdpw: destroying cast instance");
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
@@ -66,14 +70,14 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 			cast->target_output->id,
 			cast->with_cursor ? "with" : "without");
 
-		if(cast->target_output->id == out->id && cast->with_cursor == with_cursor){
+		if (cast->target_output->id == out->id && cast->with_cursor == with_cursor) {
 			sess->screencast_instance = cast;
 			++cast->refcount;
 			logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 		}
 	}
 
-	if(!sess->screencast_instance){
+	if (!sess->screencast_instance) {
 		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
 		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
 			out, with_cursor);
@@ -163,7 +167,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 	}
 
 	struct xdpw_session *sess =
-		xdpw_session_create(state, sd_bus_message_get_bus(msg), session_handle);
+		xdpw_session_create(state, sd_bus_message_get_bus(msg), strdup(session_handle));
 	if (sess == NULL) {
 		return -ENOMEM;
 	}
@@ -192,6 +196,8 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	int ret = 0;
+	struct xdpw_session *sess, *tmp_s;
+	sd_bus_message *reply = NULL;
 
 	logprint(INFO, "dbus: select sources method invoked");
 
@@ -227,7 +233,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		} else if (strcmp(key, "types") == 0) {
 			uint32_t mask;
 			sd_bus_message_read(msg, "v", "u", &mask);
-			if(mask & (1<<WINDOW)){
+			if (mask & (1<<WINDOW)) {
 				logprint(INFO, "dbus: non-monitor cast requested, not replying");
 				return -1;
 			}
@@ -235,12 +241,12 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		} else if (strcmp(key, "cursor_mode") == 0) {
 			uint32_t cursor_mode;
 			sd_bus_message_read(msg, "v", "u", &cursor_mode);
-			if (cursor_mode & (1<<HIDDEN)){
+			if (cursor_mode & (1<<HIDDEN)) {
 				cursor_embedded = false;
 			}
-			if (cursor_mode & (1<<METADATA)){
-				logprint(ERROR, "dbus: unsupported cursor mode requested, exiting");
-				abort();
+			if (cursor_mode & (1<<METADATA)) {
+				logprint(ERROR, "dbus: unsupported cursor mode requested, cancelling");
+				goto error;
 			}
 			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
 		} else {
@@ -262,9 +268,8 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	}
 
 	ret = -1;
-	struct xdpw_session *sess, *tmp_s;
-	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link){
-		if(strcmp(sess->session_handle, session_handle) == 0){
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(TRACE, "dbus: select sources: found matching session %s", sess->session_handle);
 				ret = setup_outputs(ctx, sess, cursor_embedded);
 		}
@@ -273,7 +278,6 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
@@ -286,9 +290,31 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		return ret;
 	}
-
 	sd_bus_message_unref(reply);
 	return 0;
+
+error:
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
+				logprint(TRACE, "dbus: select sources error: destroying matching session %s", sess->session_handle);
+				xdpw_session_destroy(sess);
+		}
+	}
+
+	ret = sd_bus_message_new_method_return(msg, &reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_send(NULL, reply, NULL);
+	if (ret < 0) {
+		return ret;
+	}
+	sd_bus_message_unref(reply);
+	return -1;
 }
 
 static int method_screencast_start(sd_bus_message *msg, void *data,
@@ -336,10 +362,10 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	struct xdpw_screencast_instance *cast;
+	struct xdpw_screencast_instance *cast = NULL;
 	struct xdpw_session *sess, *tmp_s;
-	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link){
-		if(strcmp(sess->session_handle, session_handle) == 0){
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(TRACE, "dbus: start: found matching session %s", sess->session_handle);
 				cast = sess->screencast_instance;
 		}
@@ -348,7 +374,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		return -1;
 	}
 
-	if(!cast->initialized){
+	if (!cast->initialized) {
 		start_screencast(cast);
 	}
 
@@ -398,6 +424,9 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_PROPERTY("AvailableCursorModes", "u", NULL,
 		offsetof(struct xdpw_state, screencast_cursor_modes),
 		SD_BUS_VTABLE_PROPERTY_CONST),
+	SD_BUS_PROPERTY("version", "u", NULL,
+		offsetof(struct xdpw_state, screencast_version),
+		SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_VTABLE_END
 };
 
@@ -409,9 +438,13 @@ int xdpw_screencast_init(struct xdpw_state *state, const char *output_name, cons
 	state->screencast.forced_pixelformat = forced_pixelformat;
 	state->screencast.output_name = output_name;
 
-	xdpw_pwr_core_connect(state);
+	int err;
+	err = xdpw_pwr_core_connect(state);
+	if (err) {
+		goto end;
+	}
 
-	int err = xdpw_wlr_screencopy_init(state);
+	err = xdpw_wlr_screencopy_init(state);
 	if (err) {
 		goto end;
 	}

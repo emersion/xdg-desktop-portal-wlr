@@ -16,8 +16,9 @@ struct xdpw_state {
 	struct wl_display *wl_display;
 	struct pw_loop *pw_loop;
 	struct xdpw_screencast_context screencast;
-	enum source_types screencast_source_types;
-	enum cursor_modes screencast_cursor_modes;
+	uint32_t screencast_source_types; // bitfield of enum source_types
+	uint32_t screencast_cursor_modes; // bitfield of enum cursor_modes
+	uint32_t screencast_version;
 };
 
 struct xdpw_request {
@@ -27,7 +28,7 @@ struct xdpw_request {
 struct xdpw_session {
 	struct wl_list link;
 	sd_bus_slot *slot;
-	const char *session_handle;
+	char *session_handle;
 	struct xdpw_screencast_instance *screencast_instance;
 };
 
@@ -44,7 +45,7 @@ int xdpw_screencast_init(struct xdpw_state *state, const char *output_name,
 struct xdpw_request *xdpw_request_create(sd_bus *bus, const char *object_path);
 void xdpw_request_destroy(struct xdpw_request *req);
 
-struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, const char *object_path);
+struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, char *object_path);
 void xdpw_session_destroy(struct xdpw_session *req);
 
 #endif

@@ -17,16 +17,18 @@
 #include <wayland-client-protocol.h>
 
 #include "screencast.h"
-#include "screencast_common.h"
 #include "pipewire_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
 
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
+	cast->wlr_frame = NULL;
 	munmap(cast->simple_frame.data, cast->simple_frame.size);
+	cast->simple_frame.data = NULL;
 	// TODO: reuse this buffer unless we quit or error out
 	wl_buffer_destroy(cast->simple_frame.buffer);
+	cast->simple_frame.buffer = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
 
 	if (cast->quit || cast->err) {
@@ -35,7 +37,6 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	}
 
 	xdpw_wlr_register_cb(cast);
-
 }
 
 static int anonymous_shm_open(void) {
@@ -377,7 +378,6 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	struct xdpw_screencast_instance *cast, *tmp_c;
 	wl_list_for_each_safe(cast, tmp_c, &ctx->screencast_instances, link) {
 		cast->quit = true;
-		//xdpw_screencast_instance_destroy(cast);
 	}
 
 	if (ctx->screencopy_manager) {
@@ -386,10 +386,10 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);
 	}
-	if (ctx->xdg_output_manager){
+	if (ctx->xdg_output_manager) {
 		zxdg_output_manager_v1_destroy(ctx->xdg_output_manager);
 	}
-	if (ctx->registry){
+	if (ctx->registry) {
 		wl_registry_destroy(ctx->registry);
 	}
 }

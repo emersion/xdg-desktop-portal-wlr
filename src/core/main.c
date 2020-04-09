@@ -6,7 +6,6 @@
 #include <pipewire/pipewire.h>
 #include <spa/utils/result.h>
 #include "xdpw.h"
-#include "screencast_common.h"
 #include "logger.h"
 
 enum event_loop_fd {
@@ -79,13 +78,14 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "dbus: failed to connect to user bus: %s", strerror(-ret));
 		goto error;
 	}
+	logprint(TRACE, "dbus: connected");
 
 	struct wl_display *wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
 		logprint(ERROR, "wayland: failed to connect to display");
 		goto error;
 	}
-	logprint(INFO, "wlroots: wl_display fd: %d", wl_display_get_fd(wl_display));
+	logprint(TRACE, "wlroots: wl_display connected");
 
 	pw_init(NULL, NULL);
 	struct pw_loop *pw_loop = pw_loop_new(NULL);
@@ -93,20 +93,25 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "pipewire: failed to create loop");
 		goto error;
 	}
+	logprint(TRACE, "pipewire: pw_loop created");
 
 	struct xdpw_state state = {
-		.xdpw_sessions = (struct wl_list) { 0 },
 		.bus = bus,
 		.wl_display = wl_display,
 		.pw_loop = pw_loop,
 		.screencast_source_types = MONITOR,
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
+		.screencast_version = XDP_CAST_PROTO_VER,
 	};
 
 	wl_list_init(&state.xdpw_sessions);
 
 	xdpw_screenshot_init(&state);
-	xdpw_screencast_init(&state, output_name, forced_pixelformat);
+	ret = xdpw_screencast_init(&state, output_name, forced_pixelformat);
+	if (ret < 0) {
+		logprint(ERROR, "xdpw: failed to initialize screencast");
+		goto error;
+	}
 
 	ret = sd_bus_request_name(bus, service_name, 0);
 	if (ret < 0) {
@@ -181,5 +186,6 @@ error:
 	sd_bus_unref(bus);
 	pw_loop_leave(state.pw_loop);
 	pw_loop_destroy(state.pw_loop);
+	wl_display_disconnect(state.wl_display);
 	return EXIT_FAILURE;
 }

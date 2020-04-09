@@ -191,16 +191,16 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 
 }
 
-void xdpw_pwr_core_connect(struct xdpw_state *state){
+int xdpw_pwr_core_connect(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	logprint(TRACE, "pipewire: establishing connection to core");
 
-	if(!ctx->pwr_context){
+	if (!ctx->pwr_context) {
 		ctx->pwr_context = pw_context_new(state->pw_loop, NULL, 0);
 		if (!ctx->pwr_context) {
 			logprint(ERROR, "pipewire: failed to create context");
-			abort();
+			return -1;
 		}
 	}
 
@@ -208,14 +208,16 @@ void xdpw_pwr_core_connect(struct xdpw_state *state){
 		ctx->core = pw_context_connect(ctx->pwr_context, NULL, 0);
 		if (!ctx->core) {
 			logprint(ERROR, "pipewire: couldn't connect to context");
-			abort();
+			return -1;
 		}
 	}
+	return 0;
 }
 
-void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast){
+void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: destroying stream");
 	pw_stream_flush(cast->stream, false);
 	pw_stream_disconnect(cast->stream);
 	pw_stream_destroy(cast->stream);
+	cast->stream = NULL;
 }

@@ -1,10 +1,12 @@
 #include "screencast_common.h"
+#include <assert.h>
 
 void randname(char *buf) {
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	long r = ts.tv_nsec;
 	for (int i = 0; i < 6; ++i) {
+		assert(buf[i] == 'X');
 		buf[i] = 'A'+(r&15)+(r&16)*2;
 		r >>= 5;
 	}

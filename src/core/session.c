@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "xdpw.h"
 #include "screencast.h"
 #include "logger.h"
@@ -38,7 +39,7 @@ static const sd_bus_vtable session_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, const char *object_path) {
+struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, char *object_path) {
 	struct xdpw_session *sess = calloc(1, sizeof(struct xdpw_session));
 
 	sess->session_handle = object_path;
@@ -56,12 +57,13 @@ struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, 
 }
 
 void xdpw_session_destroy(struct xdpw_session *sess) {
-	struct xdpw_screencast_instance *cast = sess->screencast_instance;
 	logprint(TRACE, "dbus: destroying session");
-	if (sess == NULL) {
+	if (!sess) {
 		return;
 	}
-	if (cast){
+	struct xdpw_screencast_instance *cast = sess->screencast_instance;
+	if (cast) {
+		assert(cast->refcount > 0);
 		--cast->refcount;
 		logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 		if (cast->refcount < 1) {
@@ -71,5 +73,6 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 
 	sd_bus_slot_unref(sess->slot);
 	wl_list_remove(&sess->link);
+	free(sess->session_handle);
 	free(sess);
 }

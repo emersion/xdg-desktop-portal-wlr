@@ -11,8 +11,6 @@ static int method_close(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	struct xdpw_request *req = data;
 	int ret = 0;
-	// struct xdpw_request *req = data;
-	// TODO
 	logprint(INFO, "dbus: request closed");
 
 	sd_bus_message *reply = NULL;

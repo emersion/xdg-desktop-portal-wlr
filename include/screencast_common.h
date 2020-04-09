@@ -5,6 +5,10 @@
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
 
+// this seems to be right based on
+// https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
+#define XDP_CAST_PROTO_VER 2
+
 enum cursor_modes {
   HIDDEN = 1,
   EMBEDDED = 2,

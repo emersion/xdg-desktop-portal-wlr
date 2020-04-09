@@ -7,7 +7,7 @@
 #define ALIGN 16
 
 void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast);
-void xdpw_pwr_core_connect(struct xdpw_state *state);
+int xdpw_pwr_core_connect(struct xdpw_state *state);
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast);
 
 #endif
