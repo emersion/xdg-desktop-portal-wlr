@@ -1,18 +1,30 @@
 #include "screencast_common.h"
+#include <assert.h>
 
-enum spa_video_format pipewire_from_wl_shm(void *data) {
-	struct screencast_context *ctx = data;
+void randname(char *buf) {
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	long r = ts.tv_nsec;
+	for (int i = 0; i < 6; ++i) {
+		assert(buf[i] == 'X');
+		buf[i] = 'A'+(r&15)+(r&16)*2;
+		r >>= 5;
+	}
+}
 
-	if (ctx->forced_pixelformat) {
-		if (strcmp(ctx->forced_pixelformat, "BGRx") == 0) {
+enum spa_video_format xdpw_format_pw_from_wl_shm(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+
+	if (cast->ctx->forced_pixelformat) {
+		if (strcmp(cast->ctx->forced_pixelformat, "BGRx") == 0) {
 			return SPA_VIDEO_FORMAT_BGRx;
 		}
-		if (strcmp(ctx->forced_pixelformat, "RGBx") == 0) {
+		if (strcmp(cast->ctx->forced_pixelformat, "RGBx") == 0) {
 			return SPA_VIDEO_FORMAT_RGBx;
 		}
 	}
 
-	switch (ctx->simple_frame.format) {
+	switch (cast->simple_frame.format) {
 	case WL_SHM_FORMAT_ARGB8888:
 		return SPA_VIDEO_FORMAT_BGRA;
 	case WL_SHM_FORMAT_XRGB8888:

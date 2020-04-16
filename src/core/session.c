@@ -2,16 +2,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 #include "xdpw.h"
+#include "screencast.h"
+#include "logger.h"
 
 static const char interface_name[] = "org.freedesktop.impl.portal.Session";
 
 static int method_close(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
-	
 	int ret = 0;
-	// struct xdpw_session *session = data;
-	// TODO
+	struct xdpw_session *sess = data;
 	logprint(INFO, "dbus: session closed");
 
 	sd_bus_message *reply = NULL;
@@ -27,6 +28,8 @@ static int method_close(sd_bus_message *msg, void *data,
 
 	sd_bus_message_unref(reply);
 
+	xdpw_session_destroy(sess);
+
 	return 0;
 }
 
@@ -36,24 +39,40 @@ static const sd_bus_vtable session_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-struct xdpw_session *session_create(sd_bus *bus, const char *object_path) {
-	struct xdpw_session *req = calloc(1, sizeof(struct xdpw_session));
+struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, char *object_path) {
+	struct xdpw_session *sess = calloc(1, sizeof(struct xdpw_session));
 
-	if (sd_bus_add_object_vtable(bus, &req->slot, object_path, interface_name,
-			session_vtable, NULL) < 0) {
-		free(req);
+	sess->session_handle = object_path;
+
+	if (sd_bus_add_object_vtable(bus, &sess->slot, object_path, interface_name,
+			session_vtable, sess) < 0) {
+		free(sess);
 		logprint(ERROR, "dbus: sd_bus_add_object_vtable failed: %s",
 			strerror(-errno));
 		return NULL;
 	}
 
-	return req;
+	wl_list_insert(&state->xdpw_sessions, &sess->link);
+	return sess;
 }
 
-void session_destroy(struct xdpw_session *req) {
-	if (req == NULL) {
+void xdpw_session_destroy(struct xdpw_session *sess) {
+	logprint(TRACE, "dbus: destroying session");
+	if (!sess) {
 		return;
 	}
-	sd_bus_slot_unref(req->slot);
-	free(req);
+	struct xdpw_screencast_instance *cast = sess->screencast_instance;
+	if (cast) {
+		assert(cast->refcount > 0);
+		--cast->refcount;
+		logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
+		if (cast->refcount < 1) {
+			cast->quit = true;
+		}
+	}
+
+	sd_bus_slot_unref(sess->slot);
+	wl_list_remove(&sess->link);
+	free(sess->session_handle);
+	free(sess);
 }

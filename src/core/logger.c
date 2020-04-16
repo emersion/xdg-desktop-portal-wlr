@@ -1,5 +1,10 @@
 #include "logger.h"
 
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
 static int NUM_LEVELS = 6;
 
 static const char *loglevels[] = {
