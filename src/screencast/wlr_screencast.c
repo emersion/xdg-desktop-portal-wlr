@@ -32,6 +32,9 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "wlroots: frame destroyed");
 
 	if (cast->quit || cast->err) {
+		// TODO: revisit the exit condition (remove quit?)
+		// and clean up sessions that still exist if err
+		// is the cause of the instance_destroy call
 		xdpw_screencast_instance_destroy(cast);
 		return ;
 	}
@@ -342,14 +345,14 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
-	logprint(TRACE, "wayland: registry listeners run");
+	logprint(DEBUG, "wayland: registry listeners run");
 
 	wlr_init_xdg_outputs(ctx);
 
 	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
-	logprint(TRACE, "wayland: xdg output listeners run");
+	logprint(DEBUG, "wayland: xdg output listeners run");
 
 	// make sure our wlroots supports shm protocol
 	if (!ctx->shm) {

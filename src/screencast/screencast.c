@@ -34,8 +34,8 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 }
 
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
-	assert(cast->refcount == 0);
-	logprint(TRACE, "xdpw: destroying cast instance");
+	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
+	logprint(DEBUG, "xdpw: destroying cast instance");
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
 	free(cast);
@@ -71,9 +71,17 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 			cast->with_cursor ? "with" : "without");
 
 		if (cast->target_output->id == out->id && cast->with_cursor == with_cursor) {
-			sess->screencast_instance = cast;
-			++cast->refcount;
-			logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
+			if (cast->refcount == 0) {
+				logprint(DEBUG,
+					"xdpw: matching cast instance found, "
+					"but is already scheduled for destruction, skipping");
+			}
+			else {
+				sess->screencast_instance = cast;
+				++cast->refcount;
+			}
+			logprint(INFO, "xdpw: screencast instance %p now has %d references",
+				cast, cast->refcount);
 		}
 	}
 
@@ -270,7 +278,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	ret = -1;
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(TRACE, "dbus: select sources: found matching session %s", sess->session_handle);
+				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
 				ret = setup_outputs(ctx, sess, cursor_embedded);
 		}
 	}
@@ -296,7 +304,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 error:
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(TRACE, "dbus: select sources error: destroying matching session %s", sess->session_handle);
+				logprint(DEBUG, "dbus: select sources error: destroying matching session %s", sess->session_handle);
 				xdpw_session_destroy(sess);
 		}
 	}
@@ -366,7 +374,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	struct xdpw_session *sess, *tmp_s;
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(TRACE, "dbus: start: found matching session %s", sess->session_handle);
+				logprint(DEBUG, "dbus: start: found matching session %s", sess->session_handle);
 				cast = sess->screencast_instance;
 		}
 	}
@@ -453,6 +461,7 @@ int xdpw_screencast_init(struct xdpw_state *state, const char *output_name, cons
 		screencast_vtable, state);
 
 end:
+	// TODO: clean up pipewire
 	xdpw_wlr_screencopy_finish(&state->screencast);
 	return err;
 }

@@ -78,14 +78,14 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "dbus: failed to connect to user bus: %s", strerror(-ret));
 		goto error;
 	}
-	logprint(TRACE, "dbus: connected");
+	logprint(DEBUG, "dbus: connected");
 
 	struct wl_display *wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
 		logprint(ERROR, "wayland: failed to connect to display");
 		goto error;
 	}
-	logprint(TRACE, "wlroots: wl_display connected");
+	logprint(DEBUG, "wlroots: wl_display connected");
 
 	pw_init(NULL, NULL);
 	struct pw_loop *pw_loop = pw_loop_new(NULL);
@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "pipewire: failed to create loop");
 		goto error;
 	}
-	logprint(TRACE, "pipewire: pw_loop created");
+	logprint(DEBUG, "pipewire: pw_loop created");
 
 	struct xdpw_state state = {
 		.bus = bus,

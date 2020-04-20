@@ -57,7 +57,7 @@ struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, 
 }
 
 void xdpw_session_destroy(struct xdpw_session *sess) {
-	logprint(TRACE, "dbus: destroying session");
+	logprint(DEBUG, "dbus: destroying session %p", sess);
 	if (!sess) {
 		return;
 	}
@@ -65,7 +65,8 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 	if (cast) {
 		assert(cast->refcount > 0);
 		--cast->refcount;
-		logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
+		logprint(DEBUG, "xdpw: screencast instance %p now has %d references",
+			cast, cast->refcount);
 		if (cast->refcount < 1) {
 			cast->quit = true;
 		}

@@ -161,7 +161,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 	/* make an event to signal frame ready */
 	cast->event =
 		pw_loop_add_event(state->pw_loop, pwr_on_event, cast);
-	logprint(TRACE, "pipewire: registered event %p", cast->event);
+	logprint(DEBUG, "pipewire: registered event %p", cast->event);
 
 	params[0] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
@@ -194,7 +194,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 int xdpw_pwr_core_connect(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
-	logprint(TRACE, "pipewire: establishing connection to core");
+	logprint(DEBUG, "pipewire: establishing connection to core");
 
 	if (!ctx->pwr_context) {
 		ctx->pwr_context = pw_context_new(state->pw_loop, NULL, 0);
@@ -215,7 +215,7 @@ int xdpw_pwr_core_connect(struct xdpw_state *state) {
 }
 
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: destroying stream");
+	logprint(DEBUG, "pipewire: destroying stream");
 	pw_stream_flush(cast->stream, false);
 	pw_stream_disconnect(cast->stream);
 	pw_stream_destroy(cast->stream);
