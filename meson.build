@@ -17,6 +17,7 @@ add_project_arguments(cc.get_supported_arguments([
 	'-Wno-missing-braces',
 	'-Wno-missing-field-initializers',
 	'-Wno-unused-parameter',
+	'-D_POSIX_C_SOURCE=200809L',
 ]), language: 'c')
 
 inc = include_directories('include')

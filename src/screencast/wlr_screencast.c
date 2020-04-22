@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200809L
-
 #include "wlr_screencast.h"
 
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
