@@ -1,0 +1,17 @@
+image: alpine/edge
+packages:
+  - elogind-dev
+  - gcc
+  - meson
+  - pipewire-dev
+  - wayland-dev
+  - wayland-protocols
+sources:
+  - https://github.com/emersion/xdg-desktop-portal-wlr
+tasks:
+  - setup: |
+      cd xdg-desktop-portal-wlr
+      meson build/
+  - build: |
+      cd xdg-desktop-portal-wlr
+      ninja -C build/
