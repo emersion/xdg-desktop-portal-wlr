@@ -6,33 +6,61 @@
 
 ## Building
 
-	meson build
-	ninja -C build
+```sh
+meson build
+ninja -C build
+```
 
 ## Installing
 
-	ninja -C build install
+### From Source
+
+```sh
+ninja -C build install
+```
+
+### Distro Packages
+
+#### Arch Linux (AUR)
+
+xdg-desktop-portal-wlr-git
+
+## Running
 
 Make sure `XDG_CURRENT_DESKTOP=sway` is set.
 
-	/usr/lib/xdg-desktop-portal -r &
-	xdg-desktop-portal-wlr
+When correctly installed, xdg-desktop-portal should automatically invoke
+xdg-desktop-portal-wlr when needed.
 
-## Tooling
+At the moment, some command line flags are available for testing, compatibility,
+or output selection. If you need to use one of these flags, you can provide an
+instance of xdpw using the following command:
 
-Useful tools include `dbus-monitor` to watch requests being made,
-and `dbus-send` and the similar `busctl call` for manual dbus calls.
+```/usr/lib/xdg-desktop-portal -r & xdg-desktop-portal-wlr [OPTION...]```
 
-You can test the integration with the [portal-test] Flatpak app.
+To understand the available options, you can run `xdg-desktop-portal-wlr --help`
 
-Alternatively you can trigger it with [trigger-screen-shot.py] and
-[xdp-screen-cast.py].
+## FAQ
+
+Check out or [FAQ] for answers to commonly asked questions.
+
+Please see the [screencast compatibility] guide for more information on
+compatible applications and how to get them working.
+
+If you have a question or problem that is not mentioned in those documents,
+please open an issue or come chat with us in [#sway] on freenode IRC.
+
+## Contributing
+
+If you're interested in testing or development, check out
+[CONTRIBUTING.md] for more information.
 
 ## License
 
 MIT
 
-[portal-test]: https://github.com/matthiasclasen/portal-test
 [xdg-desktop-portal]: https://github.com/flatpak/xdg-desktop-portal
-[trigger-screen-shot.py]: https://gitlab.gnome.org/snippets/814
-[xdp-screen-cast.py]: https://gitlab.gnome.org/snippets/19
+[FAQ]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/FAQ
+[screencast compatibility]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/Screencast-Compatibility
+[#sway]: https://webchat.freenode.net/#sway
+[CONTRIBUTING.md]: CONTRIBUTING.md
