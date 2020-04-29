@@ -1,4 +1,4 @@
-## Contribution Guidelines
+# Contributing
 
 We closely follow the wlroots [contributing] guidelines where possible. Please
 see that document for more information.

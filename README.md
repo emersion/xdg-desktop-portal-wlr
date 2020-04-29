@@ -44,7 +44,7 @@ To understand the available options, you can run `xdg-desktop-portal-wlr --help`
 
 Check out or [FAQ] for answers to commonly asked questions.
 
-Please see the [screencast compatibility guide] for more information on
+Please see the [screencast compatibility] guide for more information on
 compatible applications and how to get them working.
 
 If you have a question or problem that is not mentioned in those documents,
@@ -52,15 +52,15 @@ please open an issue or come chat with us in [#sway] on freenode IRC.
 
 ## Contributing
 
-If you're interested in testing or development, check out the
-[development guide] for more information.
+If you're interested in testing or development, check out
+[CONTRIBUTING.md] for more information.
 
 ## License
 
 MIT
 
 [xdg-desktop-portal]: https://github.com/flatpak/xdg-desktop-portal
-[FAQ]: docs/FAQ.md
-[screencast compatibility guide]: docs/screencast-compatibility.md
+[FAQ]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/FAQ
+[screencast compatibility]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/Screencast-Compatibility
 [#sway]: https://webchat.freenode.net/#sway
-[development guide]: docs/development.md
+[CONTRIBUTING.md]: CONTRIBUTING.md
