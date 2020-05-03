@@ -12,9 +12,8 @@ void randname(char *buf) {
 	}
 }
 
-enum spa_video_format xdpw_format_pw_from_wl_shm(void *data) {
-	struct xdpw_screencast_instance *cast = data;
-
+enum spa_video_format xdpw_format_pw_from_wl_shm(
+		struct xdpw_screencast_instance *cast) {
 	if (cast->ctx->forced_pixelformat) {
 		if (strcmp(cast->ctx->forced_pixelformat, "BGRx") == 0) {
 			return SPA_VIDEO_FORMAT_BGRx;
@@ -45,5 +44,20 @@ enum spa_video_format xdpw_format_pw_from_wl_shm(void *data) {
 		return SPA_VIDEO_FORMAT_NV12;
 	default:
 		abort();
+	}
+}
+
+enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format) {
+	switch (format) {
+	case SPA_VIDEO_FORMAT_BGRA:
+		return SPA_VIDEO_FORMAT_BGRx;
+	case SPA_VIDEO_FORMAT_ABGR:
+		return SPA_VIDEO_FORMAT_xBGR;
+	case SPA_VIDEO_FORMAT_RGBA:
+		return SPA_VIDEO_FORMAT_RGBx;
+	case SPA_VIDEO_FORMAT_ARGB:
+		return SPA_VIDEO_FORMAT_xRGB;
+	default:
+		return SPA_VIDEO_FORMAT_UNKNOWN;
 	}
 }
