@@ -23,7 +23,6 @@ int xdpw_usage(FILE* stream, int rc) {
 		"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
 		"    -o, --output=<name>              Select output to capture.\n"
-		"    -p,--pixelformat=BGRx|RGBx       Force a pixelformat in pipewire\n"
 		"                                     metadata (performs no conversion).\n"
 		"    -h,--help                        Get help (this text).\n"
 		"\n";
@@ -34,14 +33,12 @@ int xdpw_usage(FILE* stream, int rc) {
 
 int main(int argc, char *argv[]) {
 	const char* output_name = NULL;
-	const char* forced_pixelformat = NULL;
 	enum LOGLEVEL loglevel = ERROR;
 
 	static const char* shortopts = "l:o:p:h";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
-		{ "pixelformat", required_argument, NULL, 'p' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -57,9 +54,6 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'o':
 			output_name = optarg;
-			break;
-		case 'p':
-			forced_pixelformat = optarg;
 			break;
 		case 'h':
 			return xdpw_usage(stdout, 0);
@@ -107,7 +101,7 @@ int main(int argc, char *argv[]) {
 	wl_list_init(&state.xdpw_sessions);
 
 	xdpw_screenshot_init(&state);
-	ret = xdpw_screencast_init(&state, output_name, forced_pixelformat);
+	ret = xdpw_screencast_init(&state, output_name);
 	if (ret < 0) {
 		logprint(ERROR, "xdpw: failed to initialize screencast");
 		goto error;

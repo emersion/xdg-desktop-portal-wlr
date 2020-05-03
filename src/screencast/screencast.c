@@ -436,12 +436,11 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int xdpw_screencast_init(struct xdpw_state *state, const char *output_name, const char *forced_pixelformat) {
+int xdpw_screencast_init(struct xdpw_state *state, const char *output_name) {
 	sd_bus_slot *slot = NULL;
 
 	state->screencast = (struct xdpw_screencast_context) { 0 };
 	state->screencast.state = state;
-	state->screencast.forced_pixelformat = forced_pixelformat;
 	state->screencast.output_name = output_name;
 
 	int err;

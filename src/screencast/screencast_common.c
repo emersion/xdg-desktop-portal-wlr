@@ -14,15 +14,6 @@ void randname(char *buf) {
 
 enum spa_video_format xdpw_format_pw_from_wl_shm(
 		struct xdpw_screencast_instance *cast) {
-	if (cast->ctx->forced_pixelformat) {
-		if (strcmp(cast->ctx->forced_pixelformat, "BGRx") == 0) {
-			return SPA_VIDEO_FORMAT_BGRx;
-		}
-		if (strcmp(cast->ctx->forced_pixelformat, "RGBx") == 0) {
-			return SPA_VIDEO_FORMAT_RGBx;
-		}
-	}
-
 	switch (cast->simple_frame.format) {
 	case WL_SHM_FORMAT_ARGB8888:
 		return SPA_VIDEO_FORMAT_BGRA;
