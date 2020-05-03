@@ -39,8 +39,7 @@ enum {
 };
 
 int xdpw_screenshot_init(struct xdpw_state *state);
-int xdpw_screencast_init(struct xdpw_state *state, const char *output_name,
-	const char *forced_pixelformat);
+int xdpw_screencast_init(struct xdpw_state *state, const char *output_name);
 
 struct xdpw_request *xdpw_request_create(sd_bus *bus, const char *object_path);
 void xdpw_request_destroy(struct xdpw_request *req);

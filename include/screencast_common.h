@@ -59,7 +59,6 @@ struct xdpw_screencast_context {
 
 	// cli options
 	const char *output_name;
-	const char *forced_pixelformat;
 
 	// sessions
 	struct wl_list screencast_instances;
