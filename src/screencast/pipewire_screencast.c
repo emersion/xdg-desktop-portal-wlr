@@ -141,7 +141,6 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 
 	pw_loop_enter(state->pw_loop);
 
-	const struct spa_pod *params[1];
 	uint8_t buffer[1024];
 	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 
@@ -163,11 +162,20 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		pw_loop_add_event(state->pw_loop, pwr_on_event, cast);
 	logprint(DEBUG, "pipewire: registered event %p", cast->event);
 
-	params[0] = spa_pod_builder_add_object(&b,
+	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast);
+	enum spa_video_format format_without_alpha =
+		xdpw_format_pw_strip_alpha(format);
+	uint32_t n_formats = 1;
+	if (format_without_alpha != SPA_VIDEO_FORMAT_UNKNOWN) {
+		n_formats++;
+	}
+
+	const struct spa_pod *param = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
 		SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
 		SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-		SPA_FORMAT_VIDEO_format,    SPA_POD_Id(xdpw_format_pw_from_wl_shm(cast)),
+		SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
+			format, format, format_without_alpha),
 		SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
 			&SPA_RECTANGLE(cast->simple_frame.width, cast->simple_frame.height),
 			&SPA_RECTANGLE(1, 1),
@@ -187,7 +195,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		PW_ID_ANY,
 		(PW_STREAM_FLAG_DRIVER |
 			PW_STREAM_FLAG_MAP_BUFFERS),
-		params, 1);
+		&param, 1);
 
 }
 
