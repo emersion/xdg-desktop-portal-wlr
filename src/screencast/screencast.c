@@ -95,9 +95,7 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 
 }
 
-static int start_screencast(void *data) {
-	struct xdpw_screencast_instance *cast = data;
-
+static int start_screencast(struct xdpw_screencast_instance *cast) {
 	xdpw_wlr_register_cb(cast);
 
 	// process at least one frame so that we know
