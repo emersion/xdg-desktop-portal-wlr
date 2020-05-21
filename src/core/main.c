@@ -70,14 +70,15 @@ int main(int argc, char *argv[]) {
 	ret = sd_bus_open_user(&bus);
 	if (ret < 0) {
 		logprint(ERROR, "dbus: failed to connect to user bus: %s", strerror(-ret));
-		goto error;
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "dbus: connected");
 
 	struct wl_display *wl_display = wl_display_connect(NULL);
 	if (!wl_display) {
 		logprint(ERROR, "wayland: failed to connect to display");
-		goto error;
+		sd_bus_unref(bus);
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "wlroots: wl_display connected");
 
@@ -85,7 +86,9 @@ int main(int argc, char *argv[]) {
 	struct pw_loop *pw_loop = pw_loop_new(NULL);
 	if (!pw_loop) {
 		logprint(ERROR, "pipewire: failed to create loop");
-		goto error;
+		wl_display_disconnect(wl_display);
+		sd_bus_unref(bus);
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "pipewire: pw_loop created");
 
