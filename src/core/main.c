@@ -70,7 +70,7 @@ int main(int argc, char *argv[]) {
 	ret = sd_bus_open_user(&bus);
 	if (ret < 0) {
 		logprint(ERROR, "dbus: failed to connect to user bus: %s", strerror(-ret));
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "dbus: connected");
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 	if (!wl_display) {
 		logprint(ERROR, "wayland: failed to connect to display");
 		sd_bus_unref(bus);
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "wlroots: wl_display connected");
 
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
 		logprint(ERROR, "pipewire: failed to create loop");
 		wl_display_disconnect(wl_display);
 		sd_bus_unref(bus);
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 	logprint(DEBUG, "pipewire: pw_loop created");
 
