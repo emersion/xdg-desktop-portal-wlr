@@ -16,7 +16,7 @@ enum event_loop_fd {
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
 
-int xdpw_usage(FILE* stream, int rc) {
+static int xdpw_usage(FILE* stream, int rc) {
 	static const char* usage =
 		"Usage: xdg-desktop-portal-wlr [options]\n"
 		"\n"
