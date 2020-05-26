@@ -24,7 +24,7 @@ static int xdpw_usage(FILE* stream, int rc) {
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
 		"    -o, --output=<name>              Select output to capture.\n"
 		"                                     metadata (performs no conversion).\n"
-		"    -h,--help                        Get help (this text).\n"
+		"    -h, --help                       Get help (this text).\n"
 		"\n";
 
 	fprintf(stream, "%s", usage);
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
 	const char* output_name = NULL;
 	enum LOGLEVEL loglevel = ERROR;
 
-	static const char* shortopts = "l:o:p:h";
+	static const char* shortopts = "l:o:h";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
