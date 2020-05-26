@@ -56,9 +56,9 @@ int main(int argc, char *argv[]) {
 			output_name = optarg;
 			break;
 		case 'h':
-			return xdpw_usage(stdout, 0);
+			return xdpw_usage(stdout, EXIT_SUCCESS);
 		default:
-			return xdpw_usage(stderr, 1);
+			return xdpw_usage(stderr, EXIT_FAILURE);
 		}
 	}
 
