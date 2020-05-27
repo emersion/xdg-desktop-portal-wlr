@@ -17,3 +17,12 @@ Alternatively you can trigger it with [trigger-screen-shot.py] and
 [portal-test]: https://github.com/matthiasclasen/portal-test
 [trigger-screen-shot.py]: https://gitlab.gnome.org/snippets/814
 [xdp-screen-cast.py]: https://gitlab.gnome.org/snippets/19
+
+## Alternate *.portal Location
+
+xdg-desktop-portal will read the XDG_DESKTOP_PORTAL_DIR environment variable for an
+alternate path for *.portal files. This can be useful when testing changes to that
+portal file, or for testing xdpw without installing it. This feature is undocumented
+and shouldn't be relied on, but may be helpful in some circumstances.
+
+https://github.com/flatpak/xdg-desktop-portal/blob/e7f78640e35debb68fef891fc233c449006d9724/src/portal-impl.c#L124
