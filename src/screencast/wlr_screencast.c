@@ -28,8 +28,9 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 		cast->simple_frame.data = NULL;
 		wl_buffer_destroy(cast->simple_frame.buffer);
 		cast->simple_frame.buffer = NULL;
-		logprint(TRACE, "wlroots: frame destroyed");
+		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
 	}
+	logprint(TRACE, "wlroots: frame destroyed");
 
 	if (cast->quit || cast->err) {
 		// TODO: revisit the exit condition (remove quit?)
