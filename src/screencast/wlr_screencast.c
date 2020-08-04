@@ -25,9 +25,11 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	munmap(cast->simple_frame.data, cast->simple_frame.size);
 	cast->simple_frame.data = NULL;
 	// TODO: reuse this buffer unless we quit or error out
-	wl_buffer_destroy(cast->simple_frame.buffer);
-	cast->simple_frame.buffer = NULL;
-	logprint(TRACE, "wlroots: frame destroyed");
+	if (cast->quit || cast->err) {
+		wl_buffer_destroy(cast->simple_frame.buffer);
+		cast->simple_frame.buffer = NULL;
+		logprint(TRACE, "wlroots: frame destroyed");
+	}
 
 	if (cast->quit || cast->err) {
 		// TODO: revisit the exit condition (remove quit?)
