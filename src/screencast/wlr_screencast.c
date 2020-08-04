@@ -106,13 +106,13 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	if (cast->simple_frame.buffer == NULL || cast->simple_frame.data == NULL || cast->simple_frame.width != width || cast->simple_frame.height != height || cast->simple_frame.stride != stride || cast->simple_frame.format != format) {
+	if (cast->simple_frame.width != width || cast->simple_frame.height != height || cast->simple_frame.stride != stride || cast->simple_frame.format != format) {
 		logprint(TRACE, "wlroots: buffer properties changed");
 		if (cast->simple_frame.data != NULL) {
 			munmap(cast->simple_frame.data, cast->simple_frame.size);
 			cast->simple_frame.data = NULL;
 		}
-		if (cast->simple_frame.data != NULL) {
+		if (cast->simple_frame.buffer != NULL) {
 			wl_buffer_destroy(cast->simple_frame.buffer);
 			cast->simple_frame.buffer = NULL;
 		}
@@ -121,12 +121,23 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		cast->simple_frame.stride = stride;
 		cast->simple_frame.size = stride * height;
 		cast->simple_frame.format = format;
+	}
+
+	if (cast->simple_frame.buffer == NULL && cast->simple_frame.data == NULL) {
+		logprint(DEBUG, "wlroots: create shm buffer");
 		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
-			stride, &cast->simple_frame.data); //What happens, with simple_frame buffer? Does it get cleaned up? Detect change?
+			stride, &cast->simple_frame.data);
+	} else {
+		logprint(DEBUG,"wlroots: shm buffer or data exists");
 	}
 
 	if (cast->simple_frame.buffer == NULL) {
 		logprint(ERROR, "wlroots: failed to create buffer");
+		abort();
+	}
+
+	if (cast->simple_frame.data == NULL) {
+		logprint(ERROR, "wlroots: failed to map data");
 		abort();
 	}
 
