@@ -112,6 +112,10 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 			munmap(cast->simple_frame.data, cast->simple_frame.size);
 			cast->simple_frame.data = NULL;
 		}
+		if (cast->simple_frame.data != NULL) {
+			wl_buffer_destroy(cast->simple_frame.buffer);
+			cast->simple_frame.buffer = NULL;
+		}
 		cast->simple_frame.width = width;
 		cast->simple_frame.height = height;
 		cast->simple_frame.stride = stride;
