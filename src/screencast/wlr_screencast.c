@@ -19,15 +19,23 @@
 #include "xdpw.h"
 #include "logger.h"
 
+static void wlr_frame_buffer_clear(struct xdpw_screencast_instance *cast) {
+	if (cast->simple_frame.data != NULL) {
+		munmap(cast->simple_frame.data, cast->simple_frame.size);
+		cast->simple_frame.data = NULL;
+	}
+	if (cast->simple_frame.buffer != NULL) {
+		wl_buffer_destroy(cast->simple_frame.buffer);
+		cast->simple_frame.buffer = NULL;
+	}
+}
+
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
 	// TODO: reuse this buffer unless we quit or error out
 	if (cast->quit || cast->err) {
-		munmap(cast->simple_frame.data, cast->simple_frame.size);
-		cast->simple_frame.data = NULL;
-		wl_buffer_destroy(cast->simple_frame.buffer);
-		cast->simple_frame.buffer = NULL;
+		wlr_frame_buffer_clear(cast);
 		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
 	}
 	logprint(TRACE, "wlroots: frame destroyed");
@@ -100,6 +108,18 @@ static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast
 	return buffer;
 }
 
+static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
+		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
+
+	logprint(DEBUG, "wlroots: reset buffer");
+	cast->simple_frame.width = width;
+	cast->simple_frame.height = height;
+	cast->simple_frame.stride = stride;
+	cast->simple_frame.size = stride * height;
+	cast->simple_frame.format = format;
+	wlr_frame_buffer_clear(cast);
+}
+
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
 	struct xdpw_screencast_instance *cast = data;
@@ -108,19 +128,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	cast->wlr_frame = frame;
 	if (cast->simple_frame.width != width || cast->simple_frame.height != height || cast->simple_frame.stride != stride || cast->simple_frame.format != format) {
 		logprint(TRACE, "wlroots: buffer properties changed");
-		if (cast->simple_frame.data != NULL) {
-			munmap(cast->simple_frame.data, cast->simple_frame.size);
-			cast->simple_frame.data = NULL;
-		}
-		if (cast->simple_frame.buffer != NULL) {
-			wl_buffer_destroy(cast->simple_frame.buffer);
-			cast->simple_frame.buffer = NULL;
-		}
-		cast->simple_frame.width = width;
-		cast->simple_frame.height = height;
-		cast->simple_frame.stride = stride;
-		cast->simple_frame.size = stride * height;
-		cast->simple_frame.format = format;
+		wlr_frame_buffer_chparam(cast, format, width, height, stride);
 	}
 
 	if (cast->simple_frame.buffer == NULL && cast->simple_frame.data == NULL) {
