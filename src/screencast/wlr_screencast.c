@@ -22,10 +22,10 @@
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
-	munmap(cast->simple_frame.data, cast->simple_frame.size);
-	cast->simple_frame.data = NULL;
 	// TODO: reuse this buffer unless we quit or error out
 	if (cast->quit || cast->err) {
+		munmap(cast->simple_frame.data, cast->simple_frame.size);
+		cast->simple_frame.data = NULL;
 		wl_buffer_destroy(cast->simple_frame.buffer);
 		cast->simple_frame.buffer = NULL;
 		logprint(TRACE, "wlroots: frame destroyed");
@@ -105,13 +105,18 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	cast->simple_frame.width = width;
-	cast->simple_frame.height = height;
-	cast->simple_frame.stride = stride;
-	cast->simple_frame.size = stride * height;
-	cast->simple_frame.format = format;
-	cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
-		stride, &cast->simple_frame.data);
+	if (cast->simple_frame.buffer == NULL || cast->simple_frame.width != width || cast->simple_frame.height != height || cast->simple_frame.stride != stride || cast->simple_frame.format != format) {
+		logprint(TRACE, "wlroots: buffer properties changed");
+		munmap(cast->simple_frame.data, cast->simple_frame.size);
+		cast->simple_frame.data = NULL;
+		cast->simple_frame.width = width;
+		cast->simple_frame.height = height;
+		cast->simple_frame.stride = stride;
+		cast->simple_frame.size = stride * height;
+		cast->simple_frame.format = format;
+		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
+			stride, &cast->simple_frame.data); //What happens, with simple_frame buffer? Does it get cleaned up? Detect change?
+	}
 
 	if (cast->simple_frame.buffer == NULL) {
 		logprint(ERROR, "wlroots: failed to create buffer");
