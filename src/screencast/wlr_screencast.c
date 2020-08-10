@@ -131,21 +131,16 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		wlr_frame_buffer_chparam(cast, format, width, height, stride);
 	}
 
-	if (cast->simple_frame.buffer == NULL && cast->simple_frame.data == NULL) {
+	if (cast->simple_frame.buffer == NULL) {
 		logprint(DEBUG, "wlroots: create shm buffer");
 		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
 			stride, &cast->simple_frame.data);
 	} else {
-		logprint(DEBUG,"wlroots: shm buffer or data exists");
+		logprint(DEBUG,"wlroots: shm buffer exists");
 	}
 
 	if (cast->simple_frame.buffer == NULL) {
 		logprint(ERROR, "wlroots: failed to create buffer");
-		abort();
-	}
-
-	if (cast->simple_frame.data == NULL) {
-		logprint(ERROR, "wlroots: failed to map data");
 		abort();
 	}
 
