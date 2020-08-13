@@ -136,7 +136,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
 			stride, &cast->simple_frame.data);
 	} else {
-		logprint(DEBUG,"wlroots: shm buffer exists");
+		logprint(TRACE,"wlroots: shm buffer exists");
 	}
 
 	if (cast->simple_frame.buffer == NULL) {
