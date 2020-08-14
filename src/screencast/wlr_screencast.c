@@ -127,6 +127,11 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	cast->simple_frame.size = stride * height;
 	cast->simple_frame.format = format;
 	wlr_frame_buffer_destroy(cast);
+
+	if (cast->pwr_stream_state) {
+		logprint(DEBUG, "wlroots: request pipewire param change");
+		pwr_update_stream_param(cast);
+	}
 }
 
 static void wlr_frame_linux_dmabuf(void *data,
