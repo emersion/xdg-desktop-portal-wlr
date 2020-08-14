@@ -19,7 +19,7 @@
 #include "xdpw.h"
 #include "logger.h"
 
-static void wlr_frame_buffer_clear(struct xdpw_screencast_instance *cast) {
+static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// This check isn't needed
 	if (cast->simple_frame.data != NULL) {
 		munmap(cast->simple_frame.data, cast->simple_frame.size);
@@ -37,7 +37,7 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	cast->wlr_frame = NULL;
 	// TODO: reuse this buffer unless we quit or error out
 	if (cast->quit || cast->err) {
-		wlr_frame_buffer_clear(cast);
+		wlr_frame_buffer_destroy(cast);
 		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
 	}
 	logprint(TRACE, "wlroots: frame destroyed");
@@ -119,7 +119,7 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	cast->simple_frame.stride = stride;
 	cast->simple_frame.size = stride * height;
 	cast->simple_frame.format = format;
-	wlr_frame_buffer_clear(cast);
+	wlr_frame_buffer_destroy(cast);
 }
 
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
