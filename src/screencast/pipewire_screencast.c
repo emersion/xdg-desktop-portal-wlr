@@ -132,6 +132,7 @@ static void pwr_handle_stream_state_changed(void *data,
 
 static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 		const struct spa_pod *param) {
+	logprint(TRACE, "pipewire: stream parameters changed");
 	struct xdpw_screencast_instance *cast = data;
 	struct pw_stream *stream = cast->stream;
 	uint8_t params_buffer[1024];
