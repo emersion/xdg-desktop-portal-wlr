@@ -35,7 +35,6 @@ static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
-	// TODO: reuse this buffer unless we quit or error out
 	if (cast->quit || cast->err) {
 		wlr_frame_buffer_destroy(cast);
 		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
