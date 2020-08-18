@@ -20,12 +20,9 @@
 #include "logger.h"
 
 static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
-	// This check isn't needed
-	if (cast->simple_frame.data != NULL) {
-		munmap(cast->simple_frame.data, cast->simple_frame.size);
-		cast->simple_frame.data = NULL;
-	}
-	// This one is
+	munmap(cast->simple_frame.data, cast->simple_frame.size);
+	cast->simple_frame.data = NULL;
+	// wl_buffer_destroy won't work on NULL
 	if (cast->simple_frame.buffer != NULL) {
 		wl_buffer_destroy(cast->simple_frame.buffer);
 		cast->simple_frame.buffer = NULL;
