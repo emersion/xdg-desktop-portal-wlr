@@ -124,7 +124,10 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	if (cast->simple_frame.width != width || cast->simple_frame.height != height || cast->simple_frame.stride != stride || cast->simple_frame.format != format) {
+	if (cast->simple_frame.width != width ||
+			cast->simple_frame.height != height ||
+			cast->simple_frame.stride != stride ||
+			cast->simple_frame.format != format) {
 		logprint(TRACE, "wlroots: buffer properties changed");
 		wlr_frame_buffer_chparam(cast, format, width, height, stride);
 	}
