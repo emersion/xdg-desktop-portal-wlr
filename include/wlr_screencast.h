@@ -5,7 +5,7 @@
 
 #define WL_OUTPUT_VERSION 1
 
-#define SC_MANAGER_VERSION 2
+#define SC_MANAGER_VERSION 3
 
 #define WL_SHM_VERSION 1
 

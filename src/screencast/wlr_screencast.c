@@ -123,6 +123,22 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	wlr_frame_buffer_destroy(cast);
 }
 
+static void wlr_frame_linux_dmabuf(void *data,
+		struct zwlr_screencopy_frame_v1 *frame,
+		uint32_t format, uint32_t width, uint32_t height) {
+
+	logprint(TRACE, "wlroots: linux_dmabuf event handler");
+}
+
+static void wlr_frame_buffer_done(void *data,
+		struct zwlr_screencopy_frame_v1 *frame) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: buffer_done event handler");
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
+	logprint(TRACE, "wlroots: frame copied");
+}
+
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
 	struct xdpw_screencast_instance *cast = data;
@@ -150,8 +166,6 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		abort();
 	}
 
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
-	logprint(TRACE, "wlroots: frame copied");
 }
 
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -203,6 +217,8 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 	.buffer = wlr_frame_buffer,
+	.buffer_done = wlr_frame_buffer_done,
+	.linux_dmabuf = wlr_frame_linux_dmabuf,
 	.flags = wlr_frame_flags,
 	.ready = wlr_frame_ready,
 	.failed = wlr_frame_failed,
