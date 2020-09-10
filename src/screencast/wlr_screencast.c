@@ -325,10 +325,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
 
+	logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)",interface, ver);
 	if (!strcmp(interface, wl_output_interface.name)) {
 		struct xdpw_wlr_output *output = malloc(sizeof(*output));
 
 		output->id = id;
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_OUTPUT_VERSION);
 		output->output = wl_registry_bind(reg, id, &wl_output_interface, WL_OUTPUT_VERSION);
 
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
@@ -336,15 +338,19 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	}
 
 	if (!strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
+		uint32_t version = SC_MANAGER_VERSION;
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
 		ctx->screencopy_manager = wl_registry_bind(
-			reg, id, &zwlr_screencopy_manager_v1_interface, SC_MANAGER_VERSION);
+			reg, id, &zwlr_screencopy_manager_v1_interface, version);
 	}
 
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_SHM_VERSION);
 		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, WL_SHM_VERSION);
 	}
 
 	if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, XDG_OUTPUT_MANAGER_VERSION);
 		ctx->xdg_output_manager =
 			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
