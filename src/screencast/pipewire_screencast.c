@@ -57,15 +57,15 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 		return;
 	}
 
-	writeFrameData(d[0].data, cast->simple_frame.data, cast->simple_frame.height,
-		cast->simple_frame.stride, cast->simple_frame.y_invert);
+	writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
+		cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
 
 	logprint(TRACE, "pipewire: pointer %p", d[0].data);
 	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
 	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: width %d", cast->simple_frame.width);
-	logprint(TRACE, "pipewire: height %d", cast->simple_frame.height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->simple_frame.y_invert);
+	logprint(TRACE, "pipewire: width %d", cast->xdpw_frames.screencopy_frame.width);
+	logprint(TRACE, "pipewire: height %d", cast->xdpw_frames.screencopy_frame.height);
+	logprint(TRACE, "pipewire: y_invert %d", cast->xdpw_frames.screencopy_frame.y_invert);
 	logprint(TRACE, "********************");
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
@@ -111,8 +111,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
 		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(BUFFERS, 1, 32),
 		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
-		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->simple_frame.size),
-		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->simple_frame.stride),
+		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->xdpw_frames.simple_frame.size),
+		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->xdpw_frames.simple_frame.stride),
 		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(ALIGN));
 
 	params[1] = spa_pod_builder_add_object(&b,
@@ -158,10 +158,10 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	// Prepare buffer for choosen type
 	if (d[0].type == SPA_DATA_MemPtr) {
 		d[0].type = SPA_DATA_MemFd;
-		d[0].maxsize = cast->simple_frame.size;
+		d[0].maxsize = cast->xdpw_frames.simple_frame.size;
 		d[0].mapoffset = 0;
-		d[0].chunk->size = cast->simple_frame.size;
-		d[0].chunk->stride = cast->simple_frame.stride;
+		d[0].chunk->size = cast->xdpw_frames.simple_frame.size;
+		d[0].chunk->stride = cast->xdpw_frames.simple_frame.stride;
 		d[0].chunk->offset = 0;
 		d[0].flags = SPA_DATA_FLAG_READWRITE;
 		d[0].fd = anonymous_shm_open();
@@ -254,7 +254,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
 			format, format, format_without_alpha),
 		SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
-			&SPA_RECTANGLE(cast->simple_frame.width, cast->simple_frame.height),
+			&SPA_RECTANGLE(cast->xdpw_frames.simple_frame.width, cast->xdpw_frames.simple_frame.height),
 			&SPA_RECTANGLE(1, 1),
 			&SPA_RECTANGLE(4096, 4096)),
 		// variable framerate

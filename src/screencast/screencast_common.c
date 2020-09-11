@@ -37,7 +37,7 @@ int anonymous_shm_open(void) {
 
 enum spa_video_format xdpw_format_pw_from_wl_shm(
 		struct xdpw_screencast_instance *cast) {
-	switch (cast->simple_frame.format) {
+	switch (cast->xdpw_frames.screencopy_frame.format) {
 	case WL_SHM_FORMAT_ARGB8888:
 		return SPA_VIDEO_FORMAT_BGRA;
 	case WL_SHM_FORMAT_XRGB8888:

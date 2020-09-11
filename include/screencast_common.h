@@ -102,7 +102,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_wlr_output *target_output;
 	uint32_t framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_frame simple_frame;
+	union xdpw_frame xdpw_frames;
 	bool with_cursor;
 	int err;
 	bool quit;
