@@ -447,7 +447,7 @@ int xdpw_screencast_init(struct xdpw_state *state, const char *output_name) {
 		goto end;
 	}
 
-	err = xdpw_wlr_screencopy_init(state);
+	err = xdpw_wlr_screencast_init(state);
 	if (err) {
 		goto end;
 	}
@@ -457,6 +457,6 @@ int xdpw_screencast_init(struct xdpw_state *state, const char *output_name) {
 
 end:
 	// TODO: clean up pipewire
-	xdpw_wlr_screencopy_finish(&state->screencast);
+	xdpw_wlr_screencast_finish(&state->screencast);
 	return err;
 }

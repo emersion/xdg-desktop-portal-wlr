@@ -372,7 +372,7 @@ static const struct wl_registry_listener wlr_registry_listener = {
 	.global_remove = wlr_registry_handle_remove,
 };
 
-int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
+int xdpw_wlr_screencast_init(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	// initialize a list of outputs
@@ -413,7 +413,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	return 0;
 }
 
-void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
+void xdpw_wlr_screencast_finish(struct xdpw_screencast_context *ctx) {
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
