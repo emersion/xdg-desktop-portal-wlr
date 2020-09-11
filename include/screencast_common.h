@@ -51,6 +51,11 @@ struct xdpw_screencopy_frame {
 	void *data;
 };
 
+union xdpw_frame {
+	struct xdpw_simple_frame simple_frame;
+	struct xdpw_screencopy_frame screencopy_frame;
+};
+
 struct xdpw_screencast_context {
 
 	// xdpw
