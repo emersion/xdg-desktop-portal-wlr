@@ -20,6 +20,14 @@ enum source_types {
   WINDOW = 2,
 };
 
+struct xdpw_simple_frame {
+	uint32_t width;
+	uint32_t height;
+	uint32_t size;
+	uint32_t stride;
+	bool y_invert;
+};
+
 struct xdpw_frame_damage {
 	uint32_t x;
 	uint32_t y;
