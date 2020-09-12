@@ -21,13 +21,13 @@
 
 static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// Even though this check may be deemed unnecessary,
-	// this has been found to cause SEGFAULTs, like this one: 
+	// this has been found to cause SEGFAULTs, like this one:
 	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
 	if (cast->simple_frame.data != NULL) {
 		munmap(cast->simple_frame.data, cast->simple_frame.size);
 		cast->simple_frame.data = NULL;
 	}
-	
+
 	if (cast->simple_frame.buffer != NULL) {
 		wl_buffer_destroy(cast->simple_frame.buffer);
 		cast->simple_frame.buffer = NULL;
