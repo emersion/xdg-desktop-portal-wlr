@@ -48,6 +48,7 @@ executable(
 		'src/screencast/screencast.c',
 		'src/screencast/screencast_common.c',
 		'src/screencast/wlr_screencast.c',
+		'src/screencast/wlr_screencast_common.c',
 		'src/screencast/wlr_screencopy.c',
 		'src/screencast/pipewire_screencast.c',
 	]),
