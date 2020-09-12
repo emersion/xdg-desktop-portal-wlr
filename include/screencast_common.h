@@ -5,6 +5,8 @@
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
 
+#include <gbm.h>
+
 // this seems to be right based on
 // https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
 #define XDP_CAST_PROTO_VER 2
@@ -76,6 +78,7 @@ struct xdpw_screencast_context {
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
 	struct zxdg_output_manager_v1* xdg_output_manager;
 	struct wl_shm *shm;
+	struct gbm_device *gbm;
 
 	// cli options
 	const char *output_name;
