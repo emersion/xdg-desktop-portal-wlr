@@ -329,7 +329,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		struct xdpw_wlr_output *output = malloc(sizeof(*output));
 
 		output->id = id;
-		output->output = wl_registry_bind(reg, id, &wl_output_interface, 1);
+		output->output = wl_registry_bind(reg, id, &wl_output_interface, WL_OUTPUT_VERSION);
 
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
 		wl_list_insert(&ctx->output_list, &output->link);
@@ -341,12 +341,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	}
 
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
-		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, 1);
+		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, WL_SHM_VERSION);
 	}
 
 	if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
 		ctx->xdg_output_manager =
-			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, 3);
+			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
 }
 
