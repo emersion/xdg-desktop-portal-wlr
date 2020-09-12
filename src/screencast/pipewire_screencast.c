@@ -239,7 +239,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		pw_loop_add_event(state->pw_loop, pwr_on_event, cast);
 	logprint(DEBUG, "pipewire: registered event %p", cast->event);
 
-	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast);
+	enum spa_video_format format = xdpw_format_pw(cast);
 	enum spa_video_format format_without_alpha =
 		xdpw_format_pw_strip_alpha(format);
 	uint32_t n_formats = 1;
