@@ -20,6 +20,11 @@ enum source_types {
   WINDOW = 2,
 };
 
+enum xdpw_instance_type {
+	XDPW_INSTANCE_NONE=0,
+	XDPW_INSTANCE_SCP_SHM,
+};
+
 struct xdpw_simple_frame {
 	uint32_t width;
 	uint32_t height;
@@ -87,6 +92,7 @@ struct xdpw_screencast_instance {
 	uint32_t refcount;
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
+	enum xdpw_instance_type type;
 
 	// pipewire
 	struct spa_source *event;
