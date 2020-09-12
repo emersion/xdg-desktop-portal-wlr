@@ -28,22 +28,10 @@ static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
 	return;
 }
 
-static void pwr_on_event(void *data, uint64_t expirations) {
-	struct xdpw_screencast_instance *cast = data;
-	struct pw_buffer *pw_buf;
-	struct spa_buffer *spa_buf;
+void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_instance *cast) {
 	struct spa_meta_header *h;
 	struct spa_data *d;
 
-	logprint(TRACE, "********************");
-	logprint(TRACE, "pipewire: event fired");
-
-	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
-		logprint(WARN, "pipewire: out of buffers");
-		return;
-	}
-
-	spa_buf = pw_buf->buffer;
 	d = spa_buf->datas;
 	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
 		h->pts = -1;
@@ -67,6 +55,22 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 	logprint(TRACE, "pipewire: height %d", cast->xdpw_frames.screencopy_frame.height);
 	logprint(TRACE, "pipewire: y_invert %d", cast->xdpw_frames.screencopy_frame.y_invert);
 	logprint(TRACE, "********************");
+
+}
+
+static void pwr_on_event(void *data, uint64_t expirations) {
+	struct xdpw_screencast_instance *cast = data;
+	struct pw_buffer *pw_buf;
+
+	logprint(TRACE, "********************");
+	logprint(TRACE, "pipewire: event fired");
+
+	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
+		logprint(WARN, "pipewire: out of buffers");
+		return;
+	}
+
+	pwr_copy_screencast(pw_buf->buffer, cast);
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
 
