@@ -19,6 +19,7 @@
 #include "xdpw.h"
 #include "logger.h"
 
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include <gbm.h>
 #include <xf86drm.h>
 
@@ -73,6 +74,62 @@ struct wl_buffer *wlr_create_shm_buffer(struct xdpw_screencast_instance *cast,
 
 	*data_out = data;
 	return buffer;
+}
+
+struct wl_buffer *wlr_create_dmabuf_buffer(struct xdpw_screencast_instance *cast,
+		int width, int height, uint32_t fourcc, struct gbm_bo **bo_out) {
+	struct gbm_bo *bo;
+	bo = gbm_bo_create(cast->ctx->gbm, width, height, fourcc,
+		GBM_BO_USE_RENDERING);
+	if (bo == NULL) {
+		logprint(ERROR, "wlroots: failed to create gbm_bo");
+		return NULL;
+	}
+
+	struct zwp_linux_buffer_params_v1* params;
+	params = zwp_linux_dmabuf_v1_create_params(cast->ctx->linux_dmabuf);
+	if (!params) {
+		logprint(ERROR, "wlroots: failed to create linux_buffer_params");
+		gbm_bo_destroy(bo);
+		return NULL;
+	}
+
+	uint32_t offset = gbm_bo_get_offset(bo, 0);
+	uint32_t stride = gbm_bo_get_stride(bo);
+	uint64_t mod = gbm_bo_get_modifier(bo);
+	int fd = gbm_bo_get_fd(bo);
+
+	if (fd < 0) {
+		logprint(ERROR, "wlroots: failed to get file descriptor");
+		zwp_linux_buffer_params_v1_destroy(params);
+		gbm_bo_destroy(bo);
+		return NULL;
+	}
+
+	zwp_linux_buffer_params_v1_add(params, fd, 0, offset, stride,
+		mod >> 32, mod & 0xffffffff);
+	struct wl_buffer *buffer = zwp_linux_buffer_params_v1_create_immed(params,
+		width, height, fourcc, /* flags */ 0);
+	zwp_linux_buffer_params_v1_destroy(params);
+	close(fd);
+
+	if (!buffer) {
+		logprint(ERROR, "wlroots: failed to create buffer");
+		gbm_bo_destroy(bo);
+	}
+
+	*bo_out = bo;
+	return buffer;
+}
+
+void wlr_destroy_dmabuf_buffer(struct wl_buffer *buffer, struct gbm_bo *bo) {
+	if (buffer != NULL) {
+		wl_buffer_destroy(buffer);
+		buffer = NULL;
+	}
+	if (bo) {
+		gbm_bo_destroy(bo);
+	}
 }
 
 static char *gbm_find_render_node(size_t maxlen) {
