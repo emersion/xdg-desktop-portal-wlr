@@ -1,4 +1,5 @@
 #include "wlr_screencast.h"
+#include "wlr_screencast_common.h"
 #include "wlr_screencopy.h"
 
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
@@ -230,6 +231,12 @@ int xdpw_wlr_screencast_init(struct xdpw_state *state) {
 		return -1;
 	}
 
+	// create gbm_device
+	ctx->gbm = create_gbm_device();
+	if (!ctx->gbm) {
+		logprint(ERROR, "System doesn't support %s!", "gbm");
+	}
+
 	if (xdpw_wlr_screencopy_init(state) != 0) {
 		return -1;
 	}
@@ -254,6 +261,9 @@ void xdpw_wlr_screencast_finish(struct xdpw_screencast_context *ctx) {
 
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);
+	}
+	if (ctx->gbm) {
+		destroy_gbm_device(ctx->gbm);
 	}
 	if (ctx->xdg_output_manager) {
 		zxdg_output_manager_v1_destroy(ctx->xdg_output_manager);
