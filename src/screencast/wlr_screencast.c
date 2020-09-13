@@ -21,6 +21,8 @@
 #include "xdpw.h"
 #include "logger.h"
 
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
+
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	switch (cast->type) {
 	case XDPW_INSTANCE_SCP_SHM:
@@ -182,6 +184,10 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		ctx->xdg_output_manager =
 			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
+	if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, LINUX_DMABUF_VERSION);
+		ctx->linux_dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, LINUX_DMABUF_VERSION);
+	}
 }
 
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
@@ -261,6 +267,9 @@ void xdpw_wlr_screencast_finish(struct xdpw_screencast_context *ctx) {
 
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);
+	}
+	if (ctx->linux_dmabuf) {
+		zwp_linux_dmabuf_v1_destroy(ctx->linux_dmabuf);
 	}
 	if (ctx->gbm) {
 		destroy_gbm_device(ctx->gbm);

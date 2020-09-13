@@ -5,6 +5,7 @@
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
 
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include <gbm.h>
 
 // this seems to be right based on
@@ -79,6 +80,7 @@ struct xdpw_screencast_context {
 	struct zxdg_output_manager_v1* xdg_output_manager;
 	struct wl_shm *shm;
 	struct gbm_device *gbm;
+	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 
 	// cli options
 	const char *output_name;
