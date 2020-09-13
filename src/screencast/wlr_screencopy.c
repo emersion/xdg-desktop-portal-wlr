@@ -28,6 +28,10 @@ static void wlr_screencopy_buffer_free(struct xdpw_screencast_instance *cast) {
 			cast->xdpw_frames.screencopy_frame.data,
 			cast->xdpw_frames.screencopy_frame.size);
 		break;
+	case XDPW_INSTANCE_SCP_DMABUF:
+		wlr_destroy_dmabuf_buffer(cast->xdpw_frames.screencopy_frame.buffer,
+			cast->xdpw_frames.screencopy_frame.bo);
+		break;
 	default:
 		abort();
 	}
@@ -54,6 +58,9 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	case XDPW_INSTANCE_SCP_SHM:
 		cast->xdpw_frames.screencopy_frame.format = format;
 		break;
+	case XDPW_INSTANCE_SCP_DMABUF:
+		cast->xdpw_frames.screencopy_frame.fourcc = format;
+		break;
 	default:
 		abort();
 	}
@@ -68,6 +75,28 @@ static void wlr_frame_linux_dmabuf(void *data,
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
 	switch (cast->type) {
 	case XDPW_INSTANCE_SCP_SHM:
+		break;
+	case XDPW_INSTANCE_SCP_DMABUF:
+		cast->wlr_frame = frame;
+		if (cast->xdpw_frames.screencopy_frame.width != width ||
+				cast->xdpw_frames.screencopy_frame.height != height ||
+				cast->xdpw_frames.screencopy_frame.fourcc != format) {
+			logprint(TRACE, "wlroots: buffer properties changed");
+			wlr_frame_buffer_chparam(cast, format, width, height, 0);
+		}
+
+		if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
+			logprint(DEBUG, "wlroots: create dmabuf buffer");
+			cast->xdpw_frames.screencopy_frame.buffer = wlr_create_dmabuf_buffer(cast,
+				width, height, format, &cast->xdpw_frames.screencopy_frame.bo);
+		} else {
+			logprint(TRACE,"wlroots: dmabuf buffer exists");
+		}
+
+		if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
+			logprint(ERROR, "wlroots: failed to create buffer");
+			abort();
+		}
 		break;
 	default:
 		abort();
@@ -115,6 +144,8 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 			wlr_frame_buffer_done(cast,frame);
 		}
+		break;
+	case XDPW_INSTANCE_SCP_DMABUF:
 		break;
 	default:
 		abort();
