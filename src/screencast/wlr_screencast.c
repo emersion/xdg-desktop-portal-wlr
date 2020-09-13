@@ -21,7 +21,13 @@
 #include "logger.h"
 
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
-	xdpw_wlr_screencopy_frame_free(cast);
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		xdpw_wlr_screencopy_frame_free(cast);
+		break;
+	default:
+		abort();
+	}
 
 	if (cast->quit || cast->err) {
 		// TODO: revisit the exit condition (remove quit?)
@@ -36,7 +42,13 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
 
-	xdpw_wlr_screencopy_register_cb(cast);
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		xdpw_wlr_screencopy_register_cb(cast);
+		break;
+	default:
+		abort();
+	}
 	logprint(TRACE, "wlroots: callbacks registered");
 }
 
