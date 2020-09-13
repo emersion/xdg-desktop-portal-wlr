@@ -40,26 +40,42 @@ void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_inst
 		h->dts_offset = 0;
 	}
 
-	switch (cast->type) {
-	case XDPW_INSTANCE_SCP_SHM:
-		if ((d[0].data) == NULL) {
-			logprint(TRACE, "pipewire: data pointer undefined");
-			return;
-		}
+	switch (d[0].type) {
+	case SPA_DATA_MemFd:
+		switch (cast->type) {
+		case XDPW_INSTANCE_SCP_SHM:
+			if ((d[0].data) == NULL) {
+				logprint(TRACE, "pipewire: data pointer undefined");
+				return;
+			}
 
-		writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
-			cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
+			writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
+				cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
+			break;
+		default:
+			abort();
+		}
+		break;
+	case SPA_DATA_DmaBuf:
+		switch (cast->type) {
+		case XDPW_INSTANCE_SCP_DMABUF:
+			d[0].fd = cast->xdpw_frames.screencopy_frame.fd;
+			break;
+		default:
+			abort();
+		}
 		break;
 	default:
 		abort();
 	}
 
 	logprint(TRACE, "pipewire: pointer %p", d[0].data);
+	logprint(TRACE, "pipewire: fd %d", d[0].fd);
 	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
 	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: width %d", cast->xdpw_frames.screencopy_frame.width);
-	logprint(TRACE, "pipewire: height %d", cast->xdpw_frames.screencopy_frame.height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->xdpw_frames.screencopy_frame.y_invert);
+	logprint(TRACE, "pipewire: width %d", cast->xdpw_frames.simple_frame.width);
+	logprint(TRACE, "pipewire: height %d", cast->xdpw_frames.simple_frame.height);
+	logprint(TRACE, "pipewire: y_invert %d", cast->xdpw_frames.simple_frame.y_invert);
 }
 
 static void pwr_on_event(void *data, uint64_t expirations) {
@@ -143,6 +159,10 @@ uint32_t pwr_choose_buffertype(struct xdpw_screencast_instance *cast, uint32_t b
 		type = SPA_DATA_MemPtr;
 		return type;
 	}
+	if ((buffermask & (1<<SPA_DATA_DmaBuf)) > 0) {
+		type = SPA_DATA_DmaBuf;
+		return type;
+	}
 	if ((buffermask & (1<<SPA_DATA_MemPtr)) > 0) {
 		type = SPA_DATA_MemPtr;
 		return type;
@@ -191,6 +211,14 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 			logprint(ERROR, "pipewire: unable to mmap memory");
 			return;
 		}
+	} else if (d[0].type == SPA_DATA_DmaBuf) {
+		d[0].maxsize = cast->xdpw_frames.screencopy_frame.size;
+		d[0].mapoffset = cast->xdpw_frames.screencopy_frame.offset;
+		d[0].chunk->size = cast->xdpw_frames.screencopy_frame.size;
+		d[0].chunk->stride = cast->xdpw_frames.screencopy_frame.stride;
+		d[0].chunk->offset = cast->xdpw_frames.screencopy_frame.offset;
+		d[0].flags = 0;
+		d[0].fd = cast->xdpw_frames.screencopy_frame.fd;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
 		cast->err = 1;
