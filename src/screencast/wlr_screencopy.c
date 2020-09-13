@@ -21,26 +21,16 @@
 #include "xdpw.h"
 #include "logger.h"
 
-static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
-	// Even though this check may be deemed unnecessary,
-	// this has been found to cause SEGFAULTs, like this one:
-	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
-	if (cast->xdpw_frames.screencopy_frame.data != NULL) {
-		munmap(cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.size);
-		cast->xdpw_frames.screencopy_frame.data = NULL;
-	}
-
-	if (cast->xdpw_frames.screencopy_frame.buffer != NULL) {
-		wl_buffer_destroy(cast->xdpw_frames.screencopy_frame.buffer);
-		cast->xdpw_frames.screencopy_frame.buffer = NULL;
-	}
+static void wlr_screencopy_buffer_free(struct xdpw_screencast_instance *cast) {
+	wlr_destroy_shm_buffer(cast->xdpw_frames.screencopy_frame.buffer,
+		cast->xdpw_frames.screencopy_frame.data,
+		cast->xdpw_frames.screencopy_frame.size);
 }
-
 void xdpw_wlr_screencopy_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
 	if (cast->quit || cast->err) {
-		wlr_frame_buffer_destroy(cast);
+		wlr_screencopy_buffer_free(cast);
 		logprint(TRACE, "xdpw: xdpw_frames.screencopy_frame buffer destroyed");
 	}
 	logprint(TRACE, "wlroots: frame destroyed");
@@ -55,7 +45,7 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	cast->xdpw_frames.screencopy_frame.stride = stride;
 	cast->xdpw_frames.screencopy_frame.size = stride * height;
 	cast->xdpw_frames.screencopy_frame.format = format;
-	wlr_frame_buffer_destroy(cast);
+	wlr_screencopy_buffer_free(cast);
 }
 
 static void wlr_frame_linux_dmabuf(void *data,
