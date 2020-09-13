@@ -61,11 +61,38 @@ enum spa_video_format xdpw_format_pw_from_wl_shm(
 	}
 }
 
+enum spa_video_format xdpw_format_pw_from_dmabuf(uint32_t fourcc) {
+	switch (fourcc) {
+	case GBM_FORMAT_NV12:
+		return SPA_VIDEO_FORMAT_NV12;
+	case GBM_FORMAT_ARGB8888:
+		return SPA_VIDEO_FORMAT_BGRA;
+	case GBM_FORMAT_XRGB8888:
+		return SPA_VIDEO_FORMAT_BGRx;
+	case GBM_FORMAT_ABGR8888:
+		return SPA_VIDEO_FORMAT_RGBA;
+	case GBM_FORMAT_XBGR8888:
+		return SPA_VIDEO_FORMAT_RGBx;
+	case GBM_FORMAT_RGBA8888:
+		return SPA_VIDEO_FORMAT_ABGR;
+	case GBM_FORMAT_RGBX8888:
+		return SPA_VIDEO_FORMAT_xBGR;
+	case GBM_FORMAT_BGRA8888:
+		return SPA_VIDEO_FORMAT_ARGB;
+	case GBM_FORMAT_BGRX8888:
+		return SPA_VIDEO_FORMAT_xRGB;
+	default:
+		return SPA_VIDEO_FORMAT_UNKNOWN;
+	}
+}
+
 enum spa_video_format xdpw_format_pw(
 		struct xdpw_screencast_instance *cast) {
 	switch (cast->type) {
 	case XDPW_INSTANCE_SCP_SHM:
 		return xdpw_format_pw_from_wl_shm(cast->xdpw_frames.screencopy_frame.format);
+	case XDPW_INSTANCE_SCP_DMABUF:
+		return xdpw_format_pw_from_dmabuf(cast->xdpw_frames.screencopy_frame.fourcc);
 	default:
 		abort();
 	}
