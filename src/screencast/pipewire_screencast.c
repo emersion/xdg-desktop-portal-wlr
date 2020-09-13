@@ -40,13 +40,19 @@ void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_inst
 		h->dts_offset = 0;
 	}
 
-	if ((d[0].data) == NULL) {
-		logprint(TRACE, "pipewire: data pointer undefined");
-		return;
-	}
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		if ((d[0].data) == NULL) {
+			logprint(TRACE, "pipewire: data pointer undefined");
+			return;
+		}
 
-	writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
-		cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
+		writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
+			cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
+		break;
+	default:
+		abort();
+	}
 
 	logprint(TRACE, "pipewire: pointer %p", d[0].data);
 	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
@@ -54,8 +60,6 @@ void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_inst
 	logprint(TRACE, "pipewire: width %d", cast->xdpw_frames.screencopy_frame.width);
 	logprint(TRACE, "pipewire: height %d", cast->xdpw_frames.screencopy_frame.height);
 	logprint(TRACE, "pipewire: y_invert %d", cast->xdpw_frames.screencopy_frame.y_invert);
-	logprint(TRACE, "********************");
-
 }
 
 static void pwr_on_event(void *data, uint64_t expirations) {
@@ -73,6 +77,8 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 	pwr_copy_screencast(pw_buf->buffer, cast);
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
+
+	logprint(TRACE, "********************");
 
 	xdpw_wlr_frame_free(cast);
 }
