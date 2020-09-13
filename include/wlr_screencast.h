@@ -13,6 +13,8 @@ struct xdpw_state;
 
 int xdpw_wlr_screencast_init(struct xdpw_state *state);
 void xdpw_wlr_screencast_finish(struct xdpw_screencast_context *ctx);
+enum xdpw_instance_type xdpw_wlr_screencast_select_backend(
+		struct xdpw_screencast_context *ctx);
 
 struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
 	const char *name);

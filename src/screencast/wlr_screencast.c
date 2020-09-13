@@ -182,6 +182,11 @@ static const struct wl_registry_listener wlr_registry_listener = {
 	.global_remove = wlr_registry_handle_remove,
 };
 
+enum xdpw_instance_type xdpw_wlr_screencast_select_backend(
+		struct xdpw_screencast_context *ctx) {
+	return XDPW_INSTANCE_SCP_SHM;
+}
+
 int xdpw_wlr_screencast_init(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 

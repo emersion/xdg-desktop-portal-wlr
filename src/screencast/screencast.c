@@ -25,6 +25,7 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	cast->framerate = out->framerate;
 	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
+	cast->type = xdpw_wlr_screencast_select_backend(cast->ctx);
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
 	logprint(INFO, "xdpw: %d active screencast instances",
