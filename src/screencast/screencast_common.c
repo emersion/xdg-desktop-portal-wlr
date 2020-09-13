@@ -63,7 +63,12 @@ enum spa_video_format xdpw_format_pw_from_wl_shm(
 
 enum spa_video_format xdpw_format_pw(
 		struct xdpw_screencast_instance *cast) {
-	return xdpw_format_pw_from_wl_shm(cast->xdpw_frames.screencopy_frame.format);
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		return xdpw_format_pw_from_wl_shm(cast->xdpw_frames.screencopy_frame.format);
+	default:
+		abort();
+	}
 }
 
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format) {
