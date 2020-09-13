@@ -22,9 +22,15 @@
 #include "logger.h"
 
 static void wlr_screencopy_buffer_free(struct xdpw_screencast_instance *cast) {
-	wlr_destroy_shm_buffer(cast->xdpw_frames.screencopy_frame.buffer,
-		cast->xdpw_frames.screencopy_frame.data,
-		cast->xdpw_frames.screencopy_frame.size);
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		wlr_destroy_shm_buffer(cast->xdpw_frames.screencopy_frame.buffer,
+			cast->xdpw_frames.screencopy_frame.data,
+			cast->xdpw_frames.screencopy_frame.size);
+		break;
+	default:
+		abort();
+	}
 }
 void xdpw_wlr_screencopy_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
@@ -44,16 +50,28 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	cast->xdpw_frames.screencopy_frame.height = height;
 	cast->xdpw_frames.screencopy_frame.stride = stride;
 	cast->xdpw_frames.screencopy_frame.size = stride * height;
-	cast->xdpw_frames.screencopy_frame.format = format;
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		cast->xdpw_frames.screencopy_frame.format = format;
+		break;
+	default:
+		abort();
+	}
 	wlr_screencopy_buffer_free(cast);
 }
 
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
-	//struct xdpw_screencast_instance *cast = data;
+	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		break;
+	default:
+		abort();
+	}
 }
 
 static void wlr_frame_buffer_done(void *data,
@@ -70,30 +88,36 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer event handler");
-	cast->wlr_frame = frame;
-	if (cast->xdpw_frames.screencopy_frame.width != width ||
-			cast->xdpw_frames.screencopy_frame.height != height ||
-			cast->xdpw_frames.screencopy_frame.stride != stride ||
-			cast->xdpw_frames.screencopy_frame.format != format) {
-		logprint(TRACE, "wlroots: buffer properties changed");
-		wlr_frame_buffer_chparam(cast, format, width, height, stride);
-	}
+	switch(cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		cast->wlr_frame = frame;
+		if (cast->xdpw_frames.screencopy_frame.width != width ||
+				cast->xdpw_frames.screencopy_frame.height != height ||
+				cast->xdpw_frames.screencopy_frame.stride != stride ||
+				cast->xdpw_frames.screencopy_frame.format != format) {
+			logprint(TRACE, "wlroots: buffer properties changed");
+			wlr_frame_buffer_chparam(cast, format, width, height, stride);
+		}
 
-	if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
-		logprint(DEBUG, "wlroots: create shm buffer");
-		cast->xdpw_frames.screencopy_frame.buffer = wlr_create_shm_buffer(cast, format, width, height,
-			stride, &cast->xdpw_frames.screencopy_frame.data);
-	} else {
-		logprint(TRACE,"wlroots: shm buffer exists");
-	}
+		if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
+			logprint(DEBUG, "wlroots: create shm buffer");
+			cast->xdpw_frames.screencopy_frame.buffer = wlr_create_shm_buffer(cast, format, width, height,
+				stride, &cast->xdpw_frames.screencopy_frame.data);
+		} else {
+			logprint(TRACE,"wlroots: shm buffer exists");
+		}
 
-	if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
-		logprint(ERROR, "wlroots: failed to create buffer");
+		if (cast->xdpw_frames.screencopy_frame.buffer == NULL) {
+			logprint(ERROR, "wlroots: failed to create buffer");
+			abort();
+		}
+
+		if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
+			wlr_frame_buffer_done(cast,frame);
+		}
+		break;
+	default:
 		abort();
-	}
-
-	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
-		wlr_frame_buffer_done(cast,frame);
 	}
 }
 
