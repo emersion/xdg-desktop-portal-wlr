@@ -57,6 +57,11 @@ struct xdpw_screencopy_frame {
 	struct xdpw_frame_damage damage;
 	struct wl_buffer *buffer;
 	void *data;
+
+	uint32_t fourcc;
+	struct gbm_bo *bo;
+	uint32_t offset;
+	int fd;
 };
 
 union xdpw_frame {
