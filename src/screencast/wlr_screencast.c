@@ -205,7 +205,11 @@ static const struct wl_registry_listener wlr_registry_listener = {
 
 enum xdpw_instance_type xdpw_wlr_screencast_select_backend(
 		struct xdpw_screencast_context *ctx) {
-	return XDPW_INSTANCE_SCP_SHM;
+	if (zwlr_screencopy_manager_v1_get_version(ctx->screencopy_manager) < 3) {
+		return XDPW_INSTANCE_SCP_SHM;
+	} else {
+		return XDPW_INSTANCE_SCP_DMABUF;
+	}
 }
 
 int xdpw_wlr_screencast_init(struct xdpw_state *state) {
