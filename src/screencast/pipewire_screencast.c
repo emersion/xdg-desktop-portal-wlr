@@ -289,22 +289,50 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		n_formats++;
 	}
 
-	const struct spa_pod *param = spa_pod_builder_add_object(&b,
-		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
-		SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
-		SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-		SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
-			format, format, format_without_alpha),
-		SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
-			&SPA_RECTANGLE(cast->xdpw_frames.simple_frame.width, cast->xdpw_frames.simple_frame.height),
-			&SPA_RECTANGLE(1, 1),
-			&SPA_RECTANGLE(4096, 4096)),
-		// variable framerate
-		SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION(0, 1)),
-		SPA_FORMAT_VIDEO_maxFramerate, SPA_POD_CHOICE_RANGE_Fraction(
-			&SPA_FRACTION(cast->framerate, 1),
-			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(cast->framerate, 1)));
+	logprint(DEBUG, "pipewire: Supported format %d", format);
+
+	const struct spa_pod *param;
+	switch (cast->type) {
+	case XDPW_INSTANCE_SCP_SHM:
+		param = spa_pod_builder_add_object(&b,
+			SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
+			SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
+			SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
+			SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
+				format, format, format_without_alpha),
+			SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
+				&SPA_RECTANGLE(cast->xdpw_frames.simple_frame.width, cast->xdpw_frames.simple_frame.height),
+				&SPA_RECTANGLE(1, 1),
+				&SPA_RECTANGLE(4096, 4096)),
+			// variable framerate
+			SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION(0, 1)),
+			SPA_FORMAT_VIDEO_maxFramerate, SPA_POD_CHOICE_RANGE_Fraction(
+				&SPA_FRACTION(cast->framerate, 1),
+				&SPA_FRACTION(1, 1),
+				&SPA_FRACTION(cast->framerate, 1)));
+		break;
+	case XDPW_INSTANCE_SCP_DMABUF:
+		param = spa_pod_builder_add_object(&b,
+			SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
+			SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
+			SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
+			SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
+				format, format, format_without_alpha),
+			SPA_FORMAT_VIDEO_modifier,	SPA_POD_CHOICE_ENUM_Long(1,cast->xdpw_frames.screencopy_frame.modifier),
+			SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
+				&SPA_RECTANGLE(cast->xdpw_frames.simple_frame.width, cast->xdpw_frames.simple_frame.height),
+				&SPA_RECTANGLE(1, 1),
+				&SPA_RECTANGLE(4096, 4096)),
+			// variable framerate
+			SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION(0, 1)),
+			SPA_FORMAT_VIDEO_maxFramerate, SPA_POD_CHOICE_RANGE_Fraction(
+				&SPA_FRACTION(cast->framerate, 1),
+				&SPA_FRACTION(1, 1),
+				&SPA_FRACTION(cast->framerate, 1)));
+		break;
+	default:
+		abort();
+	}
 
 	pw_stream_add_listener(cast->stream, &cast->stream_listener,
 		&pwr_stream_events, cast);

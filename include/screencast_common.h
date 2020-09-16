@@ -60,6 +60,7 @@ struct xdpw_screencopy_frame {
 	void *data;
 
 	uint32_t fourcc;
+	uint64_t modifier;
 	struct gbm_bo *bo;
 	uint32_t offset;
 	int fd;

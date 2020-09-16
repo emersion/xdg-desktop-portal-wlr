@@ -93,6 +93,7 @@ static void wlr_frame_linux_dmabuf(void *data,
 			cast->xdpw_frames.screencopy_frame.size = cast->xdpw_frames.screencopy_frame.stride * height;
 			cast->xdpw_frames.screencopy_frame.offset = gbm_bo_get_offset(cast->xdpw_frames.screencopy_frame.bo, 0);
 			cast->xdpw_frames.screencopy_frame.fd = gbm_bo_get_fd(cast->xdpw_frames.screencopy_frame.bo);
+			cast->xdpw_frames.screencopy_frame.modifier = gbm_bo_get_modifier(cast->xdpw_frames.screencopy_frame.bo);
 		} else {
 			logprint(TRACE,"wlroots: dmabuf buffer exists");
 		}
