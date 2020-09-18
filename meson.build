@@ -23,7 +23,7 @@ add_project_arguments(cc.get_supported_arguments([
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
-pipewire = dependency('libpipewire-0.3', version: '>= 0.2.9')
+pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 
