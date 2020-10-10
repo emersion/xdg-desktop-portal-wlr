@@ -74,6 +74,7 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'o':
 			config.screencast_conf.output_name = strdup(optarg);
+			config.screencast_conf.chooser_type = XDPW_CHOOSER_NONE;
 			break;
 		case 'c':
 			configfile = strdup(optarg);
