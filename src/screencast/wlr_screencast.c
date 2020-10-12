@@ -357,7 +357,8 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	}
 
 	if (!strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
-		uint32_t version = SC_MANAGER_VERSION < ver ? SC_MANAGER_VERSION : ver;
+		uint32_t version = SC_MANAGER_VERSION < ver ? SC_MANAGER_VERSION :
+			ver < SC_MANAGER_VERSION_MIN ? SC_MANAGER_VERSION_MIN : ver;
 		ctx->state->screencast_version = version;
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
 		ctx->screencopy_manager = wl_registry_bind(
