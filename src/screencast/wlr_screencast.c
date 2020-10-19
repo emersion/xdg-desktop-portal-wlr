@@ -166,7 +166,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		abort();
 	}
 
-	if (cast->ctx->state->screencast_version < 3) {
+	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast,frame);
 	}
 }
@@ -363,7 +363,6 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		} else if (ver < SC_MANAGER_VERSION_MIN) {
 			version = SC_MANAGER_VERSION_MIN;
 		}
-		ctx->state->screencast_version = version;
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
 		ctx->screencopy_manager = wl_registry_bind(
 			reg, id, &zwlr_screencopy_manager_v1_interface, version);
