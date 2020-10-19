@@ -21,13 +21,13 @@
 
 static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// Even though this check may be deemed unnecessary,
-	// this has been found to cause SEGFAULTs, like this one: 
+	// this has been found to cause SEGFAULTs, like this one:
 	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
 	if (cast->simple_frame.data != NULL) {
 		munmap(cast->simple_frame.data, cast->simple_frame.size);
 		cast->simple_frame.data = NULL;
 	}
-	
+
 	if (cast->simple_frame.buffer != NULL) {
 		wl_buffer_destroy(cast->simple_frame.buffer);
 		cast->simple_frame.buffer = NULL;
@@ -123,6 +123,22 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 	wlr_frame_buffer_destroy(cast);
 }
 
+static void wlr_frame_linux_dmabuf(void *data,
+		struct zwlr_screencopy_frame_v1 *frame,
+		uint32_t format, uint32_t width, uint32_t height) {
+
+	logprint(TRACE, "wlroots: linux_dmabuf event handler");
+}
+
+static void wlr_frame_buffer_done(void *data,
+		struct zwlr_screencopy_frame_v1 *frame) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: buffer_done event handler");
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
+	logprint(TRACE, "wlroots: frame copied");
+}
+
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
 	struct xdpw_screencast_instance *cast = data;
@@ -150,8 +166,9 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		abort();
 	}
 
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
-	logprint(TRACE, "wlroots: frame copied");
+	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
+		wlr_frame_buffer_done(cast,frame);
+	}
 }
 
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -203,6 +220,8 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 	.buffer = wlr_frame_buffer,
+	.buffer_done = wlr_frame_buffer_done,
+	.linux_dmabuf = wlr_frame_linux_dmabuf,
 	.flags = wlr_frame_flags,
 	.ready = wlr_frame_ready,
 	.failed = wlr_frame_failed,
@@ -325,28 +344,39 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
 
+	logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)",interface, ver);
 	if (!strcmp(interface, wl_output_interface.name)) {
 		struct xdpw_wlr_output *output = malloc(sizeof(*output));
 
 		output->id = id;
-		output->output = wl_registry_bind(reg, id, &wl_output_interface, 1);
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_OUTPUT_VERSION);
+		output->output = wl_registry_bind(reg, id, &wl_output_interface, WL_OUTPUT_VERSION);
 
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
 		wl_list_insert(&ctx->output_list, &output->link);
 	}
 
 	if (!strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
+		uint32_t version = ver;
+		if (SC_MANAGER_VERSION < ver) {
+			version = SC_MANAGER_VERSION;
+		} else if (ver < SC_MANAGER_VERSION_MIN) {
+			version = SC_MANAGER_VERSION_MIN;
+		}
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
 		ctx->screencopy_manager = wl_registry_bind(
-			reg, id, &zwlr_screencopy_manager_v1_interface, SC_MANAGER_VERSION);
+			reg, id, &zwlr_screencopy_manager_v1_interface, version);
 	}
 
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
-		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, 1);
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_SHM_VERSION);
+		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, WL_SHM_VERSION);
 	}
 
 	if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, XDG_OUTPUT_MANAGER_VERSION);
 		ctx->xdg_output_manager =
-			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, 3);
+			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
 }
 
