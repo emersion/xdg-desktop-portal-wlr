@@ -164,10 +164,33 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	pw_stream_update_params(stream, params, 2);
 }
 
+static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
+	struct xdpw_screencast_instance *cast = data;
+	struct spa_data *d;
+
+	logprint(TRACE, "pipewire: add buffer event handle");
+
+	d = buffer->buffer->datas;
+
+	// Select buffer type from negotiation result
+	if ((d[0].type & (1u << SPA_DATA_MemPtr)) > 0) {
+		d[0].type = SPA_DATA_MemPtr;
+	} else {
+		logprint(ERROR, "pipewire: unsupported buffer type");
+		cast->err = 1;
+	}
+}
+
+static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer) {
+	logprint(TRACE, "pipewire: remove buffer event handle");
+}
+
 static const struct pw_stream_events pwr_stream_events = {
 	PW_VERSION_STREAM_EVENTS,
 	.state_changed = pwr_handle_stream_state_changed,
 	.param_changed = pwr_handle_stream_param_changed,
+	.add_buffer = pwr_handle_stream_add_buffer,
+	.remove_buffer = pwr_handle_stream_remove_buffer,
 };
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
