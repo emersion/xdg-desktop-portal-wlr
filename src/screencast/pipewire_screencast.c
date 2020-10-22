@@ -228,8 +228,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 	pw_stream_connect(cast->stream,
 		PW_DIRECTION_OUTPUT,
 		PW_ID_ANY,
-		(PW_STREAM_FLAG_DRIVER |
-			PW_STREAM_FLAG_MAP_BUFFERS),
+		PW_STREAM_FLAG_DRIVER,
 		&param, 1);
 
 }
