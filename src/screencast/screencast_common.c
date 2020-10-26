@@ -1,5 +1,9 @@
 #include "screencast_common.h"
 #include <assert.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 void randname(char *buf) {
 	struct timespec ts;
@@ -10,6 +14,25 @@ void randname(char *buf) {
 		buf[i] = 'A'+(r&15)+(r&16)*2;
 		r >>= 5;
 	}
+}
+
+int anonymous_shm_open(void) {
+	char name[] = "/xdpw-shm-XXXXXX";
+	int retries = 100;
+
+	do {
+		randname(name + strlen(name) - 6);
+
+		--retries;
+		// shm_open guarantees that O_CLOEXEC is set
+		int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+		if (fd >= 0) {
+			shm_unlink(name);
+			return fd;
+		}
+	} while (retries > 0 && errno == EEXIST);
+
+	return -1;
 }
 
 enum spa_video_format xdpw_format_pw_from_wl_shm(

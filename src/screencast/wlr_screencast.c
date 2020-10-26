@@ -54,25 +54,6 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	xdpw_wlr_register_cb(cast);
 }
 
-static int anonymous_shm_open(void) {
-	char name[] = "/xdpw-shm-XXXXXX";
-	int retries = 100;
-
-	do {
-		randname(name + strlen(name) - 6);
-
-		--retries;
-		// shm_open guarantees that O_CLOEXEC is set
-		int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-		if (fd >= 0) {
-			shm_unlink(name);
-			return fd;
-		}
-	} while (retries > 0 && errno == EEXIST);
-
-	return -1;
-}
-
 static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast,
 		enum wl_shm_format fmt, int width, int height, int stride,
 		void **data_out) {
