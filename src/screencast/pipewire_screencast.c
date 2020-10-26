@@ -5,6 +5,8 @@
 #include <spa/param/props.h>
 #include <spa/param/format-utils.h>
 #include <spa/param/video/format-utils.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 #include "wlr_screencast.h"
 #include "xdpw.h"
@@ -145,7 +147,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->simple_frame.size),
 		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->simple_frame.stride),
 		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(XDPW_PWR_ALIGN),
-		SPA_PARAM_BUFFERS_dataType,SPA_POD_CHOICE_FLAGS_Int(1<<SPA_DATA_MemPtr));
+		SPA_PARAM_BUFFERS_dataType,SPA_POD_CHOICE_FLAGS_Int(1<<SPA_DATA_MemFd));
 
 	params[1] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
@@ -164,28 +166,61 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	d = buffer->buffer->datas;
 
 	// Select buffer type from negotiation result
-	if ((d[0].type & (1u << SPA_DATA_MemPtr)) > 0) {
-		d[0].type = SPA_DATA_MemPtr;
+	if ((d[0].type & (1u << SPA_DATA_MemFd)) > 0) {
+		d[0].type = SPA_DATA_MemFd;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
 		cast->err = 1;
 		return;
 	}
 
+	logprint(TRACE, "pipewire: selected buffertype %u", d[0].type);
 	// Prepare buffer for choosen type
-	if (d[0].type == SPA_DATA_MemPtr) {
+	if (d[0].type == SPA_DATA_MemFd) {
 		d[0].maxsize = cast->simple_frame.size;
 		d[0].mapoffset = 0;
 		d[0].chunk->size = cast->simple_frame.size;
 		d[0].chunk->stride = cast->simple_frame.stride;
 		d[0].chunk->offset = 0;
 		d[0].flags = 0;
-		d[0].fd = -1;
+		d[0].fd = anonymous_shm_open();
+
+		if (d[0].fd == -1) {
+			logprint(ERROR, "pipewire: unable to create anonymous filedescriptor");
+			cast->err = 1;
+			return;
+		}
+
+		if (ftruncate(d[0].fd, d[0].maxsize) < 0) {
+			logprint(ERROR, "pipewire: unable to truncate filedescriptor");
+			close(d[0].fd);
+			d[0].fd = -1;
+			cast->err = 1;
+			return;
+		}
+
+		// mmap buffer, so we can use the data_ptr in on_process
+		d[0].data = mmap(NULL, d[0].maxsize, PROT_READ | PROT_WRITE, MAP_SHARED, d[0].fd, d[0].mapoffset);
+		if (d[0].data == MAP_FAILED) {
+			logprint(ERROR, "pipewire: unable to mmap memory");
+			cast->err = 1;
+			return;
+		}
 	}
 }
 
 static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer) {
 	logprint(TRACE, "pipewire: remove buffer event handle");
+
+	struct spa_data *d = buffer->buffer->datas;
+	switch (d[0].type) {
+	case SPA_DATA_MemFd:
+		munmap(d[0].data, d[0].maxsize);
+		close(d[0].fd);
+		break;
+	default:
+		break;
+	}
 }
 
 static const struct pw_stream_events pwr_stream_events = {
@@ -250,7 +285,8 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	pw_stream_connect(cast->stream,
 		PW_DIRECTION_OUTPUT,
 		PW_ID_ANY,
-		PW_STREAM_FLAG_DRIVER,
+		(PW_STREAM_FLAG_DRIVER |
+			PW_STREAM_FLAG_ALLOC_BUFFERS),
 		&param, 1);
 }
 
