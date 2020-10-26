@@ -43,10 +43,6 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	spa_buf = pw_buf->buffer;
 	d = spa_buf->datas;
-	if ((d[0].data) == NULL) {
-		logprint(TRACE, "pipewire: data pointer undefined");
-		return;
-	}
 	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
 		h->pts = -1;
 		h->flags = 0;
@@ -54,14 +50,10 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 		h->dts_offset = 0;
 	}
 
-	d[0].type = SPA_DATA_MemPtr;
-	d[0].maxsize = cast->simple_frame.size;
-	d[0].mapoffset = 0;
-	d[0].chunk->size = cast->simple_frame.size;
-	d[0].chunk->stride = cast->simple_frame.stride;
-	d[0].chunk->offset = 0;
-	d[0].flags = 0;
-	d[0].fd = -1;
+	if ((d[0].data) == NULL) {
+		logprint(TRACE, "pipewire: data pointer undefined");
+		return;
+	}
 
 	writeFrameData(d[0].data, cast->simple_frame.data, cast->simple_frame.height,
 		cast->simple_frame.stride, cast->simple_frame.y_invert);
@@ -151,6 +143,18 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
 		cast->err = 1;
+		return;
+	}
+
+	// Prepare buffer for choosen type
+	if (d[0].type == SPA_DATA_MemPtr) {
+		d[0].maxsize = cast->simple_frame.size;
+		d[0].mapoffset = 0;
+		d[0].chunk->size = cast->simple_frame.size;
+		d[0].chunk->stride = cast->simple_frame.stride;
+		d[0].chunk->offset = 0;
+		d[0].flags = 0;
+		d[0].fd = -1;
 	}
 }
 
