@@ -7,6 +7,7 @@
 #include <spa/param/video/format-utils.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <gbm.h>
 
 #include "wlr_screencast.h"
 #include "xdpw.h"
@@ -26,6 +27,22 @@ static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
 	}
 
 	return;
+}
+
+static void writeDmaBufFrameDataBO(void *pwFramePointer, struct gbm_bo *bo,
+		uint32_t width, uint32_t height, uint32_t stride) {
+	void *map_data = NULL;
+	void *data = NULL;
+
+	data = gbm_bo_map(bo, 0, 0, width, height, GBM_BO_TRANSFER_READ, &stride, &map_data);
+	if (data == NULL) {
+		logprint(TRACE, "pipewire: data pointer undefined");
+		return;
+	}
+
+	writeFrameData(pwFramePointer, data, height, stride, 0);
+
+	gbm_bo_unmap(bo, map_data);
 }
 
 void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_instance *cast) {
