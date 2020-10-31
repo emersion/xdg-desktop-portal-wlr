@@ -164,11 +164,22 @@ uint32_t pwr_choose_buffertype(struct xdpw_screencast_instance *cast, uint32_t b
 		return type;
 	}
 	if ((buffermask & (1<<SPA_DATA_DmaBuf)) > 0) {
-		type = SPA_DATA_DmaBuf;
-		return type;
+		// Make sure backend supports dmabufs
+		if (cast->type == XDPW_INSTANCE_SCP_DMABUF) {
+			type = SPA_DATA_DmaBuf;
+			// Make sure consumer supports dmabufs with arbitrary modifier
+			if (cast->pwr_format.modifier > 0) {
+				return type;
+			}
+		}
 	}
 	if ((buffermask & (1<<SPA_DATA_MemPtr)) > 0) {
 		type = SPA_DATA_MemPtr;
+		return type;
+	}
+
+	// Return selected buffertype even if it's not the ideal choice
+	if (type != buffermask) {
 		return type;
 	}
 
