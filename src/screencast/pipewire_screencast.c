@@ -69,6 +69,18 @@ void pwr_copy_screencast(struct spa_buffer *spa_buf, struct xdpw_screencast_inst
 			writeFrameData(d[0].data, cast->xdpw_frames.screencopy_frame.data, cast->xdpw_frames.screencopy_frame.height,
 				cast->xdpw_frames.screencopy_frame.stride, cast->xdpw_frames.screencopy_frame.y_invert);
 			break;
+		case XDPW_INSTANCE_SCP_DMABUF:
+			if ((d[0].data) == NULL) {
+				logprint(TRACE, "pipewire: data pointer undefined");
+				return;
+			}
+
+			writeDmaBufFrameDataBO(d[0].data,
+				cast->xdpw_frames.screencopy_frame.bo,
+				cast->xdpw_frames.screencopy_frame.width,
+				cast->xdpw_frames.screencopy_frame.height,
+				cast->xdpw_frames.screencopy_frame.stride);
+			break;
 		default:
 			abort();
 		}
