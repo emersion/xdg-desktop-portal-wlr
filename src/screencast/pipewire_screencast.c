@@ -358,7 +358,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 			SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
 			SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
 				format, format, format_without_alpha),
-			SPA_FORMAT_VIDEO_modifier,	SPA_POD_CHOICE_ENUM_Long(1,cast->xdpw_frames.screencopy_frame.modifier),
+			SPA_FORMAT_VIDEO_modifier,	SPA_POD_CHOICE_ENUM_Long(2,cast->xdpw_frames.screencopy_frame.modifier, 0),
 			SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
 				&SPA_RECTANGLE(cast->xdpw_frames.simple_frame.width, cast->xdpw_frames.simple_frame.height),
 				&SPA_RECTANGLE(1, 1),
