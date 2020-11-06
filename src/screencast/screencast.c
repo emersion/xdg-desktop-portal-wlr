@@ -245,10 +245,10 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		} else if (strcmp(key, "cursor_mode") == 0) {
 			uint32_t cursor_mode;
 			sd_bus_message_read(msg, "v", "u", &cursor_mode);
-			if (cursor_mode & (1<<HIDDEN)) {
+			if (cursor_mode & HIDDEN) {
 				cursor_embedded = false;
 			}
-			if (cursor_mode & (1<<METADATA)) {
+			if (cursor_mode & METADATA) {
 				logprint(ERROR, "dbus: unsupported cursor mode requested, cancelling");
 				goto error;
 			}
