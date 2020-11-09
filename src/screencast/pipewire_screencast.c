@@ -123,6 +123,26 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	pw_stream_update_params(stream, params, 2);
 }
 
+uint32_t pwr_choose_buffertype(struct xdpw_screencast_instance *cast, uint32_t buffermask) {
+	uint32_t type = buffermask;
+	logprint(DEBUG, "pipewire: buffertypemask %08x", buffermask);
+
+	// No SPA_PARAM_BUFFERS_dataType was set by the consumer
+	if (~buffermask == 0) {
+		logprint(INFO, "pipewire: no buffer type was defined");
+		type = SPA_DATA_MemPtr;
+		return type;
+	}
+	if ((buffermask & (1<<SPA_DATA_MemPtr)) > 0) {
+		type = SPA_DATA_MemPtr;
+		return type;
+	}
+
+	// No supported buffer type found
+	type = SPA_DATA_Invalid;
+	return type;
+}
+
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	struct xdpw_screencast_instance *cast = data;
 	struct spa_data *d;
@@ -130,24 +150,11 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	logprint(TRACE, "pipewire: add buffer event handle");
 
 	d = buffer->buffer->datas;
-	logprint(TRACE, "pipewire: buffer type %08x", d[0].type);
 
 	// Select buffer type from negotiation result
-	if (~d[0].type == 0) {
-		logprint(INFO, "pipewire: no buffer type was defined");
-		//either die or guess a reasonable default
-		//cast->err = 1;
-		//return;
-		//default:
-		d[0].type = SPA_DATA_MemPtr;
-	} else if ((d[0].type & (1<<SPA_DATA_MemPtr)) > 0) {
-		d[0].type = SPA_DATA_MemPtr;
-	} else {
-		logprint(ERROR, "pipewire: unsupported buffer type");
-		cast->err = 1;
-		return;
-	}
+	d[0].type = pwr_choose_buffertype(cast, d[0].type);
 
+	logprint(TRACE, "pipewire: selected buffertype %d", d[0].type);
 	// Prepare buffer for choosen type
 	if (d[0].type == SPA_DATA_MemPtr) {
 		d[0].type = SPA_DATA_MemFd;
@@ -174,6 +181,10 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 			logprint(ERROR, "pipewire: unable to mmap memory");
 			return;
 		}
+	} else {
+		logprint(ERROR, "pipewire: unsupported buffer type");
+		cast->err = 1;
+		return;
 	}
 }
 
