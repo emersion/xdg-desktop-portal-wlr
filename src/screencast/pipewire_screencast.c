@@ -115,11 +115,11 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 
 	params[0] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
-		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(BUFFERS, 1, 32),
+		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, 1, 32),
 		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
 		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->simple_frame.size),
 		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->simple_frame.stride),
-		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(ALIGN));
+		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(XDPW_PWR_ALIGN));
 
 	params[1] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
