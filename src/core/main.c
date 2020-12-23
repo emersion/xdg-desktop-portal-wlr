@@ -1,10 +1,13 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/timerfd.h>
 #include <getopt.h>
 #include <poll.h>
 #include <pipewire/pipewire.h>
 #include <spa/utils/result.h>
+#include <unistd.h>
+
 #include "xdpw.h"
 #include "logger.h"
 
@@ -12,12 +15,13 @@ enum event_loop_fd {
 	EVENT_LOOP_DBUS,
 	EVENT_LOOP_WAYLAND,
 	EVENT_LOOP_PIPEWIRE,
+	EVENT_LOOP_TIMER,
 };
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
 
-static int xdpw_usage(FILE* stream, int rc) {
-	static const char* usage =
+static int xdpw_usage(FILE *stream, int rc) {
+	static const char *usage =
 		"Usage: xdg-desktop-portal-wlr [options]\n"
 		"\n"
 		"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
@@ -27,6 +31,7 @@ static int xdpw_usage(FILE* stream, int rc) {
 		"    -c, --config=<config file>	      Select config file.\n"
 		"                                     (default is $XDG_CONFIG_HOME/xdg-desktop-portal-wlr/config)\n"
 		"    -r, --replace                    Replace a running instance.\n"
+		"    -f, --max-fps=<fps>              Set the FPS limit (default 0, no limit).\n"
 		"    -h, --help                       Get help (this text).\n"
 		"\n";
 
@@ -46,11 +51,12 @@ int main(int argc, char *argv[]) {
 	enum LOGLEVEL loglevel = DEFAULT_LOGLEVEL;
 	bool replace = false;
 
-	static const char* shortopts = "l:o:c:rh";
+	static const char *shortopts = "l:o:c:f:rh";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
 		{ "config", required_argument, NULL, 'c' },
+		{ "max-fps", required_argument, NULL, 'f' },
 		{ "replace", no_argument, NULL, 'r' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
@@ -58,8 +64,9 @@ int main(int argc, char *argv[]) {
 
 	while (1) {
 		int c = getopt_long(argc, argv, shortopts, longopts, NULL);
-		if (c < 0)
+		if (c < 0) {
 			break;
+		}
 
 		switch (c) {
 		case 'l':
@@ -73,6 +80,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'r':
 			replace = true;
+			break;
+		case 'f':
+			config.screencast_conf.max_fps = atof(optarg);
 			break;
 		case 'h':
 			return xdpw_usage(stdout, EXIT_SUCCESS);
@@ -166,6 +176,8 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}
 
+	wl_list_init(&state.timers);
+
 	struct pollfd pollfds[] = {
 		[EVENT_LOOP_DBUS] = {
 			.fd = sd_bus_get_fd(state.bus),
@@ -179,7 +191,13 @@ int main(int argc, char *argv[]) {
 			.fd = pw_loop_get_fd(state.pw_loop),
 			.events = POLLIN,
 		},
+		[EVENT_LOOP_TIMER] = {
+			.fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC),
+			.events = POLLIN,
+		}
 	};
+
+	state.timer_poll_fd = pollfds[EVENT_LOOP_TIMER].fd;
 
 	while (1) {
 		ret = poll(pollfds, sizeof(pollfds) / sizeof(pollfds[0]), -1);
@@ -214,6 +232,27 @@ int main(int argc, char *argv[]) {
 			if (ret < 0) {
 				logprint(ERROR, "pw_loop_iterate failed: %s", spa_strerror(ret));
 				goto error;
+			}
+		}
+
+		if (pollfds[EVENT_LOOP_TIMER].revents & POLLIN) {
+			logprint(TRACE, "event-loop: got a timer event");
+			
+			int timer_fd = pollfds[EVENT_LOOP_TIMER].fd;
+			uint64_t expirations;
+			ssize_t n = read(timer_fd, &expirations, sizeof(expirations));
+			if (n < 0) {
+				logprint(ERROR, "failed to read from timer FD\n");
+				goto error;
+			}
+
+			struct xdpw_timer *timer = state.next_timer;
+			if (timer != NULL) {
+				xdpw_event_loop_timer_func_t func = timer->func;
+				void *user_data = timer->user_data;
+				xdpw_destroy_timer(timer);
+
+				func(user_data);
 			}
 		}
 

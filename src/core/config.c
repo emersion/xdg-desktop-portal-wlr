@@ -39,6 +39,14 @@ static void getstring_from_conffile(dictionary *d,
 	}
 }
 
+static void getdouble_from_conffile(dictionary *d,
+		const char *key, double *dest, double fallback) {
+	if (*dest != 0) {
+		return;
+	}	
+	*dest = iniparser_getdouble(d, key, fallback);
+}
+
 static bool file_exists(const char *path) {
 	return path && access(path, R_OK) != -1;
 }
@@ -70,6 +78,7 @@ static void config_parse_file(const char *configfile, struct xdpw_config *config
 
 	// screencast
 	getstring_from_conffile(d, "screencast:output_name", &config->screencast_conf.output_name, NULL);
+	getdouble_from_conffile(d, "screencast:max_fps", &config->screencast_conf.max_fps, 0);
 
 	iniparser_freedict(d);
 	logprint(DEBUG, "config: config file parsed");

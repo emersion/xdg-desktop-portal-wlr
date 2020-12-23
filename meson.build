@@ -28,6 +28,12 @@ wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 iniparser = cc.find_library('iniparser', dirs: [join_paths(get_option('prefix'),get_option('libdir'))])
 
+epoll = dependency('', required: false)
+if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
+    not cc.has_function('signalfd', prefix: '#include <sys/signalfd.h>'))
+	epoll = dependency('epoll-shim')
+endif
+
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
 	sdbus = dependency('libsystemd',
@@ -63,11 +69,14 @@ executable(
 		'src/core/config.c',
 		'src/core/request.c',
 		'src/core/session.c',
+		'src/core/timer.c',
+		'src/core/timespec_util.c',
 		'src/screenshot/screenshot.c',
 		'src/screencast/screencast.c',
 		'src/screencast/screencast_common.c',
 		'src/screencast/wlr_screencast.c',
 		'src/screencast/pipewire_screencast.c',
+		'src/screencast/fps_limit.c'
 	]),
 	dependencies: [
 		wayland_client,
@@ -76,6 +85,7 @@ executable(
 		pipewire,
 		rt,
 		iniparser,
+		epoll,
 	],
 	include_directories: [inc],
 	install: true,

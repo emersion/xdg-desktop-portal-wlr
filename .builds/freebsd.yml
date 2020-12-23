@@ -1,6 +1,7 @@
 image: freebsd/latest
 packages:
   - basu
+  - libepoll-shim
   - meson
   - pipewire
   - pkgconf
