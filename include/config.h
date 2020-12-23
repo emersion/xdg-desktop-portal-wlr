@@ -5,6 +5,7 @@
 
 struct config_screencast {
 	char *output_name;
+	double max_fps;
 };
 
 struct xdpw_config {

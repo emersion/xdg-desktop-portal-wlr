@@ -134,7 +134,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
@@ -143,7 +143,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		}
 
 		if (strcmp(key, "session_handle_token") == 0) {
-			char* token;
+			char *token;
 			sd_bus_message_read(msg, "v", "s", &token);
 			logprint(INFO, "dbus: option token: %s", token);
 		} else {
@@ -223,7 +223,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
@@ -345,7 +345,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: app_id: %s", app_id);
 	logprint(INFO, "dbus: parent_window: %s", parent_window);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);

@@ -18,6 +18,7 @@
 #include "pipewire_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
+#include "fps_limit.h"
 
 static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// Even though this check may be deemed unnecessary,
@@ -51,7 +52,13 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 		return ;
 	}
 
-	xdpw_wlr_register_cb(cast);
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
+	if (delay_ns > 0) {
+		xdpw_add_timer(cast->ctx->state, delay_ns,
+			(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
+	} else {
+		xdpw_wlr_register_cb(cast);
+	}
 }
 
 static int anonymous_shm_open(void) {
@@ -133,8 +140,11 @@ static void wlr_frame_buffer_done(void *data,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
+	
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
+
+	fps_limit_measure_start(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
 }
 
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -267,8 +277,8 @@ static const struct wl_output_listener wlr_output_listener = {
 	.scale = wlr_output_handle_scale,
 };
 
-static void wlr_xdg_output_name(void* data, struct zxdg_output_v1* xdg_output,
-		const char* name) {
+static void wlr_xdg_output_name(void *data, struct zxdg_output_v1 *xdg_output,
+		const char *name) {
 	struct xdpw_wlr_output *output = data;
 
 	output->name = strdup(name);
@@ -287,7 +297,7 @@ static const struct zxdg_output_v1_listener wlr_xdg_output_listener = {
 };
 
 static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output,
-		struct zxdg_output_v1* xdg_output) {
+		struct zxdg_output_v1 *xdg_output) {
 	output->xdg_output = xdg_output;
 	zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener,
 		output);
@@ -312,7 +322,7 @@ struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
 }
 
 struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
-		const char* name) {
+		const char *name) {
 	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, output_list, link) {
 		if (strcmp(output->name, name) == 0) {
