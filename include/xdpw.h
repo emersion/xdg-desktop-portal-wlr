@@ -11,6 +11,7 @@
 #endif
 
 #include "screencast_common.h"
+#include "config.h"
 
 struct xdpw_state {
 	struct wl_list xdpw_sessions;
@@ -21,6 +22,7 @@ struct xdpw_state {
 	uint32_t screencast_source_types; // bitfield of enum source_types
 	uint32_t screencast_cursor_modes; // bitfield of enum cursor_modes
 	uint32_t screencast_version;
+	struct xdpw_config *config;
 };
 
 struct xdpw_request {
@@ -41,7 +43,7 @@ enum {
 };
 
 int xdpw_screenshot_init(struct xdpw_state *state);
-int xdpw_screencast_init(struct xdpw_state *state, const char *output_name);
+int xdpw_screencast_init(struct xdpw_state *state);
 
 struct xdpw_request *xdpw_request_create(sd_bus *bus, const char *object_path);
 void xdpw_request_destroy(struct xdpw_request *req);

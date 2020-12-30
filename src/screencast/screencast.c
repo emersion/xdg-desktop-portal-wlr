@@ -48,8 +48,9 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	}
 
 	struct xdpw_wlr_output *out;
-	if (ctx->output_name) {
-		out = xdpw_wlr_output_find_by_name(&ctx->output_list, ctx->output_name);
+	if (ctx->state->config->screencast_conf.output_name) {
+		out = xdpw_wlr_output_find_by_name(&ctx->output_list,
+				ctx->state->config->screencast_conf.output_name);
 		if (!out) {
 			logprint(ERROR, "wlroots: no such output");
 			abort();
@@ -434,12 +435,11 @@ static const sd_bus_vtable screencast_vtable[] = {
 	SD_BUS_VTABLE_END
 };
 
-int xdpw_screencast_init(struct xdpw_state *state, const char *output_name) {
+int xdpw_screencast_init(struct xdpw_state *state) {
 	sd_bus_slot *slot = NULL;
 
 	state->screencast = (struct xdpw_screencast_context) { 0 };
 	state->screencast.state = state;
-	state->screencast.output_name = output_name;
 
 	int err;
 	err = xdpw_pwr_core_connect(state);

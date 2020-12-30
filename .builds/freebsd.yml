@@ -6,6 +6,7 @@ packages:
   - pkgconf
   - wayland
   - wayland-protocols
+  - iniparser
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:
