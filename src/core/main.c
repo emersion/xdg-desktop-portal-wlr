@@ -24,6 +24,7 @@ static int xdpw_usage(FILE* stream, int rc) {
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
 		"    -o, --output=<name>              Select output to capture.\n"
 		"                                     metadata (performs no conversion).\n"
+		"    -r, --replace                    Replace a running instance.\n"
 		"    -h, --help                       Get help (this text).\n"
 		"\n";
 
@@ -31,14 +32,22 @@ static int xdpw_usage(FILE* stream, int rc) {
 	return rc;
 }
 
+static int handle_name_lost(sd_bus_message *m, void *userdata, sd_bus_error *ret_error) {
+	logprint(INFO, "dbus: lost name, closing connection");
+	sd_bus_close(sd_bus_message_get_bus(m));
+	return 1;
+}
+
 int main(int argc, char *argv[]) {
 	const char* output_name = NULL;
 	enum LOGLEVEL loglevel = ERROR;
+	bool replace = false;
 
-	static const char* shortopts = "l:o:h";
+	static const char* shortopts = "l:o:rh";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
+		{ "replace", no_argument, NULL, 'r' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
 	};
@@ -54,6 +63,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'o':
 			output_name = optarg;
+			break;
+		case 'r':
+			replace = true;
 			break;
 		case 'h':
 			return xdpw_usage(stdout, EXIT_SUCCESS);
@@ -110,9 +122,38 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}
 
-	ret = sd_bus_request_name(bus, service_name, 0);
+	uint64_t flags = SD_BUS_NAME_ALLOW_REPLACEMENT;
+	if (replace) {
+		flags |= SD_BUS_NAME_REPLACE_EXISTING;
+	}
+
+	ret = sd_bus_request_name(bus, service_name, flags);
 	if (ret < 0) {
 		logprint(ERROR, "dbus: failed to acquire service name: %s", strerror(-ret));
+		goto error;
+	}
+
+	const char *unique_name;
+	ret = sd_bus_get_unique_name(bus, &unique_name);
+	if (ret < 0) {
+		logprint(ERROR, "dbus: failed to get unique bus name: %s", strerror(-ret));
+		goto error;
+	}
+
+	static char match[1024];
+	snprintf(match, sizeof(match), "sender='org.freedesktop.DBus',"
+		"type='signal',"
+		"interface='org.freedesktop.DBus',"
+		"member='NameOwnerChanged',"
+		"path='/org/freedesktop/DBus',"
+		"arg0='%s',"
+		"arg1='%s'",
+		service_name, unique_name);
+
+	sd_bus_slot *slot;
+	ret = sd_bus_add_match(bus, &slot, match, handle_name_lost, NULL);
+	if (ret < 0) {
+		logprint(ERROR, "dbus: failed to add NameOwnerChanged signal match: %s", strerror(-ret));
 		goto error;
 	}
 
