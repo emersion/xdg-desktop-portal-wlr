@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 
+#define DEFAULT_LOGLEVEL ERROR
+
 enum LOGLEVEL { QUIET, ERROR, WARN, INFO, DEBUG, TRACE };
 
 struct logger_properties {

@@ -5,17 +5,6 @@
 #include <string.h>
 #include <time.h>
 
-static int NUM_LEVELS = 6;
-
-static const char *loglevels[] = {
-	"QUIET",
-	"ERROR",
-	"WARN",
-	"INFO",
-	"DEBUG",
-	"TRACE"
-};
-
 static struct logger_properties logprops;
 
 void init_logger(FILE *dst, enum LOGLEVEL level) {
@@ -24,14 +13,42 @@ void init_logger(FILE *dst, enum LOGLEVEL level) {
 }
 
 enum LOGLEVEL get_loglevel(const char *level) {
-	int i;
-	for (i = 0; i < NUM_LEVELS; i++) {
-		if (!strcmp(level, loglevels[i])) {
-			return (enum LOGLEVEL) i;
-		}
+	if (strcmp(level, "QUIET") == 0) {
+		return QUIET;
+	} else if (strcmp(level, "ERROR") == 0) {
+		return ERROR;
+	} else if (strcmp(level, "WARN") == 0) {
+		return WARN;
+	} else if (strcmp(level, "INFO") == 0) {
+		return INFO;
+	} else if (strcmp(level, "DEBUG") == 0) {
+		return DEBUG;
+	} else if (strcmp(level, "TRACE") == 0) {
+		return TRACE;
 	}
+
 	fprintf(stderr, "Could not understand log level %s\n", level);
 	abort();
+}
+
+char *print_loglevel(enum LOGLEVEL loglevel) {
+	switch (loglevel) {
+	case QUIET:
+		return "QUIET";
+	case ERROR:
+		return "ERROR";
+	case WARN:
+		return "WARN";
+	case INFO:
+		return "INFO";
+	case DEBUG:
+		return "DEBUG";
+	case TRACE:
+		return "TRACE";
+	}
+	fprintf(stderr, "Could not find log level %d\n", loglevel);
+	abort();
+	return NULL;
 }
 
 void logprint(enum LOGLEVEL level, char *msg, ...) {
@@ -56,7 +73,7 @@ void logprint(enum LOGLEVEL level, char *msg, ...) {
 
 	fprintf(logprops.dst, "%s", timestr);
 	fprintf(logprops.dst, " ");
-	fprintf(logprops.dst, "[%s]", loglevels[level]);
+	fprintf(logprops.dst, "[%s]", print_loglevel(level));
 	fprintf(logprops.dst, " - ");
 
 	va_start(args, msg);
