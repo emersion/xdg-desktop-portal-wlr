@@ -21,9 +21,9 @@ ninja -C build install
 
 ### Distro Packages
 
-#### Arch Linux (AUR)
+#### Arch Linux
 
-xdg-desktop-portal-wlr-git
+[xdg-desktop-portal-wlr](https://archlinux.org/packages/community/x86_64/xdg-desktop-portal-wlr/)
 
 ## Running
 
