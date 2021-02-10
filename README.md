@@ -23,7 +23,8 @@ ninja -C build install
 
 #### Arch Linux
 
-[xdg-desktop-portal-wlr](https://archlinux.org/packages/community/x86_64/xdg-desktop-portal-wlr/)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/xdg-desktop-portal-wlr.svg)](https://repology.org/project/xdg-desktop-portal-wlr/versions)
+
 
 ## Running
 
