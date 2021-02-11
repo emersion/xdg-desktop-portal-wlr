@@ -30,7 +30,7 @@ rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
-iniparser = cc.find_library('iniparser')
+iniparser = cc.find_library('iniparser', dirs: [join_paths(get_option('prefix'),get_option('libdir'))])
 
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
