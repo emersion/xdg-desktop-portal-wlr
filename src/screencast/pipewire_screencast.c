@@ -197,7 +197,6 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		(PW_STREAM_FLAG_DRIVER |
 			PW_STREAM_FLAG_MAP_BUFFERS),
 		&param, 1);
-
 }
 
 int xdpw_pwr_core_connect(struct xdpw_state *state) {
