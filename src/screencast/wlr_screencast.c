@@ -113,7 +113,6 @@ static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast
 
 static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
-
 	logprint(DEBUG, "wlroots: reset buffer");
 	cast->simple_frame.width = width;
 	cast->simple_frame.height = height;
@@ -126,7 +125,6 @@ static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
-
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
 }
 
@@ -190,7 +188,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
 		pw_loop_signal_event(cast->ctx->state->pw_loop, cast->event);
-		return ;
+		return;
 	}
 
 	xdpw_wlr_frame_free(cast);
@@ -229,7 +227,6 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 };
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
-
 	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
 		cast->ctx->screencopy_manager, cast->with_cursor, cast->target_output->output);
 
