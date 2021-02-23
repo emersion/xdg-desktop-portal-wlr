@@ -13,6 +13,6 @@ struct xdpw_config {
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config);
 void finish_config(struct xdpw_config *config);
-void init_config(const char *configfile, struct xdpw_config *config);
+void init_config(const char **configfile, struct xdpw_config *config);
 
 #endif

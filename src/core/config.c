@@ -10,7 +10,7 @@
 #include <iniparser.h>
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
-	logprint(loglevel, "config: Outputname  %s", config->screencast_conf.output_name);
+	logprint(loglevel, "config: outputname  %s", config->screencast_conf.output_name);
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
@@ -58,6 +58,9 @@ static char *config_path(char *prefix, char *filename) {
 
 static void config_parse_file(const char *configfile, struct xdpw_config *config) {
 	dictionary *d = iniparser_load(configfile);
+	if (configfile && !d) {
+		logprint(ERROR, "config: unable to load config file %s", configfile);
+	}
 
 	// screencast
 	getstring_from_conffile(d, "screencast:output_name", &config->screencast_conf.output_name, NULL);
@@ -100,11 +103,15 @@ static char *get_config_path(void) {
 	return NULL;
 }
 
-void init_config(const char *configfile, struct xdpw_config *config) {
-	if (configfile == NULL) {
-		configfile = get_config_path();
+void init_config(const char **configfile, struct xdpw_config *config) {
+	if (*configfile == NULL) {
+		*configfile = get_config_path();
 	}
 
-	logprint(INFO, "config: using config file %s", configfile);
-	config_parse_file(configfile, config);
+	if (*configfile) {
+		logprint(INFO, "config: using config file %s", *configfile);
+	} else {
+		logprint(INFO, "config: no config file found");
+	}
+	config_parse_file(*configfile, config);
 }
