@@ -31,7 +31,7 @@ enum LOGLEVEL get_loglevel(const char *level) {
 	abort();
 }
 
-char *print_loglevel(enum LOGLEVEL loglevel) {
+static const char *print_loglevel(enum LOGLEVEL loglevel) {
 	switch (loglevel) {
 	case QUIET:
 		return "QUIET";
@@ -48,7 +48,6 @@ char *print_loglevel(enum LOGLEVEL loglevel) {
 	}
 	fprintf(stderr, "Could not find log level %d\n", loglevel);
 	abort();
-	return NULL;
 }
 
 void logprint(enum LOGLEVEL level, char *msg, ...) {
