@@ -10,7 +10,7 @@
 #include <iniparser.h>
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
-	logprint(loglevel, "config: Outputname  %s",config->screencast_conf.output_name);
+	logprint(loglevel, "config: Outputname  %s", config->screencast_conf.output_name);
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
@@ -22,7 +22,8 @@ void finish_config(struct xdpw_config *config) {
 	free(&config->screencast_conf.output_name);
 }
 
-static void getstring_from_conffile(dictionary *d, char *key, char **dest, char *fallback) {
+static void getstring_from_conffile(dictionary *d,
+		const char *key, char **dest, const char *fallback) {
 	if (*dest != NULL) {
 		return;
 	}
@@ -55,7 +56,7 @@ static char *config_path(char *prefix, char *filename) {
 	return path;
 }
 
-static void config_parse_file(char *configfile, struct xdpw_config *config) {
+static void config_parse_file(const char *configfile, struct xdpw_config *config) {
 	dictionary *d = iniparser_load(configfile);
 
 	// screencast
@@ -99,7 +100,7 @@ static char *get_config_path(void) {
 	return NULL;
 }
 
-void init_config(char *configfile, struct xdpw_config *config) {
+void init_config(const char *configfile, struct xdpw_config *config) {
 	if (configfile == NULL) {
 		configfile = get_config_path();
 	}
