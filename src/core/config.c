@@ -57,7 +57,13 @@ static char *config_path(char *prefix, char *filename) {
 }
 
 static void config_parse_file(const char *configfile, struct xdpw_config *config) {
-	dictionary *d = iniparser_load(configfile);
+	dictionary *d = NULL;
+	if (configfile) {
+		logprint(INFO, "config: using config file %s", *configfile);
+		d = iniparser_load(configfile);
+	} else {
+		logprint(INFO, "config: no config file found");
+	}
 	if (configfile && !d) {
 		logprint(ERROR, "config: unable to load config file %s", configfile);
 	}
@@ -108,10 +114,5 @@ void init_config(const char **configfile, struct xdpw_config *config) {
 		*configfile = get_config_path();
 	}
 
-	if (*configfile) {
-		logprint(INFO, "config: using config file %s", *configfile);
-	} else {
-		logprint(INFO, "config: no config file found");
-	}
 	config_parse_file(*configfile, config);
 }
