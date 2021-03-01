@@ -42,7 +42,7 @@ static int handle_name_lost(sd_bus_message *m, void *userdata, sd_bus_error *ret
 
 int main(int argc, char *argv[]) {
 	struct xdpw_config config = {0};
-	const char *configfile = NULL;
+	char *configfile = NULL;
 	enum LOGLEVEL loglevel = DEFAULT_LOGLEVEL;
 	bool replace = false;
 
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
 
 	// TODO: cleanup
 	finish_config(&config);
-	free((char *)configfile);
+	free(configfile);
 
 	return EXIT_SUCCESS;
 

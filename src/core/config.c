@@ -109,7 +109,7 @@ static char *get_config_path(void) {
 	return NULL;
 }
 
-void init_config(const char **configfile, struct xdpw_config *config) {
+void init_config(char ** const configfile, struct xdpw_config *config) {
 	if (*configfile == NULL) {
 		*configfile = get_config_path();
 	}
