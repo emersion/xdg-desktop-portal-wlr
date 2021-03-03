@@ -24,6 +24,8 @@ static int xdpw_usage(FILE* stream, int rc) {
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
 		"    -o, --output=<name>              Select output to capture.\n"
 		"                                     metadata (performs no conversion).\n"
+		"    -c, --config=<config file>	      Select config file.\n"
+		"                                     (default is $XDG_CONFIG_HOME/xdg-desktop-portal-wlr/config)\n"
 		"    -r, --replace                    Replace a running instance.\n"
 		"    -h, --help                       Get help (this text).\n"
 		"\n";
@@ -39,14 +41,16 @@ static int handle_name_lost(sd_bus_message *m, void *userdata, sd_bus_error *ret
 }
 
 int main(int argc, char *argv[]) {
-	const char* output_name = NULL;
-	enum LOGLEVEL loglevel = ERROR;
+	struct xdpw_config config = {0};
+	char *configfile = NULL;
+	enum LOGLEVEL loglevel = DEFAULT_LOGLEVEL;
 	bool replace = false;
 
-	static const char* shortopts = "l:o:rh";
+	static const char* shortopts = "l:o:c:rh";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
 		{ "output", required_argument, NULL, 'o' },
+		{ "config", required_argument, NULL, 'c' },
 		{ "replace", no_argument, NULL, 'r' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
@@ -62,7 +66,10 @@ int main(int argc, char *argv[]) {
 			loglevel = get_loglevel(optarg);
 			break;
 		case 'o':
-			output_name = optarg;
+			config.screencast_conf.output_name = strdup(optarg);
+			break;
+		case 'c':
+			configfile = strdup(optarg);
 			break;
 		case 'r':
 			replace = true;
@@ -75,6 +82,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	init_logger(stderr, loglevel);
+	init_config(&configfile, &config);
 
 	int ret = 0;
 
@@ -111,12 +119,13 @@ int main(int argc, char *argv[]) {
 		.screencast_source_types = MONITOR,
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 		.screencast_version = XDP_CAST_PROTO_VER,
+		.config = &config,
 	};
 
 	wl_list_init(&state.xdpw_sessions);
 
 	xdpw_screenshot_init(&state);
-	ret = xdpw_screencast_init(&state, output_name);
+	ret = xdpw_screencast_init(&state);
 	if (ret < 0) {
 		logprint(ERROR, "xdpw: failed to initialize screencast");
 		goto error;
@@ -217,6 +226,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// TODO: cleanup
+	finish_config(&config);
+	free(configfile);
 
 	return EXIT_SUCCESS;
 
