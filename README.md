@@ -21,9 +21,8 @@ ninja -C build install
 
 ### Distro Packages
 
-#### Arch Linux (AUR)
+[![Packaging status](https://repology.org/badge/vertical-allrepos/xdg-desktop-portal-wlr.svg)](https://repology.org/project/xdg-desktop-portal-wlr/versions)
 
-xdg-desktop-portal-wlr-git
 
 ## Running
 

@@ -57,9 +57,6 @@ struct xdpw_screencast_context {
 	struct zxdg_output_manager_v1* xdg_output_manager;
 	struct wl_shm *shm;
 
-	// cli options
-	const char *output_name;
-
 	// sessions
 	struct wl_list screencast_instances;
 };

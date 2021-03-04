@@ -1,14 +1,10 @@
 project(
 	'xdg-desktop-portal-wlr',
 	'c',
-	version: '0.1.0',
+	version: '0.2.0',
 	license: 'MIT',
 	meson_version: '>=0.50.0',
-	default_options: [
-		'c_std=c11',
-		'warning_level=2',
-		'werror=true',
-	],
+	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
 )
 
 cc = meson.get_compiler('c')
@@ -20,12 +16,17 @@ add_project_arguments(cc.get_supported_arguments([
 	'-D_POSIX_C_SOURCE=200809L',
 ]), language: 'c')
 
+prefix = get_option('prefix')
+sysconfdir = get_option('sysconfdir')
+add_project_arguments('-DSYSCONFDIR="@0@"'.format(join_paths(prefix, sysconfdir)), language : 'c')
+
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
+iniparser = cc.find_library('iniparser', dirs: [join_paths(get_option('prefix'),get_option('libdir'))])
 
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
@@ -59,6 +60,7 @@ executable(
 	files([
 		'src/core/main.c',
 		'src/core/logger.c',
+		'src/core/config.c',
 		'src/core/request.c',
 		'src/core/session.c',
 		'src/screenshot/screenshot.c',
@@ -73,6 +75,7 @@ executable(
 		sdbus,
 		pipewire,
 		rt,
+		iniparser,
 	],
 	include_directories: [inc],
 	install: true,

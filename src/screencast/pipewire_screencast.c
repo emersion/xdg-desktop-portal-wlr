@@ -38,14 +38,14 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
 		logprint(WARN, "pipewire: out of buffers");
-		return;
+		goto out;
 	}
 
 	spa_buf = pw_buf->buffer;
 	d = spa_buf->datas;
 	if ((d[0].data) == NULL) {
 		logprint(TRACE, "pipewire: data pointer undefined");
-		return;
+		goto out;
 	}
 	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
 		h->pts = -1;
@@ -76,6 +76,7 @@ static void pwr_on_event(void *data, uint64_t expirations) {
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
 
+out:
 	xdpw_wlr_frame_free(cast);
 }
 
@@ -196,7 +197,6 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		(PW_STREAM_FLAG_DRIVER |
 			PW_STREAM_FLAG_MAP_BUFFERS),
 		&param, 1);
-
 }
 
 int xdpw_pwr_core_connect(struct xdpw_state *state) {
