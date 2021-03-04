@@ -1,10 +1,10 @@
 project(
-  'xdg-desktop-portal-wlr',
-  'c',
-version : '0.2.0',
-license : 'MIT',
-meson_version : '>=0.50.0',
-default_options : ['c_std=c11', 'warning_level=2', 'werror=true']
+	'xdg-desktop-portal-wlr',
+	'c',
+	version: '0.2.0',
+	license: 'MIT',
+	meson_version: '>=0.50.0',
+	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
 )
 
 cc = meson.get_compiler('c')
