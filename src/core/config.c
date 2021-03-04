@@ -59,7 +59,7 @@ static char *config_path(char *prefix, char *filename) {
 static void config_parse_file(const char *configfile, struct xdpw_config *config) {
 	dictionary *d = NULL;
 	if (configfile) {
-		logprint(INFO, "config: using config file %s", *configfile);
+		logprint(INFO, "config: using config file %s", configfile);
 		d = iniparser_load(configfile);
 	} else {
 		logprint(INFO, "config: no config file found");
