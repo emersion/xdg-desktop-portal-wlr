@@ -15,7 +15,7 @@ Alternatively you can trigger it with [trigger-screen-shot.py] and
 
 [contributing]: https://github.com/swaywm/wlroots/blob/master/CONTRIBUTING.md
 [portal-test]: https://github.com/matthiasclasen/portal-test
-[trigger-screen-shot.py]: https://gitlab.gnome.org/snippets/814
+[trigger-screen-shot.py]: https://gist.github.com/danshick/3446dac24c64ce6172eced4ac255ac3d
 [xdp-screen-cast.py]: https://gitlab.gnome.org/snippets/19
 
 ## Alternate *.portal Location
