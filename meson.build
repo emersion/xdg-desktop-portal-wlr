@@ -124,3 +124,24 @@ install_data(
 	'wlr.portal',
 	install_dir: join_paths(get_option('datadir'), 'xdg-desktop-portal', 'portals'),
 )
+
+scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7')
+if scdoc.found()
+	man_pages = ['xdg-desktop-portal-wlr.5.scd']
+	foreach src : man_pages
+		topic = src.split('.')[0]
+		section = src.split('.')[1]
+		output = topic + '.' + section
+
+		custom_target(
+			output,
+			input: files(src),
+			output: output,
+			command: [
+				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_pkgconfig_variable('scdoc'), output)
+			],
+			install: true,
+			install_dir: join_paths(get_option('mandir'), 'man' + section),
+		)
+	endforeach
+endif
