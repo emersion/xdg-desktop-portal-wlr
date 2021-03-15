@@ -18,8 +18,36 @@
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
+void exec_with_shell(char *command) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		perror("fork");
+	} else if (pid == 0) {
+		char *const argv[] = {
+			"sh",
+			"-c",
+			command,
+			NULL,
+		};
+		execvp("sh", argv);
+
+		perror("execvp");
+		exit(127);
+	}
+}
+
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
+
+	// only run exec_before if there's no other instance running that already ran it
+	if (wl_list_empty(&ctx->screencast_instances)) {
+		char *exec_before = ctx->state->config->screencast_conf.exec_before;
+		if (exec_before) {
+			logprint(INFO, "xdpw: executing %s before screencast", exec_before);
+			exec_with_shell(exec_before);
+		}
+	}
+
 	cast->ctx = ctx;
 	cast->target_output = out;
 	cast->framerate = out->framerate;
@@ -34,6 +62,16 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
+
+	// make sure this is the last running instance that is being destroyed
+	if (wl_list_length(&cast->link) == 1) {
+		char *exec_after = cast->ctx->state->config->screencast_conf.exec_after;
+		if (exec_after) {
+			logprint(INFO, "xdpw: executing %s after screencast", exec_after);
+			exec_with_shell(exec_after);
+		}
+	}
+
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
 	free(cast);

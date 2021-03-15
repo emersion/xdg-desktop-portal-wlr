@@ -20,6 +20,8 @@ void finish_config(struct xdpw_config *config) {
 
 	// screencast
 	free(&config->screencast_conf.output_name);
+	free(&config->screencast_conf.exec_before);
+	free(&config->screencast_conf.exec_after);
 }
 
 static void getstring_from_conffile(dictionary *d,
@@ -79,6 +81,8 @@ static void config_parse_file(const char *configfile, struct xdpw_config *config
 	// screencast
 	getstring_from_conffile(d, "screencast:output_name", &config->screencast_conf.output_name, NULL);
 	getdouble_from_conffile(d, "screencast:max_fps", &config->screencast_conf.max_fps, 0);
+	getstring_from_conffile(d, "screencast:exec_before", &config->screencast_conf.exec_before, NULL);
+	getstring_from_conffile(d, "screencast:exec_after", &config->screencast_conf.exec_after, NULL);
 
 	iniparser_freedict(d);
 	logprint(DEBUG, "config: config file parsed");
