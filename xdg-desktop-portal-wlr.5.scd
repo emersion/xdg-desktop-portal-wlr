@@ -25,6 +25,8 @@ The configuration files use the INI file format. Example:
 [screencast]
 output_name=HDMI-A-1
 max_fps=30
+exec_before=disable_notifications.sh
+exec_after=enable_notifications.sh
 ```
 
 # SCREENCAST OPTIONS
@@ -43,6 +45,12 @@ These options need to be placed under the **[screencast]** section.
 
 	This is useful to reduce CPU usage when capturing frames at the output's
 	refresh rate is unnecessary.
+
+**exec_before** = _command_
+	Execute _command_ before starting a screencast. The command will be executed within sh.
+
+**exec_after** = _command_
+	Execute _command_ after ending all screencasts. The command will be executed within sh.
 
 # SEE ALSO
 
