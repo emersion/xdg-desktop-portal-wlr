@@ -51,7 +51,7 @@ static bool file_exists(const char *path) {
 	return path && access(path, R_OK) != -1;
 }
 
-static char *config_path(char *prefix, char *filename) {
+static char *config_path(const char *prefix, const char *filename) {
 	if (!prefix || !prefix[0] || !filename || !filename[0]) {
 		return NULL;
 	}
@@ -91,12 +91,12 @@ static char *get_config_path(void) {
 	char *config_home_fallback = calloc(size_fallback, sizeof(char));
 	snprintf(config_home_fallback, size_fallback, "%s/.config", home);
 
-	char *prefix[3];
+	const char *prefix[3];
 	prefix[0] = getenv("XDG_CONFIG_HOME");
 	prefix[1] = config_home_fallback;
 	prefix[2] = SYSCONFDIR "/xdg";
 
-	char *config[2];
+	const char *config[2];
 	config[0] = getenv("XDG_CURRENT_DESKTOP");
 	config[1] = "config";
 
