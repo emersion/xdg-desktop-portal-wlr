@@ -91,16 +91,20 @@ static char *get_config_path(void) {
 	char *config_home_fallback = calloc(size_fallback, sizeof(char));
 	snprintf(config_home_fallback, size_fallback, "%s/.config", home);
 
-	const char *prefix[3];
-	prefix[0] = getenv("XDG_CONFIG_HOME");
-	prefix[1] = config_home_fallback;
-	prefix[2] = SYSCONFDIR "/xdg";
+	const char *config_home = getenv("XDG_CONFIG_HOME");
+	if (config_home == NULL || config_home[0] == '\0') {
+		config_home = config_home_fallback;
+	}
+
+	const char *prefix[2];
+	prefix[0] = config_home;
+	prefix[1] = SYSCONFDIR "/xdg";
 
 	const char *config[2];
 	config[0] = getenv("XDG_CURRENT_DESKTOP");
 	config[1] = "config";
 
-	for (size_t i = 0; i < 3; i++) {
+	for (size_t i = 0; i < 2; i++) {
 		for (size_t j = 0; j < 2; j++) {
 			char *path = config_path(prefix[i], config[j]);
 			if (!path) {
