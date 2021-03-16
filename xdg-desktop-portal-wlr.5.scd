@@ -27,6 +27,8 @@ output_name=HDMI-A-1
 max_fps=30
 exec_before=disable_notifications.sh
 exec_after=enable_notifications.sh
+chooser_type=simple
+chooser_cmd="slurp -f %o -o"
 ```
 
 # SCREENCAST OPTIONS
@@ -36,7 +38,7 @@ These options need to be placed under the **[screencast]** section.
 **output_name** = _name_
 	Select which output will be screencast.
 
-	By default, an arbitrary output is selected. The list of available outputs
+	This option is used with **chooser_type** = none. The list of available outputs
 	can be obtained via **wayland-info**(1) (under the _zxdg_output_manager_v1_
 	section).
 
@@ -51,6 +53,36 @@ These options need to be placed under the **[screencast]** section.
 
 **exec_after** = _command_
 	Execute _command_ after ending all screencasts. The command will be executed within sh.
+
+**chooser_cmd** = _command_
+	Run this command to select an output.
+
+	For more details see **OUTPUT CHOOSER**.
+
+**chooser_type** = _type_
+	Specifies the input send to the chooser.
+
+	The supported types are:
+	- default: xdpw will try to use the first chooser found in the list of hardcoded choosers
+	  (slurp, wofi, bemenu) and will fallback to an arbitrary output if none of those were found.
+	- none: xdpw will allow screencast either on the output given by **output_name**, or if empty
+	  an arbitrary output without further interaction.
+	- simple, dmenu: xdpw will launch the chooser given by **chooser_cmd**. For more details
+	  see **OUTPUT CHOOSER**.
+
+## OUTPUT CHOOSER
+
+The chooser can be any program or script with the following behaviour:
+- It returns any error code except 127. The error code 127 is internally used to signal
+  that no command could be found and all output from it will be ignored.
+- It returns the name of a valid output on stdout as given by **wayland-info**(1).
+  Everything else will be handled as declined by the user.
+- To signal that the user has declined screencast, the chooser should exit without
+  anything on stdout.
+
+Supported types of choosers via the **chooser_type** option:
+- simple: the chooser is just called without anything further on stdin.
+- dmenu: the chooser receives a newline separated list (dmenu style) of outputs on stdin.
 
 # SEE ALSO
 
