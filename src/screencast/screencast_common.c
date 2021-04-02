@@ -391,6 +391,8 @@ enum xdpw_chooser_types get_chooser_type(const char *chooser_type) {
 		return XDPW_CHOOSER_SIMPLE;
 	} else if (strcmp(chooser_type, "dmenu") == 0) {
 		return XDPW_CHOOSER_DMENU;
+	} else if (strcmp(chooser_type, "json") == 0) {
+		return XDPW_CHOOSER_JSON;
 	}
 	fprintf(stderr, "Could not understand chooser type %s\n", chooser_type);
 	exit(1);
@@ -406,6 +408,8 @@ const char *chooser_type_str(enum xdpw_chooser_types chooser_type) {
 		return "simple";
 	case XDPW_CHOOSER_DMENU:
 		return "dmenu";
+	case XDPW_CHOOSER_JSON:
+		return "json";
 	}
 	fprintf(stderr, "Could not find chooser type %d\n", chooser_type);
 	abort();

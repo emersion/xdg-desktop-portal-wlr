@@ -41,6 +41,7 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_NONE,
   XDPW_CHOOSER_SIMPLE,
   XDPW_CHOOSER_DMENU,
+  XDPW_CHOOSER_JSON,
 };
 
 enum xdpw_frame_state {
@@ -54,6 +55,17 @@ enum xdpw_frame_state {
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
+};
+
+struct xdpw_chooser_opts {
+	struct wl_list *output_list;
+
+	// XDPW_CHOOSER_JSON
+	uint32_t target_mask;
+	enum persist_modes persist_mode;
+
+	// XDPW_CHOOSER_NONE
+	char *outputname;
 };
 
 struct xdpw_frame_damage {

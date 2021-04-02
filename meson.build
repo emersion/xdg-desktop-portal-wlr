@@ -29,6 +29,7 @@ wayland_protos = dependency('wayland-protocols', version: '>=1.24')
 iniparser = dependency('inih')
 gbm = dependency('gbm')
 drm = dependency('libdrm')
+jsonc = dependency('json-c')
 
 epoll = dependency('', required: false)
 if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
@@ -90,6 +91,7 @@ executable(
 		iniparser,
 		gbm,
 		drm,
+		jsonc,
 		epoll,
 	],
 	include_directories: [inc],
