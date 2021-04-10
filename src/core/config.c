@@ -22,10 +22,10 @@ void finish_config(struct xdpw_config *config) {
 	logprint(DEBUG, "config: destroying config");
 
 	// screencast
-	free(&config->screencast_conf.output_name);
-	free(&config->screencast_conf.exec_before);
-	free(&config->screencast_conf.exec_after);
-	free(&config->screencast_conf.chooser_cmd);
+	free(config->screencast_conf.output_name);
+	free(config->screencast_conf.exec_before);
+	free(config->screencast_conf.exec_after);
+	free(config->screencast_conf.chooser_cmd);
 }
 
 static void getstring_from_conffile(dictionary *d,
