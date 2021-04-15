@@ -594,8 +594,11 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		uint32_t id) {
-	wlr_remove_output(
-		xdpw_wlr_output_find((struct xdpw_screencast_context *)data, NULL, id));
+	struct xdpw_screencast_context *ctx = data;
+	struct xdpw_wlr_output *output = xdpw_wlr_output_find(ctx, NULL, id);
+	if (output) {
+		wlr_remove_output(output);
+	}
 }
 
 static const struct wl_registry_listener wlr_registry_listener = {
