@@ -543,7 +543,13 @@ struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx
 }
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
+	free(out->name);
+	free(out->make);
+	free(out->model);
+	zxdg_output_v1_destroy(out->xdg_output);
+	wl_output_destroy(out->output);
 	wl_list_remove(&out->link);
+	free(out);
 }
 
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
@@ -552,7 +558,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 	logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)",interface, ver);
 	if (!strcmp(interface, wl_output_interface.name)) {
-		struct xdpw_wlr_output *output = malloc(sizeof(*output));
+		struct xdpw_wlr_output *output = calloc(1, sizeof(*output));
 
 		output->id = id;
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_OUTPUT_VERSION);
