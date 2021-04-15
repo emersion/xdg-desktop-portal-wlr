@@ -303,13 +303,21 @@ static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output,
 		output);
 }
 
+static void wlr_init_xdg_output(struct xdpw_screencast_context *ctx,
+		struct xdpw_wlr_output *output) {
+	struct zxdg_output_v1 *xdg_output =
+		zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
+			output->output);
+	wlr_add_xdg_output_listener(output, xdg_output);
+}
+
 static void wlr_init_xdg_outputs(struct xdpw_screencast_context *ctx) {
 	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
-		struct zxdg_output_v1 *xdg_output =
-			zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
-				output->output);
-		wlr_add_xdg_output_listener(output, xdg_output);
+		if (output->xdg_output) {
+			continue;
+		}
+		wlr_init_xdg_output(ctx, output);
 	}
 }
 
@@ -566,6 +574,9 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
 		wl_list_insert(&ctx->output_list, &output->link);
+		if (ctx->xdg_output_manager) {
+			wlr_init_xdg_output(ctx, output);
+		}
 	}
 
 	if (!strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
