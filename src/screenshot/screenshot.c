@@ -35,17 +35,78 @@ static bool exec_screenshooter(const char *path) {
 
 	return stat == 0;
 }
+static bool exec_screenshooter_interactive(const char *path) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		perror("fork");
+		return false;
+	} else if (pid == 0) {
+		char cmd[strlen(path) + 25];
+		snprintf(cmd, sizeof(cmd), "grim -g \"$(slurp)\" -- %s", path);
+		execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+		perror("execl");
+		exit(127);
+	}
+
+	int stat;
+	if (waitpid(pid, &stat, 0) < 0) {
+		perror("waitpid");
+		return false;
+	}
+
+	return stat == 0;
+}
 
 static int method_screenshot(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	int ret = 0;
+
+	bool interactive = false;
 
 	char *handle, *app_id, *parent_window;
 	ret = sd_bus_message_read(msg, "oss", &handle, &app_id, &parent_window);
 	if (ret < 0) {
 		return ret;
 	}
-	// TODO: read options
+
+	ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	char *key;
+	int inner_ret = 0;
+	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
+		inner_ret = sd_bus_message_read(msg, "s", &key);
+		if (inner_ret < 0) {
+			return inner_ret;
+		}
+
+		if (strcmp(key, "interactive") == 0) {
+			bool mode;
+			sd_bus_message_read(msg, "v", "b", &mode);
+			logprint(DEBUG, "dbus: option interactive: %x", mode);
+			interactive = mode;
+		} else if (strcmp(key, "modal") == 0) {
+			bool modal;
+			sd_bus_message_read(msg, "v", "b", &modal);
+			logprint(DEBUG, "dbus: option modal: %x", modal);
+		} else {
+			logprint(WARN, "dbus: unknown option %s", key);
+			sd_bus_message_skip(msg, "v");
+		}
+
+		inner_ret = sd_bus_message_exit_container(msg);
+		if (inner_ret < 0) {
+			return inner_ret;
+		}
+	}
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_exit_container(msg);
+	if (ret < 0) {
+		return ret;
+	}
 
 	// TODO: cleanup this
 	struct xdpw_request *req =
@@ -56,7 +117,10 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 
 	// TODO: choose a better path
 	const char path[] = "/tmp/out.png";
-	if (!exec_screenshooter(path)) {
+	if (interactive && !exec_screenshooter_interactive(path)) {
+		return -1;
+	}
+	if (!interactive && !exec_screenshooter(path)) {
 		return -1;
 	}
 
