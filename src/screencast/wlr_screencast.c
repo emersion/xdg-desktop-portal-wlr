@@ -630,14 +630,12 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	ctx->registry = wl_display_get_registry(state->wl_display);
 	wl_registry_add_listener(ctx->registry, &wlr_registry_listener, ctx);
 
-	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
 	logprint(DEBUG, "wayland: registry listeners run");
 
 	wlr_init_xdg_outputs(ctx);
 
-	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
 	logprint(DEBUG, "wayland: xdg output listeners run");
