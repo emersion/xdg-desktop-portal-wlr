@@ -26,7 +26,7 @@ rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
-iniparser = cc.find_library('iniparser')
+iniparser = cc.find_library('iniparser', has_headers: ['iniparser.h', 'dictionary.h'])
 
 epoll = dependency('', required: false)
 if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
