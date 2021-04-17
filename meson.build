@@ -61,26 +61,27 @@ add_project_arguments('-DHAVE_' + sdbus.name().to_upper() + '=1', language: 'c')
 
 subdir('protocols')
 
+xdpw_files = files([
+	'src/core/main.c',
+	'src/core/logger.c',
+	'src/core/config.c',
+	'src/core/request.c',
+	'src/core/session.c',
+	'src/core/timer.c',
+	'src/core/timespec_util.c',
+	'src/screenshot/screenshot.c',
+	'src/screencast/screencast.c',
+	'src/screencast/screencast_common.c',
+	'src/screencast/wlr_screencast.c',
+	'src/screencast/pipewire_screencast.c',
+	'src/screencast/fps_limit.c',
+])
+
 executable(
 	'xdg-desktop-portal-wlr',
-	files([
-		'src/core/main.c',
-		'src/core/logger.c',
-		'src/core/config.c',
-		'src/core/request.c',
-		'src/core/session.c',
-		'src/core/timer.c',
-		'src/core/timespec_util.c',
-		'src/screenshot/screenshot.c',
-		'src/screencast/screencast.c',
-		'src/screencast/screencast_common.c',
-		'src/screencast/wlr_screencast.c',
-		'src/screencast/pipewire_screencast.c',
-		'src/screencast/fps_limit.c'
-	]),
+	[xdpw_files, wl_proto_files],
 	dependencies: [
 		wayland_client,
-		wlr_protos,
 		sdbus,
 		pipewire,
 		rt,
