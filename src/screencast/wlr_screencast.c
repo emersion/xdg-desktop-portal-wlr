@@ -406,7 +406,7 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 
 	if (!wait_chooser(pid)) {
 		close(chooser_out[0]);
-		goto end;
+		return false;
 	}
 
 	FILE *f = fdopen(chooser_out[0], "r");
