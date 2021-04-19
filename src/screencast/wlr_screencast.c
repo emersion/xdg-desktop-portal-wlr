@@ -634,6 +634,13 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
 	logprint(DEBUG, "wayland: registry listeners run");
 
+	// make sure our wlroots supports xdg_output_manager
+	if (!ctx->xdg_output_manager) {
+		logprint(ERROR, "Compositor doesn't support %s!",
+			zxdg_output_manager_v1_interface.name);
+		return -1;
+	}
+
 	wlr_init_xdg_outputs(ctx);
 
 	wl_display_roundtrip(state->wl_display);
