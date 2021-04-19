@@ -432,8 +432,7 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 
 	logprint(TRACE, "wlroots: output chooser %s selects output %s", chooser->cmd, name);
 	wl_list_for_each(out, output_list, link) {
-		// TODO: Replugging of outputs can result in a corrupted output_list
-		if (out->name && strcmp(out->name, name) == 0) {
+		if (strcmp(out->name, name) == 0) {
 			*output = out;
 			break;
 		}
