@@ -26,12 +26,9 @@ static int xdpw_usage(FILE *stream, int rc) {
 		"\n"
 		"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
-		"    -o, --output=<name>              Select output to capture.\n"
-		"                                     metadata (performs no conversion).\n"
 		"    -c, --config=<config file>	      Select config file.\n"
 		"                                     (default is $XDG_CONFIG_HOME/xdg-desktop-portal-wlr/config)\n"
 		"    -r, --replace                    Replace a running instance.\n"
-		"    -f, --max-fps=<fps>              Set the FPS limit (default 0, no limit).\n"
 		"    -h, --help                       Get help (this text).\n"
 		"\n";
 
@@ -54,9 +51,7 @@ int main(int argc, char *argv[]) {
 	static const char *shortopts = "l:o:c:f:rh";
 	static const struct option longopts[] = {
 		{ "loglevel", required_argument, NULL, 'l' },
-		{ "output", required_argument, NULL, 'o' },
 		{ "config", required_argument, NULL, 'c' },
-		{ "max-fps", required_argument, NULL, 'f' },
 		{ "replace", no_argument, NULL, 'r' },
 		{ "help", no_argument, NULL, 'h' },
 		{ NULL, 0, NULL, 0 }
@@ -72,18 +67,11 @@ int main(int argc, char *argv[]) {
 		case 'l':
 			loglevel = get_loglevel(optarg);
 			break;
-		case 'o':
-			config.screencast_conf.output_name = strdup(optarg);
-			config.screencast_conf.chooser_type = XDPW_CHOOSER_NONE;
-			break;
 		case 'c':
 			configfile = strdup(optarg);
 			break;
 		case 'r':
 			replace = true;
-			break;
-		case 'f':
-			config.screencast_conf.max_fps = atof(optarg);
 			break;
 		case 'h':
 			return xdpw_usage(stdout, EXIT_SUCCESS);
@@ -238,7 +226,7 @@ int main(int argc, char *argv[]) {
 
 		if (pollfds[EVENT_LOOP_TIMER].revents & POLLIN) {
 			logprint(TRACE, "event-loop: got a timer event");
-			
+
 			int timer_fd = pollfds[EVENT_LOOP_TIMER].fd;
 			uint64_t expirations;
 			ssize_t n = read(timer_fd, &expirations, sizeof(expirations));
