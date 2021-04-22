@@ -119,23 +119,41 @@ static char *get_config_path(void) {
 	prefix[0] = config_home;
 	prefix[1] = SYSCONFDIR "/xdg";
 
-	const char *config[2];
-	config[0] = getenv("XDG_CURRENT_DESKTOP");
-	config[1] = "config";
+	char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
+	char *config_fallback = "config";
 
+	char *config_list = NULL;
 	for (size_t i = 0; i < 2; i++) {
-		for (size_t j = 0; j < 2; j++) {
-			char *path = config_path(prefix[i], config[j]);
-			if (!path) {
-				continue;
+		if (xdg_current_desktop) {
+			config_list = strdup(xdg_current_desktop);
+			char *config = strtok(config_list, ":");
+			while (config) {
+				char *path = config_path(prefix[i], config);
+				if (!path) {
+					config = strtok(NULL, ":");
+					continue;
+				}
+				logprint(TRACE, "config: trying config file %s", path);
+				if (file_exists(path)) {
+					free(config_list);
+					free(config_home_fallback);
+					return path;
+				}
+				free(path);
+				config = strtok(NULL, ":");
 			}
-			logprint(TRACE, "config: trying config file %s", path);
-			if (file_exists(path)) {
-				free(config_home_fallback);
-				return path;
-			}
-			free(path);
+			free(config_list);
 		}
+		char *path = config_path(prefix[i], config_fallback);
+		if (!path) {
+			continue;
+		}
+		logprint(TRACE, "config: trying config file %s", path);
+		if (file_exists(path)) {
+			free(config_home_fallback);
+			return path;
+		}
+		free(path);
 	}
 
 	free(config_home_fallback);
