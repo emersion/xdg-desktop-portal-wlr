@@ -131,12 +131,14 @@ static char *get_config_path(void) {
 			}
 			logprint(TRACE, "config: trying config file %s", path);
 			if (file_exists(path)) {
+				free(config_home_fallback);
 				return path;
 			}
 			free(path);
 		}
 	}
 
+	free(config_home_fallback);
 	return NULL;
 }
 
