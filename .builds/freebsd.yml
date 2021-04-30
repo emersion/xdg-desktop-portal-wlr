@@ -1,18 +1,23 @@
 image: freebsd/latest
 packages:
   - basu
+  - libepoll-shim
   - meson
   - pipewire
   - pkgconf
   - wayland
   - wayland-protocols
   - iniparser
+  - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
+environment:
+  C_INCLUDE_PATH: /usr/local/include
+  LIBRARY_PATH: /usr/local/lib
 tasks:
   - setup: |
       cd xdg-desktop-portal-wlr
-      meson build/
+      meson -Dauto_features=enabled -Dsystemd=disabled -Dsd-bus-provider=basu build/
   - build: |
       cd xdg-desktop-portal-wlr
       ninja -C build/

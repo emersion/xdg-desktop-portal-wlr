@@ -1,6 +1,6 @@
 # xdg-desktop-portal-wlr
 
-[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr?)
+[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits?)
 
 [xdg-desktop-portal] backend for wlroots
 
@@ -30,6 +30,12 @@ Make sure `XDG_CURRENT_DESKTOP=sway` is set.
 
 When correctly installed, xdg-desktop-portal should automatically invoke
 xdg-desktop-portal-wlr when needed.
+
+### Configuration
+
+See `man 5 xdg-desktop-portal-wlr`.
+
+### Manual startup
 
 At the moment, some command line flags are available for testing, compatibility,
 or output selection. If you need to use one of these flags, you can provide an

@@ -18,6 +18,7 @@
 #include "pipewire_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
+#include "fps_limit.h"
 
 static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// Even though this check may be deemed unnecessary,
@@ -51,7 +52,13 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 		return ;
 	}
 
-	xdpw_wlr_register_cb(cast);
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
+	if (delay_ns > 0) {
+		xdpw_add_timer(cast->ctx->state, delay_ns,
+			(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
+	} else {
+		xdpw_wlr_register_cb(cast);
+	}
 }
 
 static int anonymous_shm_open(void) {
@@ -133,8 +140,11 @@ static void wlr_frame_buffer_done(void *data,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
+
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
+
+	fps_limit_measure_start(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
 }
 
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -267,8 +277,8 @@ static const struct wl_output_listener wlr_output_listener = {
 	.scale = wlr_output_handle_scale,
 };
 
-static void wlr_xdg_output_name(void* data, struct zxdg_output_v1* xdg_output,
-		const char* name) {
+static void wlr_xdg_output_name(void *data, struct zxdg_output_v1 *xdg_output,
+		const char *name) {
 	struct xdpw_wlr_output *output = data;
 
 	output->name = strdup(name);
@@ -287,20 +297,226 @@ static const struct zxdg_output_v1_listener wlr_xdg_output_listener = {
 };
 
 static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output,
-		struct zxdg_output_v1* xdg_output) {
+		struct zxdg_output_v1 *xdg_output) {
 	output->xdg_output = xdg_output;
 	zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener,
 		output);
 }
 
+static void wlr_init_xdg_output(struct xdpw_screencast_context *ctx,
+		struct xdpw_wlr_output *output) {
+	struct zxdg_output_v1 *xdg_output =
+		zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
+			output->output);
+	wlr_add_xdg_output_listener(output, xdg_output);
+}
+
 static void wlr_init_xdg_outputs(struct xdpw_screencast_context *ctx) {
 	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
-		struct zxdg_output_v1 *xdg_output =
-			zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
-				output->output);
-		wlr_add_xdg_output_listener(output, xdg_output);
+		if (output->xdg_output) {
+			continue;
+		}
+		wlr_init_xdg_output(ctx, output);
 	}
+}
+
+static pid_t spawn_chooser(char *cmd, int chooser_in[2], int chooser_out[2]) {
+	logprint(TRACE,
+			"exec chooser called: cmd %s, pipe chooser_in (%d,%d), pipe chooser_out (%d,%d)",
+			cmd, chooser_in[0], chooser_in[1], chooser_out[0], chooser_out[1]);
+	pid_t pid = fork();
+
+	if (pid < 0) {
+		perror("fork");
+		return pid;
+	} else if (pid == 0) {
+		close(chooser_in[1]);
+		close(chooser_out[0]);
+
+		dup2(chooser_in[0], STDIN_FILENO);
+		dup2(chooser_out[1], STDOUT_FILENO);
+		close(chooser_in[0]);
+		close(chooser_out[1]);
+
+		execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
+
+		perror("execl");
+		_exit(127);
+	}
+
+	close(chooser_in[0]);
+	close(chooser_out[1]);
+
+	return pid;
+}
+
+static bool wait_chooser(pid_t pid) {
+	int status;
+	if (waitpid(pid ,&status, 0) != -1 && WIFEXITED(status)) {
+		return WEXITSTATUS(status) != 127;
+	}
+	return false;
+}
+
+static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
+		struct wl_list *output_list, struct xdpw_wlr_output **output) {
+	logprint(DEBUG, "wlroots: output chooser called");
+	struct xdpw_wlr_output *out;
+	size_t name_size = 0;
+	char *name = NULL;
+	*output = NULL;
+
+	int chooser_in[2]; //p -> c
+	int chooser_out[2]; //c -> p
+
+	if (pipe(chooser_in) == -1) {
+		perror("pipe chooser_in");
+		logprint(ERROR, "Failed to open pipe chooser_in");
+		goto error_chooser_in;
+	}
+	if (pipe(chooser_out) == -1) {
+		perror("pipe chooser_out");
+		logprint(ERROR, "Failed to open pipe chooser_out");
+		goto error_chooser_out;
+	}
+
+	pid_t pid = spawn_chooser(chooser->cmd, chooser_in, chooser_out);
+	if (pid < 0) {
+		logprint(ERROR, "Failed to fork chooser");
+		goto error_fork;
+	}
+
+	switch (chooser->type) {
+	case XDPW_CHOOSER_DMENU:;
+		FILE *f = fdopen(chooser_in[1], "w");
+		if (f == NULL) {
+			perror("fdopen pipe chooser_in");
+			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
+			goto error_fork;
+		}
+		wl_list_for_each(out, output_list, link) {
+			fprintf(f, "%s\n", out->name);
+		}
+		fclose(f);
+		break;
+	default:
+		close(chooser_in[1]);
+	}
+
+	if (!wait_chooser(pid)) {
+		close(chooser_out[0]);
+		return false;
+	}
+
+	FILE *f = fdopen(chooser_out[0], "r");
+	if (f == NULL) {
+		perror("fdopen pipe chooser_out");
+		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
+		close(chooser_out[0]);
+		goto end;
+	}
+
+	ssize_t nread = getline(&name, &name_size, f);
+	fclose(f);
+	if (nread < 0) {
+		perror("getline failed");
+		goto end;
+	}
+
+	//Strip newline
+	char *p = strchr(name, '\n');
+	if (p != NULL) {
+		*p = '\0';
+	}
+
+	logprint(TRACE, "wlroots: output chooser %s selects output %s", chooser->cmd, name);
+	wl_list_for_each(out, output_list, link) {
+		if (strcmp(out->name, name) == 0) {
+			*output = out;
+			break;
+		}
+	}
+	free(name);
+
+end:
+	return true;
+
+error_fork:
+	close(chooser_out[0]);
+	close(chooser_out[1]);
+error_chooser_out:
+	close(chooser_in[0]);
+	close(chooser_in[1]);
+error_chooser_in:
+	*output = NULL;
+	return false;
+}
+
+static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output_list) {
+	logprint(DEBUG, "wlroots: output chooser called");
+	struct xdpw_output_chooser default_chooser[] = {
+		{XDPW_CHOOSER_SIMPLE, "slurp -f %o -o"},
+		{XDPW_CHOOSER_DMENU, "wofi -d -n"},
+		{XDPW_CHOOSER_DMENU, "bemenu"},
+	};
+
+	size_t N = sizeof(default_chooser)/sizeof(default_chooser[0]);
+	struct xdpw_wlr_output *output = NULL;
+	bool ret;
+	for (size_t i = 0; i<N; i++) {
+		ret = wlr_output_chooser(&default_chooser[i], output_list, &output);
+		if (!ret) {
+			logprint(DEBUG, "wlroots: output chooser %s not found. Trying next one.",
+					default_chooser[i].cmd);
+			continue;
+		}
+		if (output != NULL) {
+			logprint(DEBUG, "wlroots: output chooser selects %s", output->name);
+		} else {
+			logprint(DEBUG, "wlroots: output chooser canceled");
+		}
+		return output;
+	}
+	return xdpw_wlr_output_first(output_list);
+}
+
+struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx) {
+	switch (ctx->state->config->screencast_conf.chooser_type) {
+	case XDPW_CHOOSER_DEFAULT:
+		return wlr_output_chooser_default(&ctx->output_list);
+	case XDPW_CHOOSER_NONE:
+		if (ctx->state->config->screencast_conf.output_name) {
+			return xdpw_wlr_output_find_by_name(&ctx->output_list, ctx->state->config->screencast_conf.output_name);
+		} else {
+			return xdpw_wlr_output_first(&ctx->output_list);
+		}
+	case XDPW_CHOOSER_DMENU:
+	case XDPW_CHOOSER_SIMPLE:;
+		struct xdpw_wlr_output *output = NULL;
+		if (!ctx->state->config->screencast_conf.chooser_cmd) {
+			logprint(ERROR, "wlroots: no output chooser given");
+			goto end;
+		}
+		struct xdpw_output_chooser chooser = {
+			ctx->state->config->screencast_conf.chooser_type,
+			ctx->state->config->screencast_conf.chooser_cmd
+		};
+		logprint(DEBUG, "wlroots: output chooser %s (%d)", chooser.cmd, chooser.type);
+		bool ret = wlr_output_chooser(&chooser, &ctx->output_list, &output);
+		if (!ret) {
+			logprint(ERROR, "wlroots: output chooser %s failed", chooser.cmd);
+			goto end;
+		}
+		if (output) {
+			logprint(DEBUG, "wlroots: output chooser selects %s", output->name);
+		} else {
+			logprint(DEBUG, "wlroots: output chooser canceled");
+		}
+		return output;
+	}
+end:
+	return NULL;
 }
 
 struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
@@ -312,7 +528,7 @@ struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
 }
 
 struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
-		const char* name) {
+		const char *name) {
 	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, output_list, link) {
 		if (strcmp(output->name, name) == 0) {
@@ -334,7 +550,13 @@ struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx
 }
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
+	free(out->name);
+	free(out->make);
+	free(out->model);
+	zxdg_output_v1_destroy(out->xdg_output);
+	wl_output_destroy(out->output);
 	wl_list_remove(&out->link);
+	free(out);
 }
 
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
@@ -343,7 +565,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 	logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)",interface, ver);
 	if (!strcmp(interface, wl_output_interface.name)) {
-		struct xdpw_wlr_output *output = malloc(sizeof(*output));
+		struct xdpw_wlr_output *output = calloc(1, sizeof(*output));
 
 		output->id = id;
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_OUTPUT_VERSION);
@@ -351,6 +573,9 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
 		wl_list_insert(&ctx->output_list, &output->link);
+		if (ctx->xdg_output_manager) {
+			wlr_init_xdg_output(ctx, output);
+		}
 	}
 
 	if (!strcmp(interface, zwlr_screencopy_manager_v1_interface.name)) {
@@ -379,8 +604,11 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		uint32_t id) {
-	wlr_remove_output(
-		xdpw_wlr_output_find((struct xdpw_screencast_context *)data, NULL, id));
+	struct xdpw_screencast_context *ctx = data;
+	struct xdpw_wlr_output *output = xdpw_wlr_output_find(ctx, NULL, id);
+	if (output) {
+		wlr_remove_output(output);
+	}
 }
 
 static const struct wl_registry_listener wlr_registry_listener = {
@@ -401,14 +629,19 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	ctx->registry = wl_display_get_registry(state->wl_display);
 	wl_registry_add_listener(ctx->registry, &wlr_registry_listener, ctx);
 
-	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
 	logprint(DEBUG, "wayland: registry listeners run");
 
+	// make sure our wlroots supports xdg_output_manager
+	if (!ctx->xdg_output_manager) {
+		logprint(ERROR, "Compositor doesn't support %s!",
+			zxdg_output_manager_v1_interface.name);
+		return -1;
+	}
+
 	wlr_init_xdg_outputs(ctx);
 
-	wl_display_dispatch(state->wl_display);
 	wl_display_roundtrip(state->wl_display);
 
 	logprint(DEBUG, "wayland: xdg output listeners run");

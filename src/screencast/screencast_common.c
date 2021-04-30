@@ -52,3 +52,32 @@ enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format) {
 		return SPA_VIDEO_FORMAT_UNKNOWN;
 	}
 }
+
+enum xdpw_chooser_types get_chooser_type(const char *chooser_type) {
+	if (!chooser_type || strcmp(chooser_type, "default") == 0) {
+		return XDPW_CHOOSER_DEFAULT;
+	} else if (strcmp(chooser_type, "none") == 0) {
+		return XDPW_CHOOSER_NONE;
+	} else if (strcmp(chooser_type, "simple") == 0) {
+		return XDPW_CHOOSER_SIMPLE;
+	} else if (strcmp(chooser_type, "dmenu") == 0) {
+		return XDPW_CHOOSER_DMENU;
+	}
+	fprintf(stderr, "Could not understand chooser type %s\n", chooser_type);
+	exit(1);
+}
+
+const char *chooser_type_str(enum xdpw_chooser_types chooser_type) {
+	switch (chooser_type) {
+	case XDPW_CHOOSER_DEFAULT:
+		return "default";
+	case XDPW_CHOOSER_NONE:
+		return "none";
+	case XDPW_CHOOSER_SIMPLE:
+		return "simple";
+	case XDPW_CHOOSER_DMENU:
+		return "dmenu";
+	}
+	fprintf(stderr, "Could not find chooser type %d\n", chooser_type);
+	abort();
+}

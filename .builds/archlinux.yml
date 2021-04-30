@@ -7,13 +7,14 @@ packages:
   - wayland-protocols
   - pipewire
   - iniparser
+  - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:
   - setup: |
       cd xdg-desktop-portal-wlr
-      CC=gcc meson build-gcc/
-      CC=clang meson build-clang/
+      CC=gcc meson -Dauto_features=enabled -Dsd-bus-provider=libsystemd build-gcc/
+      CC=clang meson -Dauto_features=enabled -Dsd-bus-provider=libsystemd build-clang/
   - build-gcc: |
       cd xdg-desktop-portal-wlr
       ninja -C build-gcc/

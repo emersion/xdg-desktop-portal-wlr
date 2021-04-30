@@ -23,6 +23,9 @@ struct xdpw_state {
 	uint32_t screencast_cursor_modes; // bitfield of enum cursor_modes
 	uint32_t screencast_version;
 	struct xdpw_config *config;
+	int timer_poll_fd;
+	struct wl_list timers;
+	struct xdpw_timer *next_timer;
 };
 
 struct xdpw_request {
@@ -34,6 +37,16 @@ struct xdpw_session {
 	sd_bus_slot *slot;
 	char *session_handle;
 	struct xdpw_screencast_instance *screencast_instance;
+};
+
+typedef void (*xdpw_event_loop_timer_func_t)(void *data);
+
+struct xdpw_timer {
+	struct xdpw_state *state;
+	xdpw_event_loop_timer_func_t func;
+	void *user_data;
+	struct timespec at;
+	struct wl_list link; // xdpw_state::timers
 };
 
 enum {
@@ -50,5 +63,10 @@ void xdpw_request_destroy(struct xdpw_request *req);
 
 struct xdpw_session *xdpw_session_create(struct xdpw_state *state, sd_bus *bus, char *object_path);
 void xdpw_session_destroy(struct xdpw_session *req);
+
+struct xdpw_timer *xdpw_add_timer(struct xdpw_state *state,
+	uint64_t delay_ns, xdpw_event_loop_timer_func_t func, void *data);
+
+void xdpw_destroy_timer(struct xdpw_timer *timer);
 
 #endif

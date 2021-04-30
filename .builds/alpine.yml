@@ -7,12 +7,13 @@ packages:
   - wayland-dev
   - wayland-protocols
   - iniparser-dev
+  - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:
   - setup: |
       cd xdg-desktop-portal-wlr
-      meson build/
+      meson -Dauto_features=enabled -Dsystemd=disabled -Dsd-bus-provider=libelogind build/
   - build: |
       cd xdg-desktop-portal-wlr
       ninja -C build/

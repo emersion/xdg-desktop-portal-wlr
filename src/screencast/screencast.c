@@ -18,8 +18,36 @@
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
+void exec_with_shell(char *command) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		perror("fork");
+	} else if (pid == 0) {
+		char *const argv[] = {
+			"sh",
+			"-c",
+			command,
+			NULL,
+		};
+		execvp("sh", argv);
+
+		perror("execvp");
+		exit(127);
+	}
+}
+
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
+
+	// only run exec_before if there's no other instance running that already ran it
+	if (wl_list_empty(&ctx->screencast_instances)) {
+		char *exec_before = ctx->state->config->screencast_conf.exec_before;
+		if (exec_before) {
+			logprint(INFO, "xdpw: executing %s before screencast", exec_before);
+			exec_with_shell(exec_before);
+		}
+	}
+
 	cast->ctx = ctx;
 	cast->target_output = out;
 	cast->framerate = out->framerate;
@@ -34,12 +62,22 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
+
+	// make sure this is the last running instance that is being destroyed
+	if (wl_list_length(&cast->link) == 1) {
+		char *exec_after = cast->ctx->state->config->screencast_conf.exec_after;
+		if (exec_after) {
+			logprint(INFO, "xdpw: executing %s after screencast", exec_after);
+			exec_with_shell(exec_after);
+		}
+	}
+
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
 	free(cast);
 }
 
-int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
+bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -48,19 +86,10 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	}
 
 	struct xdpw_wlr_output *out;
-	if (ctx->state->config->screencast_conf.output_name) {
-		out = xdpw_wlr_output_find_by_name(&ctx->output_list,
-				ctx->state->config->screencast_conf.output_name);
-		if (!out) {
-			logprint(ERROR, "wlroots: no such output");
-			abort();
-		}
-	} else {
-		out = xdpw_wlr_output_first(&ctx->output_list);
-		if (!out) {
-			logprint(ERROR, "wlroots: no output found");
-			abort();
-		}
+	out = xdpw_wlr_output_chooser(ctx);
+	if (!out) {
+		logprint(ERROR, "wlroots: no output found");
+		return false;
 	}
 
 	struct xdpw_screencast_instance *cast, *tmp_c;
@@ -92,7 +121,7 @@ int setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	logprint(INFO, "wlroots: output: %s",
 		sess->screencast_instance->target_output->name);
 
-	return 0;
+	return true;
 
 }
 
@@ -134,7 +163,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
@@ -143,7 +172,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		}
 
 		if (strcmp(key, "session_handle_token") == 0) {
-			char* token;
+			char *token;
 			sd_bus_message_read(msg, "v", "s", &token);
 			logprint(INFO, "dbus: option token: %s", token);
 		} else {
@@ -223,7 +252,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
@@ -272,22 +301,23 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	ret = -1;
+	bool output_selection_canceled = 1;
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
-				ret = setup_outputs(ctx, sess, cursor_embedded);
+				output_selection_canceled = !setup_outputs(ctx, sess, cursor_embedded);
 		}
-	}
-	if (ret < 0) {
-		return ret;
 	}
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
-	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
+	if (output_selection_canceled) {
+		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
+	} else {
+		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
+	}
 	if (ret < 0) {
 		return ret;
 	}
@@ -345,7 +375,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: app_id: %s", app_id);
 	logprint(INFO, "dbus: parent_window: %s", parent_window);
 
-	char* key;
+	char *key;
 	int innerRet = 0;
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);

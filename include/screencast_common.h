@@ -5,6 +5,8 @@
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
 
+#include "fps_limit.h"
+
 // this seems to be right based on
 // https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
 #define XDP_CAST_PROTO_VER 2
@@ -18,6 +20,18 @@ enum cursor_modes {
 enum source_types {
   MONITOR = 1,
   WINDOW = 2,
+};
+
+enum xdpw_chooser_types {
+  XDPW_CHOOSER_DEFAULT,
+  XDPW_CHOOSER_NONE,
+  XDPW_CHOOSER_SIMPLE,
+  XDPW_CHOOSER_DMENU,
+};
+
+struct xdpw_output_chooser {
+	enum xdpw_chooser_types type;
+	char *cmd;
 };
 
 struct xdpw_frame_damage {
@@ -54,7 +68,7 @@ struct xdpw_screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
-	struct zxdg_output_manager_v1* xdg_output_manager;
+	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
 
 	// sessions
@@ -88,6 +102,9 @@ struct xdpw_screencast_instance {
 	bool with_cursor;
 	int err;
 	bool quit;
+
+	// fps limit
+	struct fps_limit_state fps_limit;
 };
 
 struct xdpw_wlr_output {
@@ -108,4 +125,6 @@ enum spa_video_format xdpw_format_pw_from_wl_shm(
 	struct xdpw_screencast_instance *cast);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 
+enum xdpw_chooser_types get_chooser_type(const char *chooser_type);
+const char *chooser_type_str(enum xdpw_chooser_types chooser_type);
 #endif /* SCREENCAST_COMMON_H */

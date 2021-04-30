@@ -1,7 +1,7 @@
 project(
 	'xdg-desktop-portal-wlr',
 	'c',
-	version: '0.2.0',
+	version: '0.3.0',
 	license: 'MIT',
 	meson_version: '>=0.50.0',
 	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
@@ -26,7 +26,13 @@ rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
-iniparser = cc.find_library('iniparser', dirs: [join_paths(get_option('prefix'),get_option('libdir'))])
+iniparser = cc.find_library('iniparser', has_headers: ['iniparser.h', 'dictionary.h'])
+
+epoll = dependency('', required: false)
+if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
+    not cc.has_function('signalfd', prefix: '#include <sys/signalfd.h>'))
+	epoll = dependency('epoll-shim')
+endif
 
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
@@ -55,27 +61,32 @@ add_project_arguments('-DHAVE_' + sdbus.name().to_upper() + '=1', language: 'c')
 
 subdir('protocols')
 
+xdpw_files = files([
+	'src/core/main.c',
+	'src/core/logger.c',
+	'src/core/config.c',
+	'src/core/request.c',
+	'src/core/session.c',
+	'src/core/timer.c',
+	'src/core/timespec_util.c',
+	'src/screenshot/screenshot.c',
+	'src/screencast/screencast.c',
+	'src/screencast/screencast_common.c',
+	'src/screencast/wlr_screencast.c',
+	'src/screencast/pipewire_screencast.c',
+	'src/screencast/fps_limit.c',
+])
+
 executable(
 	'xdg-desktop-portal-wlr',
-	files([
-		'src/core/main.c',
-		'src/core/logger.c',
-		'src/core/config.c',
-		'src/core/request.c',
-		'src/core/session.c',
-		'src/screenshot/screenshot.c',
-		'src/screencast/screencast.c',
-		'src/screencast/screencast_common.c',
-		'src/screencast/wlr_screencast.c',
-		'src/screencast/pipewire_screencast.c',
-	]),
+	[xdpw_files, wl_proto_files],
 	dependencies: [
 		wayland_client,
-		wlr_protos,
 		sdbus,
 		pipewire,
 		rt,
 		iniparser,
+		epoll,
 	],
 	include_directories: [inc],
 	install: true,
@@ -114,3 +125,24 @@ install_data(
 	'wlr.portal',
 	install_dir: join_paths(get_option('datadir'), 'xdg-desktop-portal', 'portals'),
 )
+
+scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7')
+if scdoc.found()
+	man_pages = ['xdg-desktop-portal-wlr.5.scd']
+	foreach src : man_pages
+		topic = src.split('.')[0]
+		section = src.split('.')[1]
+		output = topic + '.' + section
+
+		custom_target(
+			output,
+			input: files(src),
+			output: output,
+			command: [
+				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_pkgconfig_variable('scdoc'), output)
+			],
+			install: true,
+			install_dir: join_paths(get_option('mandir'), 'man' + section),
+		)
+	endforeach
+endif

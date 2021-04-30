@@ -166,27 +166,34 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast);
 	enum spa_video_format format_without_alpha =
 		xdpw_format_pw_strip_alpha(format);
-	uint32_t n_formats = 1;
-	if (format_without_alpha != SPA_VIDEO_FORMAT_UNKNOWN) {
-		n_formats++;
-	}
 
-	const struct spa_pod *param = spa_pod_builder_add_object(&b,
-		SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat,
-		SPA_FORMAT_mediaType,       SPA_POD_Id(SPA_MEDIA_TYPE_video),
-		SPA_FORMAT_mediaSubtype,    SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw),
-		SPA_FORMAT_VIDEO_format,    SPA_POD_CHOICE_ENUM_Id(n_formats + 1,
-			format, format, format_without_alpha),
-		SPA_FORMAT_VIDEO_size,      SPA_POD_CHOICE_RANGE_Rectangle(
+	struct spa_pod_frame f;
+	spa_pod_builder_push_object(&b, &f, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
+	spa_pod_builder_add(&b, SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), 0);
+	spa_pod_builder_add(&b, SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
+	if (format_without_alpha != SPA_VIDEO_FORMAT_UNKNOWN) {
+		spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format,
+			SPA_POD_CHOICE_ENUM_Id(3, format, format, format_without_alpha), 0);
+	} else {
+		spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format,
+			SPA_POD_CHOICE_ENUM_Id(2, format, format), 0);
+	}
+	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_size,
+		SPA_POD_CHOICE_RANGE_Rectangle(
 			&SPA_RECTANGLE(cast->simple_frame.width, cast->simple_frame.height),
 			&SPA_RECTANGLE(1, 1),
 			&SPA_RECTANGLE(4096, 4096)),
-		// variable framerate
-		SPA_FORMAT_VIDEO_framerate, SPA_POD_Fraction(&SPA_FRACTION(0, 1)),
-		SPA_FORMAT_VIDEO_maxFramerate, SPA_POD_CHOICE_RANGE_Fraction(
+		0);
+	// variable framerate
+	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_framerate,
+		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
+	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_maxFramerate,
+		SPA_POD_CHOICE_RANGE_Fraction(
 			&SPA_FRACTION(cast->framerate, 1),
 			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(cast->framerate, 1)));
+			&SPA_FRACTION(cast->framerate, 1)),
+		0);
+	const struct spa_pod *param = spa_pod_builder_pop(&b, &f);
 
 	pw_stream_add_listener(cast->stream, &cast->stream_listener,
 		&pwr_stream_events, cast);

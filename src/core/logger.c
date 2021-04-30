@@ -28,7 +28,7 @@ enum LOGLEVEL get_loglevel(const char *level) {
 	}
 
 	fprintf(stderr, "Could not understand log level %s\n", level);
-	abort();
+	exit(1);
 }
 
 static const char *print_loglevel(enum LOGLEVEL loglevel) {
