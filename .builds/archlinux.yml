@@ -6,7 +6,7 @@ packages:
   - wayland
   - wayland-protocols
   - pipewire
-  - iniparser
+  - libinih
   - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr

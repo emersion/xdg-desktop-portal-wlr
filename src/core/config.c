@@ -3,12 +3,11 @@
 #include "logger.h"
 #include "screencast_common.h"
 
-#include <dictionary.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <iniparser.h>
+#include <ini.h>
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
 	logprint(loglevel, "config: outputname  %s", config->screencast_conf.output_name);
@@ -28,63 +27,65 @@ void finish_config(struct xdpw_config *config) {
 	free(config->screencast_conf.chooser_cmd);
 }
 
-static void getstring_from_conffile(dictionary *d,
-		const char *key, char **dest, const char *fallback) {
-	if (*dest != NULL) {
+static void parse_string(char **dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
 		return;
 	}
-	const char *c = iniparser_getstring(d, key, fallback);
-	if (c == NULL) {
-		return;
-	}
-	// Allow keys without value as default
-	if (strcmp(c, "") != 0) {
-		*dest = strdup(c);
-	} else {
-		*dest = fallback ? strdup(fallback) : NULL;
-	}
+	free(*dest);
+	*dest = strdup(value);
 }
 
-static void getdouble_from_conffile(dictionary *d,
-		const char *key, double *dest, double fallback) {
-	if (*dest != 0) {
+static void parse_double(double *dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
 		return;
 	}
-	*dest = iniparser_getdouble(d, key, fallback);
+	*dest = strtod(value, (char**)NULL);
+}
+
+static int handle_ini_screencast(struct config_screencast *screencast_conf, const char *key, const char *value) {
+	if (strcmp(key, "output_name") == 0) {
+		parse_string(&screencast_conf->output_name, value);
+	} else if (strcmp(key, "max_fps") == 0) {
+		parse_double(&screencast_conf->max_fps, value);
+	} else if (strcmp(key, "exec_before") == 0) {
+		parse_string(&screencast_conf->exec_before, value);
+	} else if (strcmp(key, "exec_after") == 0) {
+		parse_string(&screencast_conf->exec_after, value);
+	} else if (strcmp(key, "chooser_cmd") == 0) {
+		parse_string(&screencast_conf->chooser_cmd, value);
+	} else if (strcmp(key, "chooser_type") == 0) {
+		char *chooser_type = NULL;
+		parse_string(&chooser_type, value);
+		screencast_conf->chooser_type = get_chooser_type(chooser_type);
+		free(chooser_type);
+	} else {
+		logprint(TRACE, "config: skipping invalid key in config file");
+		return 0;
+	}
+	return 1;
+}
+
+static int handle_ini_config(void *data, const char* section, const char *key, const char *value) {
+	struct xdpw_config *config = (struct xdpw_config*)data;
+	logprint(TRACE, "config: parsing setction %s, key %s, value %s", section, key, value);
+
+	if (strcmp(section, "screencast") == 0) {
+		return handle_ini_screencast(&config->screencast_conf, key, value);
+	}
+
+	logprint(TRACE, "config: skipping invalid key in config file");
+	return 0;
+}
+
+static void default_config(struct xdpw_config *config) {
+	config->screencast_conf.max_fps = 0;
+	config->screencast_conf.chooser_type = XDPW_CHOOSER_DEFAULT;
 }
 
 static bool file_exists(const char *path) {
 	return path && access(path, R_OK) != -1;
-}
-
-static void config_parse_file(const char *configfile, struct xdpw_config *config) {
-	dictionary *d = NULL;
-	if (configfile) {
-		logprint(INFO, "config: using config file %s", configfile);
-		d = iniparser_load(configfile);
-	} else {
-		logprint(INFO, "config: no config file found");
-	}
-	if (configfile && !d) {
-		logprint(ERROR, "config: unable to load config file %s", configfile);
-	}
-
-	// screencast
-	getstring_from_conffile(d, "screencast:output_name", &config->screencast_conf.output_name, NULL);
-	getdouble_from_conffile(d, "screencast:max_fps", &config->screencast_conf.max_fps, 0);
-	getstring_from_conffile(d, "screencast:exec_before", &config->screencast_conf.exec_before, NULL);
-	getstring_from_conffile(d, "screencast:exec_after", &config->screencast_conf.exec_after, NULL);
-	getstring_from_conffile(d, "screencast:chooser_cmd", &config->screencast_conf.chooser_cmd, NULL);
-	if (!config->screencast_conf.chooser_type) {
-		char *chooser_type = NULL;
-		getstring_from_conffile(d, "screencast:chooser_type", &chooser_type, "default");
-		config->screencast_conf.chooser_type = get_chooser_type(chooser_type);
-		free(chooser_type);
-	}
-
-	iniparser_freedict(d);
-	logprint(DEBUG, "config: config file parsed");
-	print_config(DEBUG, config);
 }
 
 static char *config_path(const char *prefix, const char *filename) {
@@ -141,5 +142,12 @@ void init_config(char ** const configfile, struct xdpw_config *config) {
 		*configfile = get_config_path();
 	}
 
-	config_parse_file(*configfile, config);
+	default_config(config);
+	if (*configfile == NULL) {
+		logprint(ERROR, "config: no config file found");
+		return;
+	}
+	if (ini_parse(*configfile, handle_ini_config, config) < 0) {
+		logprint(ERROR, "config: unable to load config file %s", *configfile);
+	}
 }
