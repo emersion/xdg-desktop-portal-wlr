@@ -28,7 +28,7 @@ max_fps=30
 exec_before=disable_notifications.sh
 exec_after=enable_notifications.sh
 chooser_type=simple
-chooser_cmd="slurp -f %o -or"
+chooser_cmd=slurp -f %o -or
 ```
 
 # SCREENCAST OPTIONS
