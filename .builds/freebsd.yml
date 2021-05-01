@@ -7,7 +7,7 @@ packages:
   - pkgconf
   - wayland
   - wayland-protocols
-  - iniparser
+  - inih
   - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
