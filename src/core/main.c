@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
 
 	init_logger(stderr, loglevel);
 	init_config(&configfile, &config);
+	print_config(DEBUG, &config);
 
 	int ret = 0;
 

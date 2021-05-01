@@ -10,9 +10,12 @@
 #include <ini.h>
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
-	logprint(loglevel, "config: outputname  %s", config->screencast_conf.output_name);
-	logprint(loglevel, "config: chooser_cmd: %s\n", config->screencast_conf.chooser_cmd);
-	logprint(loglevel, "config: chooser_type: %s\n", chooser_type_str(config->screencast_conf.chooser_type));
+	logprint(loglevel, "config: outputname:  %s", config->screencast_conf.output_name);
+	logprint(loglevel, "config: max_fps:  %d", config->screencast_conf.max_fps);
+	logprint(loglevel, "config: exec_before:  %s", config->screencast_conf.exec_before);
+	logprint(loglevel, "config: exec_after:  %s", config->screencast_conf.exec_after);
+	logprint(loglevel, "config: chooser_cmd: %s", config->screencast_conf.chooser_cmd);
+	logprint(loglevel, "config: chooser_type: %s", chooser_type_str(config->screencast_conf.chooser_type));
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
