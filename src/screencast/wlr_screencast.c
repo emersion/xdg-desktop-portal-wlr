@@ -457,8 +457,8 @@ static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output
 	logprint(DEBUG, "wlroots: output chooser called");
 	struct xdpw_output_chooser default_chooser[] = {
 		{XDPW_CHOOSER_SIMPLE, "slurp -f %o -or"},
-		{XDPW_CHOOSER_DMENU, "wofi -d -n"},
-		{XDPW_CHOOSER_DMENU, "bemenu"},
+		{XDPW_CHOOSER_DMENU, "wofi -d -n --prompt='Select the monitor to share:'"},
+		{XDPW_CHOOSER_DMENU, "bemenu --prompt='Select the monitor to share:'"},
 	};
 
 	size_t N = sizeof(default_chooser)/sizeof(default_chooser[0]);
