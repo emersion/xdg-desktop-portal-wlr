@@ -37,13 +37,15 @@ See `man 5 xdg-desktop-portal-wlr`.
 
 ### Manual startup
 
-At the moment, some command line flags are available for testing, compatibility,
-or output selection. If you need to use one of these flags, you can provide an
-instance of xdpw using the following command:
+At the moment, some command line flags are available for development and
+testing. If you need to use one of these flags, you can start an instance of
+xdpw using the following command:
 
-```/usr/lib/xdg-desktop-portal -r & xdg-desktop-portal-wlr [OPTION...]```
+```sh
+xdg-desktop-portal-wlr -r [OPTION...]
+```
 
-To understand the available options, you can run `xdg-desktop-portal-wlr --help`
+To list the available options, you can run `xdg-desktop-portal-wlr --help`.
 
 ## FAQ
 
