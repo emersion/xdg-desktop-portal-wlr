@@ -26,7 +26,11 @@ ninja -C build install
 
 ## Running
 
-Make sure `XDG_CURRENT_DESKTOP=sway` is set.
+Make sure `XDG_CURRENT_DESKTOP` is set. Make sure `WAYLAND_DISPLAY` and
+`XDG_CURRENT_DESKTOP` are imported into D-Bus. If you're running Sway, this
+can be added to your config file:
+
+    exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=sway
 
 When correctly installed, xdg-desktop-portal should automatically invoke
 xdg-desktop-portal-wlr when needed.
