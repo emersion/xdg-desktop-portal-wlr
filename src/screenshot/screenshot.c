@@ -5,6 +5,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 #include "xdpw.h"
+#include "screenshot.h"
 
 static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.Screenshot";
@@ -148,9 +149,143 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 	return 0;
 }
 
+static bool spawn_chooser(int chooser_out[2]) {
+	pid_t pid = fork();
+	if (pid < 0) {
+		perror("fork");
+		return false;
+	} else if (pid == 0) {
+		close(chooser_out[0]);
+
+		dup2(chooser_out[1], STDOUT_FILENO);
+		close(chooser_out[1]);
+
+		execl("/bin/sh", "/bin/sh", "-c", "grim -g \"$(slurp -p)\" -t ppm -", NULL);
+
+		perror("execl");
+		_exit(127);
+	}
+
+	int stat;
+	if (waitpid(pid, &stat, 0) < 0) {
+		perror("waitpid");
+		return false;
+	}
+
+	close(chooser_out[1]);
+	return stat == 0;
+}
+
+static bool exec_color_picker(struct xdpw_ppm_pixel *pixel) {
+	int chooser_out[2];
+	if (pipe(chooser_out) == -1) {
+		perror("pipe chooser_out");
+		return false;
+	}
+
+	if (!spawn_chooser(chooser_out)) {
+		logprint(ERROR, "Selection failed");
+		close(chooser_out[0]);
+		return false;
+	}
+
+	FILE *f = fdopen(chooser_out[0], "r");
+	if (f == NULL) {
+		perror("fopen pipe chooser_out");
+		close(chooser_out[0]);
+		return false;
+	}
+
+	char *format = NULL;
+	size_t len = 1;
+	if (getline(&format, &len, f) < 0) {
+		goto error_img;
+	}
+	if (strcmp(format, "P6\n") != 0) {
+		goto error_img;
+	}
+	if (getline(&format, &len, f) < 0) {
+		goto error_img;
+	}
+	if (strcmp(format, "1 1\n") != 0) {
+		goto error_img;
+	}
+
+	if (fscanf(f, "%d\n", &pixel->max_color_value) != 1) {
+		goto error_img;
+	}
+
+	unsigned char pixels[3];
+	if (fread(pixels, 3, 1, f) != 1) {
+		goto error_img;
+	}
+
+	pixel->red = pixels[0];
+	pixel->green = pixels[1];
+	pixel->blue = pixels[2];
+
+	free(format);
+	fclose(f);
+
+	return true;
+
+error_img:
+	logprint(WARN, "Invalid image format or size");
+	free(format);
+	fclose(f);
+	return false;
+}
+
+static int method_pick_color(sd_bus_message *msg, void *data,
+		sd_bus_error *ret_error) {
+
+	int ret = 0;
+
+	char *handle, *app_id, *parent_window;
+	ret = sd_bus_message_read(msg, "oss", &handle, &app_id, &parent_window);
+	if (ret < 0) {
+		return ret;
+	}
+
+	struct xdpw_request *req =
+		xdpw_request_create(sd_bus_message_get_bus(msg), handle);
+	if (req == NULL) {
+		return -ENOMEM;
+	}
+
+	struct xdpw_ppm_pixel pixel = {0};
+	if (!exec_color_picker(&pixel)) {
+		return -1;
+	}
+
+	double red = pixel.red / (pixel.max_color_value * 1.0);
+	double green = pixel.green / (pixel.max_color_value * 1.0);
+	double blue = pixel.blue / (pixel.max_color_value * 1.0);
+
+	sd_bus_message *reply = NULL;
+	ret = sd_bus_message_new_method_return(msg, &reply);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1, "color", "(ddd)", red, green, blue);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_send(NULL, reply, NULL);
+	if (ret < 0) {
+		return ret;
+	}
+
+	sd_bus_message_unref(reply);
+	return 0;
+}
+
 static const sd_bus_vtable screenshot_vtable[] = {
 	SD_BUS_VTABLE_START(0),
 	SD_BUS_METHOD("Screenshot", "ossa{sv}", "ua{sv}", method_screenshot, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_METHOD("PickColor", "ossa{sv}", "ua{sv}", method_pick_color, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_VTABLE_END
 };
 
