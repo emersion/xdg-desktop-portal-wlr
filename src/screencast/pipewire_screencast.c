@@ -136,7 +136,7 @@ static const struct pw_stream_events pwr_stream_events = {
 	.param_changed = pwr_handle_stream_param_changed,
 };
 
-void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
+void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	struct xdpw_screencast_context *ctx = cast->ctx;
 	struct xdpw_state *state = ctx->state;
 
@@ -206,7 +206,7 @@ void xdpw_pwr_stream_init(struct xdpw_screencast_instance *cast) {
 		&param, 1);
 }
 
-int xdpw_pwr_core_connect(struct xdpw_state *state) {
+int xdpw_pwr_context_create(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	logprint(DEBUG, "pipewire: establishing connection to core");
