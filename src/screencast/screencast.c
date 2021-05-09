@@ -134,7 +134,7 @@ static int start_screencast(struct xdpw_screencast_instance *cast) {
 	wl_display_dispatch(cast->ctx->state->wl_display);
 	wl_display_roundtrip(cast->ctx->state->wl_display);
 
-	xdpw_pwr_stream_init(cast);
+	xdpw_pwr_stream_create(cast);
 
 	cast->initialized = true;
 	return 0;
@@ -472,7 +472,7 @@ int xdpw_screencast_init(struct xdpw_state *state) {
 	state->screencast.state = state;
 
 	int err;
-	err = xdpw_pwr_core_connect(state);
+	err = xdpw_pwr_context_create(state);
 	if (err) {
 		goto end;
 	}
