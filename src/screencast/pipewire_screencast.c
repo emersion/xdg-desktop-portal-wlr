@@ -229,6 +229,22 @@ int xdpw_pwr_context_create(struct xdpw_state *state) {
 	return 0;
 }
 
+void xdpw_pwr_context_destroy(struct xdpw_state *state) {
+	struct xdpw_screencast_context *ctx = &state->screencast;
+
+	logprint(DEBUG, "pipewire: disconnecting fom core");
+
+	if (ctx->core) {
+		pw_core_disconnect(ctx->core);
+		ctx->core = NULL;
+	}
+
+	if (ctx->pwr_context) {
+		pw_context_destroy(ctx->pwr_context);
+		ctx->pwr_context = NULL;
+	}
+}
+
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
 	if (!cast->stream) {
 		return;

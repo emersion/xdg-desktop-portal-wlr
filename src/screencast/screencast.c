@@ -474,19 +474,22 @@ int xdpw_screencast_init(struct xdpw_state *state) {
 	int err;
 	err = xdpw_pwr_context_create(state);
 	if (err) {
-		goto end;
+		goto fail_pipewire;
 	}
 
 	err = xdpw_wlr_screencopy_init(state);
 	if (err) {
-		goto end;
+		goto fail_screencopy;
 	}
 
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
 		screencast_vtable, state);
 
-end:
-	// TODO: clean up pipewire
+fail_screencopy:
 	xdpw_wlr_screencopy_finish(&state->screencast);
+
+fail_pipewire:
+	xdpw_pwr_context_destroy(state);
+
 	return err;
 }
