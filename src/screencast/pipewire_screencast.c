@@ -230,6 +230,10 @@ int xdpw_pwr_context_create(struct xdpw_state *state) {
 }
 
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
+	if (!cast->stream) {
+		return;
+	}
+
 	logprint(DEBUG, "pipewire: destroying stream");
 	pw_stream_flush(cast->stream, false);
 	pw_stream_disconnect(cast->stream);
