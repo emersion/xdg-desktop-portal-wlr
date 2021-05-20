@@ -18,6 +18,7 @@ xdpw will try to load the configuration file from these locations:
 - /etc/xdg/xdg-desktop-portal-wlr/config
 
 _$XDG_CONFIG_HOME_ defaults to _~/.config_.
+_$XDG_CURRENT_DESKTOP_ can be a colon seperated list. Each element of that list will be tried.
 
 The configuration files use the INI file format. Example:
 

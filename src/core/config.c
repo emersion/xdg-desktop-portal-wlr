@@ -119,8 +119,8 @@ static char *get_config_path(void) {
 	prefix[0] = config_home;
 	prefix[1] = SYSCONFDIR "/xdg";
 
-	char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
-	char *config_fallback = "config";
+	const char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
+	const char *config_fallback = "config";
 
 	char *config_list = NULL;
 	for (size_t i = 0; i < 2; i++) {
