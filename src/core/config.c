@@ -11,7 +11,7 @@
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
 	logprint(loglevel, "config: outputname:  %s", config->screencast_conf.output_name);
-	logprint(loglevel, "config: max_fps:  %d", config->screencast_conf.max_fps);
+	logprint(loglevel, "config: max_fps:  %f", config->screencast_conf.max_fps);
 	logprint(loglevel, "config: exec_before:  %s", config->screencast_conf.exec_before);
 	logprint(loglevel, "config: exec_after:  %s", config->screencast_conf.exec_after);
 	logprint(loglevel, "config: chooser_cmd: %s", config->screencast_conf.chooser_cmd);
