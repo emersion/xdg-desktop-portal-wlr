@@ -206,6 +206,18 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 		&param, 1);
 }
 
+void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
+	if (!cast->stream) {
+		return;
+	}
+
+	logprint(DEBUG, "pipewire: destroying stream");
+	pw_stream_flush(cast->stream, false);
+	pw_stream_disconnect(cast->stream);
+	pw_stream_destroy(cast->stream);
+	cast->stream = NULL;
+}
+
 int xdpw_pwr_context_create(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
@@ -243,16 +255,4 @@ void xdpw_pwr_context_destroy(struct xdpw_state *state) {
 		pw_context_destroy(ctx->pwr_context);
 		ctx->pwr_context = NULL;
 	}
-}
-
-void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
-	if (!cast->stream) {
-		return;
-	}
-
-	logprint(DEBUG, "pipewire: destroying stream");
-	pw_stream_flush(cast->stream, false);
-	pw_stream_disconnect(cast->stream);
-	pw_stream_destroy(cast->stream);
-	cast->stream = NULL;
 }
