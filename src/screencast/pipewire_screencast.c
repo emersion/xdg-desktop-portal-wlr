@@ -43,10 +43,7 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 				SPA_POD_CHOICE_ENUM_Id(3, format, format, format_without_alpha), 0);
 	}
 	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_size,
-		SPA_POD_CHOICE_RANGE_Rectangle(
-			&SPA_RECTANGLE(width, height),
-			&SPA_RECTANGLE(1, 1),
-			&SPA_RECTANGLE(4096, 4096)),
+		SPA_POD_Rectangle(&SPA_RECTANGLE(width, height)),
 		0);
 	// variable framerate
 	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_framerate,
