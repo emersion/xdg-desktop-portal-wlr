@@ -26,6 +26,37 @@ static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
 	return;
 }
 
+static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_format format, enum spa_video_format format_without_alpha,
+		uint32_t width, uint32_t height, uint32_t framerate) {
+	struct spa_pod_frame f;
+	spa_pod_builder_push_object(b, &f, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
+	spa_pod_builder_add(b, SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), 0);
+	spa_pod_builder_add(b, SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
+	if (format_without_alpha != SPA_VIDEO_FORMAT_UNKNOWN) {
+		spa_pod_builder_add(b, SPA_FORMAT_VIDEO_format,
+			SPA_POD_CHOICE_ENUM_Id(3, format, format, format_without_alpha), 0);
+	} else {
+		spa_pod_builder_add(b, SPA_FORMAT_VIDEO_format,
+			SPA_POD_CHOICE_ENUM_Id(2, format, format), 0);
+	}
+	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_size,
+		SPA_POD_CHOICE_RANGE_Rectangle(
+			&SPA_RECTANGLE(width, height),
+			&SPA_RECTANGLE(1, 1),
+			&SPA_RECTANGLE(4096, 4096)),
+		0);
+	// variable framerate
+	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_framerate,
+		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
+	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_maxFramerate,
+		SPA_POD_CHOICE_RANGE_Fraction(
+			&SPA_FRACTION(framerate, 1),
+			&SPA_FRACTION(1, 1),
+			&SPA_FRACTION(framerate, 1)),
+		0);
+	return spa_pod_builder_pop(b, &f);
+}
+
 static void pwr_on_event(void *data, uint64_t expirations) {
 	struct xdpw_screencast_instance *cast = data;
 	struct pw_buffer *pw_buf;
@@ -168,33 +199,8 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	enum spa_video_format format_without_alpha =
 		xdpw_format_pw_strip_alpha(format);
 
-	struct spa_pod_frame f;
-	spa_pod_builder_push_object(&b, &f, SPA_TYPE_OBJECT_Format, SPA_PARAM_EnumFormat);
-	spa_pod_builder_add(&b, SPA_FORMAT_mediaType, SPA_POD_Id(SPA_MEDIA_TYPE_video), 0);
-	spa_pod_builder_add(&b, SPA_FORMAT_mediaSubtype, SPA_POD_Id(SPA_MEDIA_SUBTYPE_raw), 0);
-	if (format_without_alpha != SPA_VIDEO_FORMAT_UNKNOWN) {
-		spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format,
-			SPA_POD_CHOICE_ENUM_Id(3, format, format, format_without_alpha), 0);
-	} else {
-		spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_format,
-			SPA_POD_CHOICE_ENUM_Id(2, format, format), 0);
-	}
-	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_size,
-		SPA_POD_CHOICE_RANGE_Rectangle(
-			&SPA_RECTANGLE(cast->simple_frame.width, cast->simple_frame.height),
-			&SPA_RECTANGLE(1, 1),
-			&SPA_RECTANGLE(4096, 4096)),
-		0);
-	// variable framerate
-	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_framerate,
-		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
-	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_maxFramerate,
-		SPA_POD_CHOICE_RANGE_Fraction(
-			&SPA_FRACTION(cast->max_framerate, 1),
-			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(cast->max_framerate, 1)),
-		0);
-	const struct spa_pod *param = spa_pod_builder_pop(&b, &f);
+	const struct spa_pod *param = build_format(&b, format, format_without_alpha,
+			cast->simple_frame.width, cast->simple_frame.height, cast->framerate);
 
 	pw_stream_add_listener(cast->stream, &cast->stream_listener,
 		&pwr_stream_events, cast);
