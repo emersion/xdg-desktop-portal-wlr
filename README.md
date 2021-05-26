@@ -59,7 +59,7 @@ Please see the [screencast compatibility] guide for more information on
 compatible applications and how to get them working.
 
 If you have a question or problem that is not mentioned in those documents,
-please open an issue or come chat with us in [#sway] on freenode IRC.
+please open an issue or come chat with us in #sway on Libera Chat.
 
 ## Contributing
 
@@ -73,5 +73,4 @@ MIT
 [xdg-desktop-portal]: https://github.com/flatpak/xdg-desktop-portal
 [FAQ]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/FAQ
 [screencast compatibility]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/Screencast-Compatibility
-[#sway]: https://webchat.freenode.net/#sway
 [CONTRIBUTING.md]: CONTRIBUTING.md
