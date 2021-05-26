@@ -6,6 +6,7 @@
 #define XDPW_PWR_BUFFERS 1
 #define XDPW_PWR_ALIGN 16
 
+void pwr_update_stream_param(struct xdpw_screencast_instance *cast);
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast);
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast);
 int xdpw_pwr_context_create(struct xdpw_state *state);
