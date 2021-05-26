@@ -169,6 +169,22 @@ static const struct pw_stream_events pwr_stream_events = {
 	.param_changed = pwr_handle_stream_param_changed,
 };
 
+void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: stream update parameters");
+	struct pw_stream *stream = cast->stream;
+	uint8_t params_buffer[1024];
+	struct spa_pod_builder b =
+		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
+	const struct spa_pod *params[1];
+
+	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->simple_frame.format);
+
+	params[0] = build_format(&b, format,
+			cast->simple_frame.width, cast->simple_frame.height, cast->framerate);
+
+	pw_stream_update_params(stream, params, 1);
+}
+
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	struct xdpw_screencast_context *ctx = cast->ctx;
 	struct xdpw_state *state = ctx->state;
