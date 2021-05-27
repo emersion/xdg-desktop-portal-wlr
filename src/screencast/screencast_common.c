@@ -36,6 +36,23 @@ int anonymous_shm_open(void) {
 	return -1;
 }
 
+struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
+		enum wl_shm_format fmt, int width, int height, int stride) {
+	struct xdpw_screencast_context *ctx = cast->ctx;
+	int size = stride * height;
+
+	if (fd < 0) {
+		return NULL;
+	}
+
+	struct wl_shm_pool *pool = wl_shm_create_pool(ctx->shm, fd, size);
+	struct wl_buffer *buffer =
+		wl_shm_pool_create_buffer(pool, 0, width, height, stride, fmt);
+	wl_shm_pool_destroy(pool);
+
+	return buffer;
+}
+
 enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format) {
 	switch (format) {
 	case WL_SHM_FORMAT_ARGB8888:
