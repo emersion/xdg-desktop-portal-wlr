@@ -127,6 +127,14 @@ static void wlr_frame_buffer_done(void *data,
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
 
+	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
+		xdpw_pwr_dequeue_buffer(cast);
+		if (!cast->current_pw_buffer) {
+			xdpw_wlr_frame_free(cast);
+			return;
+		}
+	}
+
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
@@ -182,10 +190,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	cast->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	cast->simple_frame.tv_nsec = tv_nsec;
 
-	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
-		pw_loop_signal_event(cast->ctx->state->pw_loop, cast->event);
-		return;
-	}
+	xdpw_pwr_enqueue_buffer(cast);
 
 	xdpw_wlr_frame_free(cast);
 }
@@ -196,6 +201,8 @@ static void wlr_frame_failed(void *data,
 
 	logprint(TRACE, "wlroots: failed event handler");
 	cast->err = true;
+
+	xdpw_pwr_enqueue_buffer(cast);
 
 	xdpw_wlr_frame_free(cast);
 }
