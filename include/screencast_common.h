@@ -93,6 +93,7 @@ struct xdpw_screencast_instance {
 	uint32_t node_id;
 	bool pwr_stream_state;
 	uint32_t framerate;
+	struct pw_buffer *current_pw_buffer;
 
 	// wlroots
 	struct zwlr_screencopy_frame_v1 *frame_callback;

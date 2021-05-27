@@ -7,6 +7,7 @@
 #include <spa/param/video/format-utils.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <assert.h>
 
 #include "wlr_screencast.h"
 #include "xdpw.h"
@@ -230,6 +231,58 @@ static const struct pw_stream_events pwr_stream_events = {
 	.add_buffer = pwr_handle_stream_add_buffer,
 	.remove_buffer = pwr_handle_stream_remove_buffer,
 };
+
+void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: dequeueing buffer");
+
+	assert(cast->current_pw_buffer == NULL);
+	if ((cast->current_pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
+		logprint(WARN, "pipewire: out of buffers");
+		return;
+	}
+}
+
+void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: exporting buffer");
+
+	struct pw_buffer *pw_buf = cast->current_pw_buffer;
+
+	if (!pw_buf) {
+		logprint(TRACE, "pipewire: no pipewire buffer to queue");
+		return;
+	}
+
+	struct spa_buffer *spa_buf = pw_buf->buffer;
+	struct spa_data *d = spa_buf->datas;
+	struct spa_meta_header *h;
+	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
+		h->pts = -1;
+		h->flags = 0;
+		h->seq = cast->seq++;
+		h->dts_offset = 0;
+	}
+	if (d[0].data == NULL) {
+		logprint(TRACE, "pipewire: data pointer undefined");
+		goto queue;
+	}
+
+	writeFrameData(d[0].data, cast->simple_frame.data, cast->simple_frame.height,
+		cast->simple_frame.stride, cast->simple_frame.y_invert);
+
+	logprint(TRACE, "********************");
+	logprint(TRACE, "pipewire: pointer %p", d[0].data);
+	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
+	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
+	logprint(TRACE, "pipewire: width %d", cast->simple_frame.width);
+	logprint(TRACE, "pipewire: height %d", cast->simple_frame.height);
+	logprint(TRACE, "pipewire: y_invert %d", cast->simple_frame.y_invert);
+	logprint(TRACE, "********************");
+
+queue:
+	pw_stream_queue_buffer(cast->stream, pw_buf);
+
+	cast->current_pw_buffer = NULL;
+}
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
