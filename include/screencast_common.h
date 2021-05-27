@@ -85,7 +85,6 @@ struct xdpw_screencast_instance {
 	bool initialized;
 
 	// pipewire
-	struct spa_source *event;
 	struct pw_stream *stream;
 	struct spa_hook stream_listener;
 	struct spa_video_info_raw pwr_format;
