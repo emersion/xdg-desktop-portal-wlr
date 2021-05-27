@@ -60,51 +60,6 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
-static void pwr_on_event(void *data, uint64_t expirations) {
-	struct xdpw_screencast_instance *cast = data;
-	struct pw_buffer *pw_buf;
-	struct spa_buffer *spa_buf;
-	struct spa_meta_header *h;
-	struct spa_data *d;
-
-	logprint(TRACE, "********************");
-	logprint(TRACE, "pipewire: event fired");
-
-	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
-		logprint(WARN, "pipewire: out of buffers");
-		goto out;
-	}
-
-	spa_buf = pw_buf->buffer;
-	d = spa_buf->datas;
-	if ((d[0].data) == NULL) {
-		logprint(TRACE, "pipewire: data pointer undefined");
-		goto out;
-	}
-	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
-		h->pts = -1;
-		h->flags = 0;
-		h->seq = cast->seq++;
-		h->dts_offset = 0;
-	}
-
-	writeFrameData(d[0].data, cast->simple_frame.data, cast->simple_frame.height,
-		cast->simple_frame.stride, cast->simple_frame.y_invert);
-
-	logprint(TRACE, "pipewire: pointer %p", d[0].data);
-	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
-	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: width %d", cast->simple_frame.width);
-	logprint(TRACE, "pipewire: height %d", cast->simple_frame.height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->simple_frame.y_invert);
-	logprint(TRACE, "********************");
-
-	pw_stream_queue_buffer(cast->stream, pw_buf);
-
-out:
-	xdpw_wlr_frame_free(cast);
-}
-
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -321,11 +276,6 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 		abort();
 	}
 	cast->pwr_stream_state = false;
-
-	/* make an event to signal frame ready */
-	cast->event =
-		pw_loop_add_event(state->pw_loop, pwr_on_event, cast);
-	logprint(DEBUG, "pipewire: registered event %p", cast->event);
 
 	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->simple_frame.format);
 
