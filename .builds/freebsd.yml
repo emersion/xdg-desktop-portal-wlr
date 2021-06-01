@@ -11,9 +11,6 @@ packages:
   - scdoc
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
-environment:
-  C_INCLUDE_PATH: /usr/local/include
-  LIBRARY_PATH: /usr/local/lib
 tasks:
   - setup: |
       cd xdg-desktop-portal-wlr
