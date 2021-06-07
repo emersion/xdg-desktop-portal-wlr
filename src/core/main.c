@@ -196,6 +196,19 @@ int main(int argc, char *argv[]) {
 			goto error;
 		}
 
+		if (pollfds[EVENT_LOOP_DBUS].revents & POLLHUP) {
+			logprint(INFO, "event-loop: disconnected from dbus");
+			break;
+		}
+		if (pollfds[EVENT_LOOP_WAYLAND].revents & POLLHUP) {
+			logprint(INFO, "event-loop: disconnected from wayland");
+			break;
+		}
+		if (pollfds[EVENT_LOOP_PIPEWIRE].revents & POLLHUP) {
+			logprint(INFO, "event-loop: disconnected from pipewire");
+			break;
+		}
+
 		if (pollfds[EVENT_LOOP_DBUS].revents & POLLIN) {
 			logprint(TRACE, "event-loop: got dbus event");
 			do {
