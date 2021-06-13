@@ -96,7 +96,7 @@ struct xdpw_screencast_instance {
 	// wlroots
 	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct xdpw_wlr_output *target_output;
-	uint32_t framerate;
+	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 	struct xdpw_frame simple_frame;
 	bool with_cursor;
