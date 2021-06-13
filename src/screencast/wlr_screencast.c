@@ -52,7 +52,7 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 		return ;
 	}
 
-	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->max_framerate);
 	if (delay_ns > 0) {
 		xdpw_add_timer(cast->ctx->state, delay_ns,
 			(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
@@ -144,7 +144,7 @@ static void wlr_frame_buffer_done(void *data,
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
-	fps_limit_measure_start(&cast->fps_limit, cast->ctx->state->config->screencast_conf.max_fps);
+	fps_limit_measure_start(&cast->fps_limit, cast->max_framerate);
 }
 
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,

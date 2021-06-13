@@ -50,7 +50,12 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 
 	cast->ctx = ctx;
 	cast->target_output = out;
-	cast->framerate = out->framerate;
+	if (ctx->state->config->screencast_conf.max_fps > 0) {
+		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out->framerate ?
+			ctx->state->config->screencast_conf.max_fps : (uint32_t)out->framerate;
+	} else {
+		cast->max_framerate = (uint32_t)out->framerate;
+	}
 	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);

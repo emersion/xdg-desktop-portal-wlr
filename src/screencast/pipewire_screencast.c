@@ -189,9 +189,9 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
 	spa_pod_builder_add(&b, SPA_FORMAT_VIDEO_maxFramerate,
 		SPA_POD_CHOICE_RANGE_Fraction(
-			&SPA_FRACTION(cast->framerate, 1),
+			&SPA_FRACTION(cast->max_framerate, 1),
 			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(cast->framerate, 1)),
+			&SPA_FRACTION(cast->max_framerate, 1)),
 		0);
 	const struct spa_pod *param = spa_pod_builder_pop(&b, &f);
 
