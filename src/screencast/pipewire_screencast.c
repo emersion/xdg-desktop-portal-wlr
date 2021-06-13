@@ -113,6 +113,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	}
 
 	spa_format_video_raw_parse(param, &cast->pwr_format);
+	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
 	params[0] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
