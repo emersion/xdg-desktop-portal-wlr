@@ -42,6 +42,17 @@ struct xdpw_frame_damage {
 };
 
 struct xdpw_frame {
+	uint32_t size;
+	uint32_t stride;
+	bool y_invert;
+	uint64_t tv_sec;
+	uint32_t tv_nsec;
+	struct xdpw_frame_damage damage;
+	struct wl_buffer *buffer;
+	struct pw_buffer *current_pw_buffer;
+};
+
+struct xdpw_screencopy_frame {
 	uint32_t width;
 	uint32_t height;
 	uint32_t size;
@@ -83,6 +94,7 @@ struct xdpw_screencast_instance {
 	uint32_t refcount;
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
+	struct xdpw_frame current_frame;
 
 	// pipewire
 	struct pw_stream *stream;
@@ -92,14 +104,13 @@ struct xdpw_screencast_instance {
 	uint32_t node_id;
 	bool pwr_stream_state;
 	uint32_t framerate;
-	struct pw_buffer *current_pw_buffer;
 
 	// wlroots
 	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct xdpw_wlr_output *target_output;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_frame simple_frame;
+	struct xdpw_screencopy_frame screencopy_frame;
 	bool with_cursor;
 	int err;
 	bool quit;

@@ -24,14 +24,14 @@ static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
 	// Even though this check may be deemed unnecessary,
 	// this has been found to cause SEGFAULTs, like this one:
 	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
-	if (cast->simple_frame.data != NULL) {
-		munmap(cast->simple_frame.data, cast->simple_frame.size);
-		cast->simple_frame.data = NULL;
+	if (cast->screencopy_frame.data != NULL) {
+		munmap(cast->screencopy_frame.data, cast->screencopy_frame.size);
+		cast->screencopy_frame.data = NULL;
 	}
 
-	if (cast->simple_frame.buffer != NULL) {
-		wl_buffer_destroy(cast->simple_frame.buffer);
-		cast->simple_frame.buffer = NULL;
+	if (cast->screencopy_frame.buffer != NULL) {
+		wl_buffer_destroy(cast->screencopy_frame.buffer);
+		cast->screencopy_frame.buffer = NULL;
 	}
 }
 
@@ -40,7 +40,7 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	cast->wlr_frame = NULL;
 	if (cast->quit || cast->err) {
 		wlr_frame_buffer_destroy(cast);
-		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
+		logprint(TRACE, "xdpw: screencopy_frame buffer destroyed");
 	}
 	logprint(TRACE, "wlroots: frame destroyed");
 
@@ -102,11 +102,11 @@ static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast
 static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
 	logprint(DEBUG, "wlroots: reset buffer");
-	cast->simple_frame.width = width;
-	cast->simple_frame.height = height;
-	cast->simple_frame.stride = stride;
-	cast->simple_frame.size = stride * height;
-	cast->simple_frame.format = format;
+	cast->screencopy_frame.width = width;
+	cast->screencopy_frame.height = height;
+	cast->screencopy_frame.stride = stride;
+	cast->screencopy_frame.size = stride * height;
+	cast->screencopy_frame.format = format;
 	wlr_frame_buffer_destroy(cast);
 
 	if (cast->pwr_stream_state) {
@@ -129,13 +129,13 @@ static void wlr_frame_buffer_done(void *data,
 
 	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
 		xdpw_pwr_dequeue_buffer(cast);
-		if (!cast->current_pw_buffer) {
+		if (!cast->current_frame.current_pw_buffer) {
 			xdpw_wlr_frame_free(cast);
 			return;
 		}
 	}
 
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->screencopy_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
 	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
@@ -147,23 +147,23 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	if (cast->simple_frame.width != width ||
-			cast->simple_frame.height != height ||
-			cast->simple_frame.stride != stride ||
-			cast->simple_frame.format != format) {
+	if (cast->screencopy_frame.width != width ||
+			cast->screencopy_frame.height != height ||
+			cast->screencopy_frame.stride != stride ||
+			cast->screencopy_frame.format != format) {
 		logprint(TRACE, "wlroots: buffer properties changed");
 		wlr_frame_buffer_chparam(cast, format, width, height, stride);
 	}
 
-	if (cast->simple_frame.buffer == NULL) {
+	if (cast->screencopy_frame.buffer == NULL) {
 		logprint(DEBUG, "wlroots: create shm buffer");
-		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
-			stride, &cast->simple_frame.data);
+		cast->screencopy_frame.buffer = create_shm_buffer(cast, format, width, height,
+			stride, &cast->screencopy_frame.data);
 	} else {
 		logprint(TRACE,"wlroots: shm buffer exists");
 	}
 
-	if (cast->simple_frame.buffer == NULL) {
+	if (cast->screencopy_frame.buffer == NULL) {
 		logprint(ERROR, "wlroots: failed to create buffer");
 		abort();
 	}
@@ -178,7 +178,7 @@ static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: flags event handler");
-	cast->simple_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
+	cast->screencopy_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -187,8 +187,8 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: ready event handler");
 
-	cast->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
-	cast->simple_frame.tv_nsec = tv_nsec;
+	cast->screencopy_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
+	cast->screencopy_frame.tv_nsec = tv_nsec;
 
 	xdpw_pwr_enqueue_buffer(cast);
 
@@ -213,10 +213,10 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: damage event handler");
 
-	cast->simple_frame.damage.x = x;
-	cast->simple_frame.damage.y = y;
-	cast->simple_frame.damage.width = width;
-	cast->simple_frame.damage.height = height;
+	cast->screencopy_frame.damage.x = x;
+	cast->screencopy_frame.damage.y = y;
+	cast->screencopy_frame.damage.width = width;
+	cast->screencopy_frame.damage.height = height;
 }
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
