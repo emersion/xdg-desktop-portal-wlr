@@ -448,7 +448,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		"streams", "a(ua{sv})", 1,
 		cast->node_id, 2,
 		"position", "(ii)", 0, 0,
-		"size", "(ii)", cast->simple_frame.width, cast->simple_frame.height);
+		"size", "(ii)", cast->screencopy_frame.width, cast->screencopy_frame.height);
 
 	if (ret < 0) {
 		return ret;
