@@ -72,6 +72,9 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
+		if (!cast->wlr_frame) {
+			xdpw_wlr_register_cb(cast);
+		}
 		break;
 	default:
 		cast->pwr_stream_state = false;
