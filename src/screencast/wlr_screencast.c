@@ -20,28 +20,9 @@
 #include "logger.h"
 #include "fps_limit.h"
 
-static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
-	// Even though this check may be deemed unnecessary,
-	// this has been found to cause SEGFAULTs, like this one:
-	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
-	if (cast->screencopy_frame.data != NULL) {
-		munmap(cast->screencopy_frame.data, cast->screencopy_frame.size);
-		cast->screencopy_frame.data = NULL;
-	}
-
-	if (cast->screencopy_frame.buffer != NULL) {
-		wl_buffer_destroy(cast->screencopy_frame.buffer);
-		cast->screencopy_frame.buffer = NULL;
-	}
-}
-
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
-	if (cast->quit || cast->err) {
-		wlr_frame_buffer_destroy(cast);
-		logprint(TRACE, "xdpw: screencopy_frame buffer destroyed");
-	}
 	logprint(TRACE, "wlroots: frame destroyed");
 
 	if (cast->quit || cast->err) {
@@ -61,44 +42,6 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 			xdpw_wlr_register_cb(cast);
 		}
 	}
-}
-
-static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast,
-		enum wl_shm_format fmt, int width, int height, int stride,
-		void **data_out) {
-	struct xdpw_screencast_context *ctx = cast->ctx;
-	int size = stride * height;
-
-	int fd = anonymous_shm_open();
-	if (fd < 0) {
-		logprint(ERROR, "wlroots: shm_open failed");
-		return NULL;
-	}
-
-	int ret;
-	while ((ret = ftruncate(fd, size)) == EINTR);
-
-	if (ret < 0) {
-		close(fd);
-		logprint(ERROR, "wlroots: ftruncate failed");
-		return NULL;
-	}
-
-	void *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED) {
-		logprint(ERROR, "wlroots: mmap failed: %m");
-		close(fd);
-		return NULL;
-	}
-
-	struct wl_shm_pool *pool = wl_shm_create_pool(ctx->shm, fd, size);
-	close(fd);
-	struct wl_buffer *buffer =
-		wl_shm_pool_create_buffer(pool, 0, width, height, stride, fmt);
-	wl_shm_pool_destroy(pool);
-
-	*data_out = data;
-	return buffer;
 }
 
 static void wlr_frame_linux_dmabuf(void *data,
@@ -146,7 +89,12 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->screencopy_frame.buffer);
+	if (cast->current_frame.buffer == NULL) {
+		logprint(ERROR, "wlroots: imported buffer doesn't contain a wlr_buffer");
+		abort();
+	}
+
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
 	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
@@ -164,19 +112,6 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	cast->screencopy_frame.stride = stride;
 	cast->screencopy_frame.size = stride * height;
 	cast->screencopy_frame.format = format;
-
-	if (cast->screencopy_frame.buffer == NULL) {
-		logprint(DEBUG, "wlroots: create shm buffer");
-		cast->screencopy_frame.buffer = create_shm_buffer(cast, format, width, height,
-			stride, &cast->screencopy_frame.data);
-	} else {
-		logprint(TRACE,"wlroots: shm buffer exists");
-	}
-
-	if (cast->screencopy_frame.buffer == NULL) {
-		logprint(ERROR, "wlroots: failed to create buffer");
-		abort();
-	}
 
 	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast,frame);

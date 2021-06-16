@@ -13,22 +13,6 @@
 #include "xdpw.h"
 #include "logger.h"
 
-static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
-		uint32_t height, uint32_t stride, bool inverted) {
-	if (!inverted) {
-		memcpy(pwFramePointer, wlrFramePointer, height * stride);
-		return;
-	}
-
-	for (size_t i = 0; i < (size_t)height; ++i) {
-		void *flippedWlrRowPointer = wlrFramePointer + ((height - i - 1) * stride);
-		void *pwRowPointer = pwFramePointer + (i * stride);
-		memcpy(pwRowPointer, flippedWlrRowPointer, stride);
-	}
-
-	return;
-}
-
 static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_format format,
 		uint32_t width, uint32_t height, uint32_t framerate) {
 	struct spa_pod_frame f[1];
@@ -143,6 +127,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 		d[0].chunk->offset = 0;
 		d[0].flags = 0;
 		d[0].fd = anonymous_shm_open();
+		d[0].data = NULL;
 
 		if (d[0].fd == -1) {
 			logprint(ERROR, "pipewire: unable to create anonymous filedescriptor");
@@ -158,13 +143,9 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 			return;
 		}
 
-		// mmap buffer, so we can use the data_ptr in on_process
-		d[0].data = mmap(NULL, d[0].maxsize, PROT_READ | PROT_WRITE, MAP_SHARED, d[0].fd, d[0].mapoffset);
-		if (d[0].data == MAP_FAILED) {
-			logprint(ERROR, "pipewire: unable to mmap memory");
-			cast->err = 1;
-			return;
-		}
+		// create wl_buffer
+		buffer->user_data = import_wl_shm_buffer(cast, d[0].fd, cast->screencopy_frame.format,
+			cast->screencopy_frame.width, cast->screencopy_frame.height, cast->screencopy_frame.stride);
 	}
 }
 
@@ -174,7 +155,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	struct spa_data *d = buffer->buffer->datas;
 	switch (d[0].type) {
 	case SPA_DATA_MemFd:
-		munmap(d[0].data, d[0].maxsize);
+		wl_buffer_destroy(buffer->user_data);
 		close(d[0].fd);
 		break;
 	default:
@@ -196,6 +177,7 @@ void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	assert(cast->current_frame.current_pw_buffer == NULL);
 	if ((cast->current_frame.current_pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
 		logprint(WARN, "pipewire: out of buffers");
+		cast->current_frame.buffer = NULL;
 		return;
 	}
 
@@ -203,6 +185,7 @@ void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	struct spa_data *d = spa_buf->datas;
 	cast->current_frame.size = d[0].chunk->size;
 	cast->current_frame.stride = d[0].chunk->stride;
+	cast->current_frame.buffer = cast->current_frame.current_pw_buffer->user_data;
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
@@ -224,16 +207,14 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
 	}
-	if (d[0].data == NULL) {
-		logprint(TRACE, "pipewire: data pointer undefined");
-		goto queue;
+
+	if (cast->screencopy_frame.y_invert) {
+		//TODO: Flip buffer or set stride negative
+		cast->err = 1;
 	}
 
-	writeFrameData(d[0].data, cast->screencopy_frame.data, cast->screencopy_frame.height,
-		cast->screencopy_frame.stride, cast->screencopy_frame.y_invert);
-
 	logprint(TRACE, "********************");
-	logprint(TRACE, "pipewire: pointer %p", d[0].data);
+	logprint(TRACE, "pipewire: fd %u", d[0].fd);
 	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
 	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
 	logprint(TRACE, "pipewire: width %d", cast->screencopy_frame.width);
@@ -241,10 +222,10 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: y_invert %d", cast->screencopy_frame.y_invert);
 	logprint(TRACE, "********************");
 
-queue:
 	pw_stream_queue_buffer(cast->stream, pw_buf);
 
 	cast->current_frame.current_pw_buffer = NULL;
+	cast->current_frame.buffer = NULL;
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
