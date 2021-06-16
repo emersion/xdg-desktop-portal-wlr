@@ -208,7 +208,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		h->dts_offset = 0;
 	}
 
-	if (cast->screencopy_frame.y_invert) {
+	if (cast->current_frame.y_invert) {
 		//TODO: Flip buffer or set stride negative
 		cast->err = 1;
 	}
@@ -219,7 +219,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
 	logprint(TRACE, "pipewire: width %d", cast->screencopy_frame.width);
 	logprint(TRACE, "pipewire: height %d", cast->screencopy_frame.height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->screencopy_frame.y_invert);
+	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);
 	logprint(TRACE, "********************");
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);

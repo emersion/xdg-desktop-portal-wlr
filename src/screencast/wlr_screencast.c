@@ -123,7 +123,7 @@ static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: flags event handler");
-	cast->screencopy_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
+	cast->current_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -132,8 +132,8 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: ready event handler");
 
-	cast->screencopy_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
-	cast->screencopy_frame.tv_nsec = tv_nsec;
+	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
+	cast->current_frame.tv_nsec = tv_nsec;
 
 	xdpw_pwr_enqueue_buffer(cast);
 
@@ -158,10 +158,10 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: damage event handler");
 
-	cast->screencopy_frame.damage.x = x;
-	cast->screencopy_frame.damage.y = y;
-	cast->screencopy_frame.damage.width = width;
-	cast->screencopy_frame.damage.height = height;
+	cast->current_frame.damage.x = x;
+	cast->current_frame.damage.y = y;
+	cast->current_frame.damage.width = width;
+	cast->current_frame.damage.height = height;
 }
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
