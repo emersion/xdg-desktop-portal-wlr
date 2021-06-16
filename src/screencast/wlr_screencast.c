@@ -101,22 +101,6 @@ static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast
 	return buffer;
 }
 
-static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
-		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
-	logprint(DEBUG, "wlroots: reset buffer");
-	cast->screencopy_frame.width = width;
-	cast->screencopy_frame.height = height;
-	cast->screencopy_frame.stride = stride;
-	cast->screencopy_frame.size = stride * height;
-	cast->screencopy_frame.format = format;
-	wlr_frame_buffer_destroy(cast);
-
-	if (cast->pwr_stream_state) {
-		logprint(DEBUG, "wlroots: request pipewire param change");
-		pwr_update_stream_param(cast);
-	}
-}
-
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
@@ -128,13 +112,38 @@ static void wlr_frame_buffer_done(void *data,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
-
-	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
+	if (cast->pwr_stream_state) {
 		xdpw_pwr_dequeue_buffer(cast);
-		if (!cast->current_frame.current_pw_buffer) {
-			xdpw_wlr_frame_free(cast);
-			return;
+	}
+
+	if (!cast->current_frame.current_pw_buffer) {
+		logprint(WARN, "wlroots: failed to dequeue buffer");
+		xdpw_wlr_frame_free(cast);
+		return;
+	}
+
+	// Check if announced screencopy information is compatible with pipewire meta
+	if ((cast->pwr_format.format != xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format) &&
+			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format))) ||
+			cast->pwr_format.size.width != cast->screencopy_frame.width ||
+			cast->pwr_format.size.height != cast->screencopy_frame.height) {
+		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
+
+		xdpw_pwr_enqueue_buffer(cast);
+		if (cast->pwr_stream_state) {
+			pwr_update_stream_param(cast);
 		}
+		xdpw_wlr_frame_free(cast);
+		return;
+	}
+
+	// Check if dequeued buffer is compatible with announced buffer
+	if (cast->current_frame.size != cast->screencopy_frame.size ||
+			cast->current_frame.stride != cast->screencopy_frame.stride) {
+		logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");
+		xdpw_pwr_enqueue_buffer(cast);
+		xdpw_wlr_frame_free(cast);
+		return;
 	}
 
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->screencopy_frame.buffer);
@@ -149,13 +158,12 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	if (cast->screencopy_frame.width != width ||
-			cast->screencopy_frame.height != height ||
-			cast->screencopy_frame.stride != stride ||
-			cast->screencopy_frame.format != format) {
-		logprint(TRACE, "wlroots: buffer properties changed");
-		wlr_frame_buffer_chparam(cast, format, width, height, stride);
-	}
+
+	cast->screencopy_frame.width = width;
+	cast->screencopy_frame.height = height;
+	cast->screencopy_frame.stride = stride;
+	cast->screencopy_frame.size = stride * height;
+	cast->screencopy_frame.format = format;
 
 	if (cast->screencopy_frame.buffer == NULL) {
 		logprint(DEBUG, "wlroots: create shm buffer");
