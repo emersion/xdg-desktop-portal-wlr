@@ -268,7 +268,7 @@ void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[1];
 
-	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format);
+	enum spa_video_format format = xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info.format);
 
 	params[0] = build_format(&b, format,
 			cast->screencopy_frame_info.width, cast->screencopy_frame_info.height, cast->framerate);
@@ -298,7 +298,7 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	}
 	cast->pwr_stream_state = false;
 
-	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format);
+	enum spa_video_format format = xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info.format);
 
 	const struct spa_pod *param = build_format(&b, format,
 			cast->screencopy_frame_info.width, cast->screencopy_frame_info.height, cast->framerate);

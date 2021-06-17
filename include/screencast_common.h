@@ -63,7 +63,7 @@ struct xdpw_screencopy_frame_info {
 	uint32_t height;
 	uint32_t size;
 	uint32_t stride;
-	enum wl_shm_format format;
+	uint32_t format;
 };
 
 struct xdpw_buffer {
@@ -71,7 +71,7 @@ struct xdpw_buffer {
 
 	uint32_t width;
 	uint32_t height;
-	enum wl_shm_format format;
+	uint32_t format;
 
 	int fd;
 	uint32_t size;
@@ -154,7 +154,9 @@ void randname(char *buf);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
-enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format);
+enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
+uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
+enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 
 enum xdpw_chooser_types get_chooser_type(const char *chooser_type);

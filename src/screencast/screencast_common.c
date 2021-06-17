@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libdrm/drm_fourcc.h>
 
 #include "logger.h"
 
@@ -78,7 +79,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		return NULL;
 	}
 
-	buffer->buffer = import_wl_shm_buffer(cast, buffer->fd, frame_info->format,
+	buffer->buffer = import_wl_shm_buffer(cast, buffer->fd, xdpw_format_wl_shm_from_drm_fourcc(frame_info->format),
 			frame_info->width, frame_info->height, frame_info->stride);
 	if (buffer->buffer == NULL) {
 		logprint(ERROR, "xdpw: unable to create wl_buffer");
@@ -97,44 +98,102 @@ void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	free(buffer);
 }
 
-enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format) {
+enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format) {
+	switch (format) {
+	case DRM_FORMAT_ARGB8888:
+		return WL_SHM_FORMAT_ARGB8888;
+	case DRM_FORMAT_XRGB8888:
+		return WL_SHM_FORMAT_XRGB8888;
+	case DRM_FORMAT_RGBA8888:
+	case DRM_FORMAT_RGBX8888:
+	case DRM_FORMAT_ABGR8888:
+	case DRM_FORMAT_XBGR8888:
+	case DRM_FORMAT_BGRA8888:
+	case DRM_FORMAT_BGRX8888:
+	case DRM_FORMAT_NV12:
+	case DRM_FORMAT_XRGB2101010:
+	case DRM_FORMAT_XBGR2101010:
+	case DRM_FORMAT_RGBX1010102:
+	case DRM_FORMAT_BGRX1010102:
+	case DRM_FORMAT_ARGB2101010:
+	case DRM_FORMAT_ABGR2101010:
+	case DRM_FORMAT_RGBA1010102:
+	case DRM_FORMAT_BGRA1010102:
+		return (enum wl_shm_format)format;
+	default:
+		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported drm "
+			"format 0x%08x", format);
+		abort();
+	}
+}
+
+uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format) {
 	switch (format) {
 	case WL_SHM_FORMAT_ARGB8888:
-		return SPA_VIDEO_FORMAT_BGRA;
+		return DRM_FORMAT_ARGB8888;
 	case WL_SHM_FORMAT_XRGB8888:
-		return SPA_VIDEO_FORMAT_BGRx;
+		return DRM_FORMAT_XRGB8888;
 	case WL_SHM_FORMAT_RGBA8888:
-		return SPA_VIDEO_FORMAT_ABGR;
 	case WL_SHM_FORMAT_RGBX8888:
-		return SPA_VIDEO_FORMAT_xBGR;
 	case WL_SHM_FORMAT_ABGR8888:
-		return SPA_VIDEO_FORMAT_RGBA;
 	case WL_SHM_FORMAT_XBGR8888:
-		return SPA_VIDEO_FORMAT_RGBx;
 	case WL_SHM_FORMAT_BGRA8888:
-		return SPA_VIDEO_FORMAT_ARGB;
 	case WL_SHM_FORMAT_BGRX8888:
-		return SPA_VIDEO_FORMAT_xRGB;
 	case WL_SHM_FORMAT_NV12:
-		return SPA_VIDEO_FORMAT_NV12;
 	case WL_SHM_FORMAT_XRGB2101010:
-		return SPA_VIDEO_FORMAT_xRGB_210LE;
 	case WL_SHM_FORMAT_XBGR2101010:
-		return SPA_VIDEO_FORMAT_xBGR_210LE;
 	case WL_SHM_FORMAT_RGBX1010102:
-		return SPA_VIDEO_FORMAT_RGBx_102LE;
 	case WL_SHM_FORMAT_BGRX1010102:
-		return SPA_VIDEO_FORMAT_BGRx_102LE;
 	case WL_SHM_FORMAT_ARGB2101010:
-		return SPA_VIDEO_FORMAT_ARGB_210LE;
 	case WL_SHM_FORMAT_ABGR2101010:
-		return SPA_VIDEO_FORMAT_ABGR_210LE;
 	case WL_SHM_FORMAT_RGBA1010102:
-		return SPA_VIDEO_FORMAT_RGBA_102LE;
 	case WL_SHM_FORMAT_BGRA1010102:
+		return (uint32_t)format;
+	default:
+		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported wl_shm "
+			"format 0x%08x", format);
+		abort();
+	}
+}
+
+enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format) {
+	switch (format) {
+	case DRM_FORMAT_ARGB8888:
+		return SPA_VIDEO_FORMAT_BGRA;
+	case DRM_FORMAT_XRGB8888:
+		return SPA_VIDEO_FORMAT_BGRx;
+	case DRM_FORMAT_RGBA8888:
+		return SPA_VIDEO_FORMAT_ABGR;
+	case DRM_FORMAT_RGBX8888:
+		return SPA_VIDEO_FORMAT_xBGR;
+	case DRM_FORMAT_ABGR8888:
+		return SPA_VIDEO_FORMAT_RGBA;
+	case DRM_FORMAT_XBGR8888:
+		return SPA_VIDEO_FORMAT_RGBx;
+	case DRM_FORMAT_BGRA8888:
+		return SPA_VIDEO_FORMAT_ARGB;
+	case DRM_FORMAT_BGRX8888:
+		return SPA_VIDEO_FORMAT_xRGB;
+	case DRM_FORMAT_NV12:
+		return SPA_VIDEO_FORMAT_NV12;
+	case DRM_FORMAT_XRGB2101010:
+		return SPA_VIDEO_FORMAT_xRGB_210LE;
+	case DRM_FORMAT_XBGR2101010:
+		return SPA_VIDEO_FORMAT_xBGR_210LE;
+	case DRM_FORMAT_RGBX1010102:
+		return SPA_VIDEO_FORMAT_RGBx_102LE;
+	case DRM_FORMAT_BGRX1010102:
+		return SPA_VIDEO_FORMAT_BGRx_102LE;
+	case DRM_FORMAT_ARGB2101010:
+		return SPA_VIDEO_FORMAT_ARGB_210LE;
+	case DRM_FORMAT_ABGR2101010:
+		return SPA_VIDEO_FORMAT_ABGR_210LE;
+	case DRM_FORMAT_RGBA1010102:
+		return SPA_VIDEO_FORMAT_RGBA_102LE;
+	case DRM_FORMAT_BGRA1010102:
 		return SPA_VIDEO_FORMAT_BGRA_102LE;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: failed to convert wl_shm "
+		logprint(ERROR, "xdg-desktop-portal-wlr: failed to convert drm "
 			"format 0x%08x to spa_video_format", format);
 		abort();
 	}
