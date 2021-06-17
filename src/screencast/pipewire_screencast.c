@@ -68,8 +68,8 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_instance *cast,
 		const struct spa_pod *params[static 1]) {
 	uint32_t param_count = 1;
-	params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info.format),
-			cast->screencopy_frame_info.width, cast->screencopy_frame_info.height, cast->framerate);
+	params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
+			cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate);
 
 	return param_count;
 }
@@ -122,6 +122,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[2];
+	uint32_t blocks;
+	uint32_t data_type;
 
 	if (!param || id != SPA_PARAM_Format) {
 		return;
@@ -130,9 +132,16 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
+	if (spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier) != NULL) {
+		abort();
+	} else {
+		cast->buffer_type = WL_SHM;
+		blocks = 1;
+		data_type = 1<<SPA_DATA_MemFd;
+	}
 
-	params[0] = build_buffer(&b, 1, cast->screencopy_frame_info.size,
-			cast->screencopy_frame_info.stride, 1<<SPA_DATA_MemFd);
+	params[0] = build_buffer(&b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
+			cast->screencopy_frame_info[cast->buffer_type].stride, data_type);
 
 	params[1] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
@@ -152,6 +161,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 
 	// Select buffer type from negotiation result
 	if ((d[0].type & (1u << SPA_DATA_MemFd)) > 0) {
+		assert(cast->buffer_type == WL_SHM);
 		d[0].type = SPA_DATA_MemFd;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
@@ -161,7 +171,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 
 	logprint(TRACE, "pipewire: selected buffertype %u", d[0].type);
 
-	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, &cast->screencopy_frame_info);
+	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, cast->buffer_type, &cast->screencopy_frame_info[cast->buffer_type]);
 	if (xdpw_buffer == NULL) {
 		logprint(ERROR, "pipewire: failed to create xdpw buffer");
 		cast->err = 1;
