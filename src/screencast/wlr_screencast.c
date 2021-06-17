@@ -91,7 +91,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	cast->screencopy_frame_info.height = height;
 	cast->screencopy_frame_info.stride = stride;
 	cast->screencopy_frame_info.size = stride * height;
-	cast->screencopy_frame_info.format = format;
+	cast->screencopy_frame_info.format = xdpw_format_drm_fourcc_from_wl_shm(format);
 
 	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast, frame);
@@ -116,8 +116,8 @@ static void wlr_frame_buffer_done(void *data,
 	}
 
 	// Check if announced screencopy information is compatible with pipewire meta
-	if ((cast->pwr_format.format != xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format) &&
-			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format))) ||
+	if ((cast->pwr_format.format != xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info.format) &&
+			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info.format))) ||
 			cast->pwr_format.size.width != cast->screencopy_frame_info.width ||
 			cast->pwr_format.size.height != cast->screencopy_frame_info.height) {
 		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
