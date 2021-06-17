@@ -103,6 +103,7 @@ struct xdpw_screencast_context {
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
+	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 
 	// gbm
 	struct gbm_device *gbm;
