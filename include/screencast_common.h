@@ -22,6 +22,11 @@ enum source_types {
   WINDOW = 2,
 };
 
+enum buffer_type {
+  WL_SHM = 0,
+  DMABUF = 1,
+};
+
 enum xdpw_chooser_types {
   XDPW_CHOOSER_DEFAULT,
   XDPW_CHOOSER_NONE,
@@ -68,6 +73,7 @@ struct xdpw_screencopy_frame_info {
 
 struct xdpw_buffer {
 	struct wl_list link;
+	enum buffer_type buffer_type;
 
 	uint32_t width;
 	uint32_t height;
@@ -127,11 +133,12 @@ struct xdpw_screencast_instance {
 	struct xdpw_wlr_output *target_output;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_screencopy_frame_info screencopy_frame_info;
+	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
 	bool with_cursor;
 	int err;
 	bool quit;
 	bool need_buffer;
+	enum buffer_type buffer_type;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
@@ -152,7 +159,7 @@ struct xdpw_wlr_output {
 
 void randname(char *buf);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
-	struct xdpw_screencopy_frame_info *frame_info);
+	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
 uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
