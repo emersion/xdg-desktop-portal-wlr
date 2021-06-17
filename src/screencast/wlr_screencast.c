@@ -101,7 +101,13 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
+	struct xdpw_screencast_instance *cast = data;
+
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
+
+	cast->screencopy_frame_info[DMABUF].width = width;
+	cast->screencopy_frame_info[DMABUF].height = height;
+	cast->screencopy_frame_info[DMABUF].format = format;
 }
 
 static void wlr_frame_buffer_done(void *data,
