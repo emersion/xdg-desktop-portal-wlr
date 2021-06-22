@@ -27,6 +27,8 @@ pipewire = dependency('libpipewire-0.3', version: '>= 0.3.41')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 iniparser = dependency('inih')
+gbm = dependency('gbm')
+drm = dependency('libdrm')
 
 epoll = dependency('', required: false)
 if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
@@ -92,6 +94,8 @@ executable(
 		pipewire,
 		rt,
 		iniparser,
+		gbm,
+		drm,
 		epoll,
 	],
 	include_directories: [inc],

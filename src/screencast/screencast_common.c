@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <libdrm/drm_fourcc.h>
+#include <xf86drm.h>
 
 #include "logger.h"
 
@@ -18,6 +19,47 @@ void randname(char *buf) {
 		buf[i] = 'A'+(r&15)+(r&16)*2;
 		r >>= 5;
 	}
+}
+
+static char *gbm_find_render_node() {
+	drmDevice *devices[64];
+	char *render_node = NULL;
+
+	int n = drmGetDevices2(0, devices, sizeof(devices) / sizeof(devices[0]));
+	for (int i = 0; i < n; ++i) {
+		drmDevice *dev = devices[i];
+		if (!(dev->available_nodes & (1 << DRM_NODE_RENDER)))
+			continue;
+
+		render_node = strdup(dev->nodes[DRM_NODE_RENDER]);
+		break;
+	}
+
+	drmFreeDevices(devices, n);
+	return render_node;
+}
+
+struct gbm_device *xdpw_gbm_device_create(void) {
+	struct gbm_device *gbm;
+	char *render_node = NULL;
+
+	render_node = gbm_find_render_node();
+	if (render_node == NULL) {
+		logprint(ERROR, "xdpw: Could not find render node");
+		return NULL;
+	}
+	logprint(INFO, "xdpw: Using render node %s", render_node);
+
+	int fd = open(render_node, O_RDWR | O_CLOEXEC);
+	if (fd < 0) {
+		logprint(ERROR, "xdpw: Could not open render node %s", render_node);
+		free(render_node);
+		return NULL;
+	}
+
+	free(render_node);
+	gbm = gbm_create_device(fd);
+	return gbm;
 }
 
 static int anonymous_shm_open(void) {
