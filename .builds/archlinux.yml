@@ -8,6 +8,7 @@ packages:
   - pipewire
   - libinih
   - scdoc
+  - mesa
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:
