@@ -1,6 +1,7 @@
 #ifndef SCREENCAST_COMMON_H
 #define SCREENCAST_COMMON_H
 
+#include <gbm.h>
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
@@ -103,6 +104,9 @@ struct xdpw_screencast_context {
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
 
+	// gbm
+	struct gbm_device *gbm;
+
 	// sessions
 	struct wl_list screencast_instances;
 };
@@ -158,6 +162,7 @@ struct xdpw_wlr_output {
 };
 
 void randname(char *buf);
+struct gbm_device *xdpw_gbm_device_create(void);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
