@@ -186,6 +186,9 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	if ((d[0].type & (1u << SPA_DATA_MemFd)) > 0) {
 		assert(cast->buffer_type == WL_SHM);
 		d[0].type = SPA_DATA_MemFd;
+	} else if ((d[0].type & (1u << SPA_DATA_DmaBuf)) > 0) {
+		assert(cast->buffer_type == DMABUF);
+		d[0].type = SPA_DATA_DmaBuf;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
 		cast->err = 1;

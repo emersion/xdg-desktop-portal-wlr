@@ -85,6 +85,8 @@ struct xdpw_buffer {
 	uint32_t stride;
 	uint32_t offset;
 
+	struct gbm_bo *bo;
+
 	struct wl_buffer *buffer;
 };
 

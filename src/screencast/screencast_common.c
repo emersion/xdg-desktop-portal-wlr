@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <libdrm/drm_fourcc.h>
 #include <xf86drm.h>
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 #include "logger.h"
 
@@ -135,7 +136,52 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		}
 		break;
 	case DMABUF:
-		abort();
+		buffer->bo = gbm_bo_create(cast->ctx->gbm,
+				frame_info->width, frame_info->height, frame_info->format,
+				GBM_BO_USE_RENDERING);
+		if (buffer->bo == NULL) {
+			logprint(ERROR, "xdpw: failed to create gbm_bo");
+			free(buffer);
+			return NULL;
+		}
+
+		struct zwp_linux_buffer_params_v1 *params;
+		params = zwp_linux_dmabuf_v1_create_params(cast->ctx->linux_dmabuf);
+		if (!params) {
+			logprint(ERROR, "xdpw: failed to create linux_buffer_params");
+			gbm_bo_destroy(buffer->bo);
+			free(buffer);
+			return NULL;
+		}
+
+		buffer->size = 0;
+		buffer->stride = gbm_bo_get_stride(buffer->bo);
+		buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
+		uint64_t mod = gbm_bo_get_modifier(buffer->bo);
+		buffer->fd = gbm_bo_get_fd(buffer->bo);
+
+		if (buffer->fd < 0) {
+			logprint(ERROR, "xdpw: failed to get file descriptor");
+			zwp_linux_buffer_params_v1_destroy(params);
+			gbm_bo_destroy(buffer->bo);
+			free(buffer);
+			return NULL;
+		}
+
+		zwp_linux_buffer_params_v1_add(params, buffer->fd, 0, buffer->offset, buffer->stride,
+			mod >> 32, mod & 0xffffffff);
+		buffer->buffer = zwp_linux_buffer_params_v1_create_immed(params,
+			buffer->width, buffer->height,
+			buffer->format, /* flags */ 0);
+		zwp_linux_buffer_params_v1_destroy(params);
+
+		if (!buffer->buffer) {
+			logprint(ERROR, "xdpw: failed to create buffer");
+			gbm_bo_destroy(buffer->bo);
+			close(buffer->fd);
+			free(buffer);
+			return NULL;
+		}
 	}
 
 	return buffer;
@@ -143,6 +189,9 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	wl_buffer_destroy(buffer->buffer);
+	if (buffer->buffer_type == DMABUF) {
+		gbm_bo_destroy(buffer->bo);
+	}
 	close(buffer->fd);
 	wl_list_remove(&buffer->link);
 	free(buffer);
