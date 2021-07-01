@@ -267,9 +267,9 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		}
 
 		if (strcmp(key, "multiple") == 0) {
-			bool multiple;
+			int multiple;
 			sd_bus_message_read(msg, "v", "b", &multiple);
-			logprint(INFO, "dbus: option multiple: %x", multiple);
+			logprint(INFO, "dbus: option multiple: %d", multiple);
 		} else if (strcmp(key, "types") == 0) {
 			uint32_t mask;
 			sd_bus_message_read(msg, "v", "u", &mask);

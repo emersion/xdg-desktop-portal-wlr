@@ -83,14 +83,14 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 		}
 
 		if (strcmp(key, "interactive") == 0) {
-			bool mode;
+			int mode;
 			sd_bus_message_read(msg, "v", "b", &mode);
-			logprint(DEBUG, "dbus: option interactive: %x", mode);
+			logprint(DEBUG, "dbus: option interactive: %d", mode);
 			interactive = mode;
 		} else if (strcmp(key, "modal") == 0) {
-			bool modal;
+			int modal;
 			sd_bus_message_read(msg, "v", "b", &modal);
-			logprint(DEBUG, "dbus: option modal: %x", modal);
+			logprint(DEBUG, "dbus: option modal: %d", modal);
 		} else {
 			logprint(WARN, "dbus: unknown option %s", key);
 			sd_bus_message_skip(msg, "v");
