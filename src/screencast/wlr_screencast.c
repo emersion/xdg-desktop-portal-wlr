@@ -173,6 +173,7 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
+	cast->current_frame.damage_count = 0;
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.xdpw_buffer->buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
@@ -199,10 +200,13 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: damage event handler");
 
-	cast->current_frame.damage.x = x;
-	cast->current_frame.damage.y = y;
-	cast->current_frame.damage.width = width;
-	cast->current_frame.damage.height = height;
+	logprint(TRACE, "wlroots: damage %"PRIu32": %"PRIu32",%"PRIu32"x%"PRIu32",%"PRIu32, cast->current_frame.damage_count, x, y, width, height);
+	struct xdpw_frame_damage damage = {x, y, width, height};
+	if (cast->current_frame.damage_count < 4) {
+		cast->current_frame.damage[cast->current_frame.damage_count++] = damage;
+	} else {
+		cast->current_frame.damage[3] = merge_damage(&cast->current_frame.damage[3], &damage);
+	}
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,

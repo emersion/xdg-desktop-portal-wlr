@@ -410,3 +410,17 @@ const char *chooser_type_str(enum xdpw_chooser_types chooser_type) {
 	fprintf(stderr, "Could not find chooser type %d\n", chooser_type);
 	abort();
 }
+
+struct xdpw_frame_damage merge_damage(struct xdpw_frame_damage *damage1, struct xdpw_frame_damage *damage2) {
+	struct xdpw_frame_damage damage;
+	uint32_t x0, y0;
+	damage.x = damage1->x < damage2->y ? damage1->x : damage2->x;
+	damage.y = damage1->y < damage2->y ? damage1->y : damage2->y;
+
+	x0 = damage1->x + damage1->width < damage2->x + damage2->width ? damage2->x + damage2->width : damage1->x + damage1->width;
+	y0 = damage1->y + damage1->height < damage2->y + damage2->height ? damage2->y + damage2->height : damage1->y + damage1->height;
+	damage.width = x0 - damage.x;
+	damage.height = y0 - damage.y;
+
+	return damage;
+}
