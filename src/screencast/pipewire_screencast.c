@@ -203,7 +203,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	struct pw_stream *stream = cast->stream;
 	uint8_t params_buffer[3][1024];
 	struct spa_pod_dynamic_builder b[3];
-	const struct spa_pod *params[4];
+	const struct spa_pod *params[5];
 	uint32_t blocks;
 	uint32_t data_type;
 
@@ -330,7 +330,12 @@ fixate_format:
 			sizeof(struct spa_meta_region) * 1,
 			sizeof(struct spa_meta_region) * 4));
 
-	pw_stream_update_params(stream, params, 4);
+	params[4] = spa_pod_builder_add_object(&b[2].b,
+		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoCrop),
+		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_region)));
+
+	pw_stream_update_params(stream, params, 5);
 	spa_pod_dynamic_builder_clean(&b[0]);
 	spa_pod_dynamic_builder_clean(&b[1]);
 	spa_pod_dynamic_builder_clean(&b[2]);
@@ -493,6 +498,14 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		}
 	}
 
+	struct spa_meta_region *crop;
+	if ((crop = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoCrop, sizeof(*crop)))) {
+		crop->region.position.x = cast->current_frame.crop.x;
+		crop->region.position.y = cast->current_frame.crop.y;
+		crop->region.size.width = cast->current_frame.crop.width;
+		crop->region.size.height = cast->current_frame.crop.height;
+	}
+
 	if (buffer_corrupt) {
 		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
 			d[plane].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
@@ -515,6 +528,9 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: width %d", cast->current_frame.xdpw_buffer->width);
 	logprint(TRACE, "pipewire: height %d", cast->current_frame.xdpw_buffer->height);
 	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);
+	logprint(TRACE, "pipewire: crop %u,%u (%ux%u)",
+			cast->current_frame.crop.x, cast->current_frame.crop.y,
+			cast->current_frame.crop.width, cast->current_frame.crop.height);
 	logprint(TRACE, "********************");
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
