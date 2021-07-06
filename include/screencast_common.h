@@ -108,6 +108,7 @@ struct xdpw_screencast_instance {
 	bool with_cursor;
 	int err;
 	bool quit;
+	bool copied;
 
 	// fps limit
 	struct fps_limit_state fps_limit;

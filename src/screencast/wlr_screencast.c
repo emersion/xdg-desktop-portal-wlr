@@ -34,10 +34,15 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	}
 
 	if (cast->pwr_stream_state) {
-		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-		if (delay_ns > 0) {
-			xdpw_add_timer(cast->ctx->state, delay_ns,
-				(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
+		if (cast->copied) {
+			uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+			cast->copied = false;
+			if (delay_ns > 0) {
+				xdpw_add_timer(cast->ctx->state, delay_ns,
+					(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
+			} else {
+				xdpw_wlr_register_cb(cast);
+			}
 		} else {
 			xdpw_wlr_register_cb(cast);
 		}
@@ -134,6 +139,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	cast->current_frame.tv_nsec = tv_nsec;
+	cast->copied = true;
 
 	xdpw_pwr_enqueue_buffer(cast);
 
