@@ -499,7 +499,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	}
 
 	struct spa_meta_region *crop;
-	if ((crop = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoCrop, sizeof(*crop)))) {
+	if (cast->cropmode == XDPW_CROP_PIPEWIRE && (crop = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoCrop, sizeof(*crop)))) {
 		crop->region.position.x = cast->current_frame.crop.x;
 		crop->region.position.y = cast->current_frame.crop.y;
 		crop->region.size.width = cast->current_frame.crop.width;

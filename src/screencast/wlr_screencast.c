@@ -252,8 +252,17 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 };
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
-	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
+	switch (cast->cropmode) {
+	case XDPW_CROP_WLROOTS:
+		cast->frame_callback = zwlr_screencopy_manager_v1_capture_output_region(
+			cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output,
+			cast->current_frame.crop.x, cast->current_frame.crop.y,
+			cast->current_frame.crop.width, cast->current_frame.crop.height);
+		break;
+	default:
+		cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
+			cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
+	}
 
 	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
 		&wlr_frame_listener, cast);
