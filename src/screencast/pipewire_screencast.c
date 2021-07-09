@@ -12,22 +12,6 @@
 #include "xdpw.h"
 #include "logger.h"
 
-static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
-		uint32_t height, uint32_t stride, bool inverted) {
-	if (!inverted) {
-		memcpy(pwFramePointer, wlrFramePointer, height * stride);
-		return;
-	}
-
-	for (size_t i = 0; i < (size_t)height; ++i) {
-		void *flippedWlrRowPointer = wlrFramePointer + ((height - i - 1) * stride);
-		void *pwRowPointer = pwFramePointer + (i * stride);
-		memcpy(pwRowPointer, flippedWlrRowPointer, stride);
-	}
-
-	return;
-}
-
 static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_format format,
 		uint32_t width, uint32_t height, uint32_t framerate) {
 	struct spa_pod_frame f[1];
@@ -59,51 +43,6 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
-static void pwr_on_event(void *data, uint64_t expirations) {
-	struct xdpw_screencast_instance *cast = data;
-	struct pw_buffer *pw_buf;
-	struct spa_buffer *spa_buf;
-	struct spa_meta_header *h;
-	struct spa_data *d;
-
-	logprint(TRACE, "********************");
-	logprint(TRACE, "pipewire: event fired");
-
-	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
-		logprint(WARN, "pipewire: out of buffers");
-		goto out;
-	}
-
-	spa_buf = pw_buf->buffer;
-	d = spa_buf->datas;
-	if ((d[0].data) == NULL) {
-		logprint(TRACE, "pipewire: data pointer undefined");
-		goto out;
-	}
-	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
-		h->pts = -1;
-		h->flags = 0;
-		h->seq = cast->seq++;
-		h->dts_offset = 0;
-	}
-
-	writeFrameData(d[0].data, cast->simple_frame.data, cast->simple_frame.height,
-		cast->simple_frame.stride, cast->simple_frame.y_invert);
-
-	logprint(TRACE, "pipewire: pointer %p", d[0].data);
-	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
-	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: width %d", cast->simple_frame.width);
-	logprint(TRACE, "pipewire: height %d", cast->simple_frame.height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->simple_frame.y_invert);
-	logprint(TRACE, "********************");
-
-	pw_stream_queue_buffer(cast->stream, pw_buf);
-
-out:
-	xdpw_wlr_frame_free(cast);
-}
-
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -116,6 +55,7 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
+		xdpw_wlr_register_cb(cast);
 		break;
 	default:
 		cast->pwr_stream_state = false;
@@ -131,7 +71,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	uint8_t params_buffer[1024];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
-	const struct spa_pod *params[2];
+	const struct spa_pod *params[4];
 
 	if (!param || id != SPA_PARAM_Format) {
 		return;
@@ -144,8 +84,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
 		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, 1, 32),
 		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
-		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->simple_frame.size),
-		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->simple_frame.stride),
+		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->screencopy_frame.size),
+		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->screencopy_frame.stride),
 		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(XDPW_PWR_ALIGN),
 		SPA_PARAM_BUFFERS_dataType,SPA_POD_CHOICE_FLAGS_Int(1<<SPA_DATA_MemFd));
 
@@ -154,7 +94,17 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	pw_stream_update_params(stream, params, 2);
+	params[2] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoDamage),
+		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_region)));
+
+	params[3] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoCrop),
+		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_region)));
+
+	pw_stream_update_params(stream, params, 4);
 }
 
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
@@ -177,10 +127,10 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	logprint(TRACE, "pipewire: selected buffertype %u", d[0].type);
 	// Prepare buffer for choosen type
 	if (d[0].type == SPA_DATA_MemFd) {
-		d[0].maxsize = cast->simple_frame.size;
+		d[0].maxsize = cast->screencopy_frame.size;
 		d[0].mapoffset = 0;
-		d[0].chunk->size = cast->simple_frame.size;
-		d[0].chunk->stride = cast->simple_frame.stride;
+		d[0].chunk->size = cast->screencopy_frame.size;
+		d[0].chunk->stride = cast->screencopy_frame.stride;
 		d[0].chunk->offset = 0;
 		d[0].flags = 0;
 		d[0].fd = anonymous_shm_open();
@@ -199,13 +149,9 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 			return;
 		}
 
-		// mmap buffer, so we can use the data_ptr in on_process
-		d[0].data = mmap(NULL, d[0].maxsize, PROT_READ | PROT_WRITE, MAP_SHARED, d[0].fd, d[0].mapoffset);
-		if (d[0].data == MAP_FAILED) {
-			logprint(ERROR, "pipewire: unable to mmap memory");
-			cast->err = 1;
-			return;
-		}
+		// create wl_buffer
+		d[0].data = import_shm_buffer(cast, d[0].fd, cast->screencopy_frame.format,
+			cast->screencopy_frame.width, cast->screencopy_frame.height, cast->screencopy_frame.stride);
 	}
 }
 
@@ -215,7 +161,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	struct spa_data *d = buffer->buffer->datas;
 	switch (d[0].type) {
 	case SPA_DATA_MemFd:
-		munmap(d[0].data, d[0].maxsize);
+		wl_buffer_destroy(d[0].data);
 		close(d[0].fd);
 		break;
 	default:
@@ -231,6 +177,93 @@ static const struct pw_stream_events pwr_stream_events = {
 	.remove_buffer = pwr_handle_stream_remove_buffer,
 };
 
+void xdpw_pwr_import_buffer(struct xdpw_screencast_instance *cast) {
+	struct pw_buffer *pw_buf;
+	struct spa_buffer *spa_buf;
+	struct spa_data *d;
+
+	logprint(TRACE, "pipewire: importing buffer");
+
+	if ((pw_buf = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
+		logprint(WARN, "pipewire: out of buffers");
+		cast->simple_frame.current_pw_buffer = pw_buf;
+		cast->simple_frame.buffer = NULL;
+		return;
+	}
+
+	spa_buf = pw_buf->buffer;
+	d = spa_buf->datas;
+	cast->simple_frame.current_pw_buffer = pw_buf;
+	cast->simple_frame.size = d[0].chunk->size;
+	cast->simple_frame.stride = d[0].chunk->stride;
+	cast->simple_frame.buffer = d[0].data;
+}
+
+void xdpw_pwr_export_buffer(struct xdpw_screencast_instance *cast) {
+	struct pw_buffer *pw_buf;
+	struct spa_buffer *spa_buf;
+	struct spa_meta_header *h;
+	struct spa_meta_region *damage;
+	struct spa_meta_region *crop;
+	struct spa_data *d;
+
+	logprint(TRACE, "pipewire: exporting buffer");
+
+	pw_buf = cast->simple_frame.current_pw_buffer;
+
+	if (!pw_buf) {
+		logprint(TRACE, "pipewire: no pipewire buffer to queue");
+		return;
+	}
+
+	spa_buf = pw_buf->buffer;
+	d = spa_buf->datas;
+	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
+		h->pts = -1;
+		h->flags = 0;
+		h->seq = cast->seq++;
+		h->dts_offset = 0;
+	}
+
+	if ((damage = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoDamage, sizeof(*damage)))) {
+		damage->region.position.x = cast->simple_frame.damage.x;
+		damage->region.position.y = cast->simple_frame.damage.y;
+		damage->region.size.width = cast->simple_frame.damage.width;
+		damage->region.size.height = cast->simple_frame.damage.height;
+	}
+
+	if (cast->cropmode == XDPW_CROP_PIPEWIRE && (crop = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoCrop, sizeof(*crop)))) {
+		crop->region.position.x = cast->simple_frame.crop.x;
+		crop->region.position.y = cast->simple_frame.crop.y;
+		crop->region.size.width = cast->simple_frame.crop.width;
+		crop->region.size.height = cast->simple_frame.crop.height;
+	}
+
+	if (cast->simple_frame.y_invert) {
+		//TODO: Flip buffer or set stride negative
+	}
+
+	logprint(TRACE, "********************");
+	logprint(TRACE, "pipewire: pointer %p", d[0].data);
+	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
+	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
+	logprint(TRACE, "pipewire: width %d", cast->screencopy_frame.width);
+	logprint(TRACE, "pipewire: height %d", cast->screencopy_frame.height);
+	logprint(TRACE, "pipewire: y_invert %d", cast->simple_frame.y_invert);
+	logprint(TRACE, "pipewire: damage %u,%u (%ux%u)",
+			cast->simple_frame.damage.x, cast->simple_frame.damage.y,
+			cast->simple_frame.damage.width, cast->simple_frame.damage.height);
+	logprint(TRACE, "pipewire: crop %u,%u (%ux%u)",
+			cast->simple_frame.crop.x, cast->simple_frame.crop.y,
+			cast->simple_frame.crop.width, cast->simple_frame.crop.height);
+	logprint(TRACE, "********************");
+
+	pw_stream_queue_buffer(cast->stream, pw_buf);
+
+	cast->simple_frame.current_pw_buffer = NULL;
+	cast->simple_frame.buffer = NULL;
+}
+
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
 	struct pw_stream *stream = cast->stream;
@@ -239,10 +272,10 @@ void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[1];
 
-	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->simple_frame.format);
+	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format);
 
 	params[0] = build_format(&b, format,
-			cast->simple_frame.width, cast->simple_frame.height, cast->framerate);
+			cast->screencopy_frame.width, cast->screencopy_frame.height, cast->framerate);
 
 	pw_stream_update_params(stream, params, 1);
 }
@@ -269,15 +302,10 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	}
 	cast->pwr_stream_state = false;
 
-	/* make an event to signal frame ready */
-	cast->event =
-		pw_loop_add_event(state->pw_loop, pwr_on_event, cast);
-	logprint(DEBUG, "pipewire: registered event %p", cast->event);
-
-	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->simple_frame.format);
+	enum spa_video_format format = xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format);
 
 	const struct spa_pod *param = build_format(&b, format,
-			cast->simple_frame.width, cast->simple_frame.height, cast->framerate);
+			cast->screencopy_frame.width, cast->screencopy_frame.height, cast->framerate);
 
 	pw_stream_add_listener(cast->stream, &cast->stream_listener,
 		&pwr_stream_events, cast);
