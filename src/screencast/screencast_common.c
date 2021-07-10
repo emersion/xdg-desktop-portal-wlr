@@ -139,12 +139,18 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		break;
 	case DMABUF:;
 		uint32_t flags = GBM_BO_USE_RENDERING;
-		if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
-			flags |= GBM_BO_USE_LINEAR;
+		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
+			uint64_t *modifiers = (uint64_t*)&cast->pwr_format.modifier;
+			buffer->bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm, frame_info->width, frame_info->height,
+				frame_info->format, modifiers, 1, flags);
+		} else {
+			if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
+				flags |= GBM_BO_USE_LINEAR;
+			}
+			buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
+				frame_info->format, flags);
 		}
 
-		buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
-				frame_info->format, flags);
 		if (buffer->bo == NULL) {
 			logprint(ERROR, "xdpw: failed to create gbm_bo");
 			free(buffer);
