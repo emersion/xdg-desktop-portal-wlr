@@ -545,6 +545,28 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out);
 }
 
+static void linux_dmabuf_handle_modifier(void *data,
+		struct zwp_linux_dmabuf_v1 *zwp_linux_dmabuf_v1,
+		uint32_t format, uint32_t modifier_hi, uint32_t modifier_lo) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(TRACE, "wlroots: linux_dmabuf_handle_modifier called");
+
+	struct xdpw_format_modifier_pair *fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
+
+	fm_pair->fourcc = format;
+	fm_pair->modifier = ((((uint64_t)modifier_hi) << 32) | modifier_lo);
+
+	logprint(TRACE, "wlroots: format %u (%u)", fm_pair->fourcc, fm_pair->modifier);
+
+	wl_list_insert(&ctx->format_modifier_pairs, &fm_pair->link);
+}
+
+static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_listener = {
+	.format = noop,
+	.modifier = linux_dmabuf_handle_modifier,
+};
+
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
@@ -589,6 +611,8 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, LINUX_DMABUF_VERSION);
 		ctx->linux_dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, LINUX_DMABUF_VERSION);
+
+		zwp_linux_dmabuf_v1_add_listener(ctx->linux_dmabuf, &linux_dmabuf_listener, ctx);
 	}
 }
 
@@ -614,6 +638,9 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
 	// initialize a list of active screencast instances
 	wl_list_init(&ctx->screencast_instances);
+
+	// initialize a list of format modifier pairs
+	wl_list_init(&ctx->format_modifier_pairs);
 
 	// retrieve registry
 	ctx->registry = wl_display_get_registry(state->wl_display);
@@ -659,6 +686,12 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 }
 
 void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
+	struct xdpw_format_modifier_pair *fm_pair, *tmp_fmp;
+	wl_list_for_each_safe(fm_pair, tmp_fmp, &ctx->format_modifier_pairs, link) {
+		wl_list_remove(&fm_pair->link);
+		free(fm_pair);
+	}
+
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
