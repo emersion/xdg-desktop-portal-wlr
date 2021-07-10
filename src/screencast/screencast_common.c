@@ -219,6 +219,37 @@ void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	free(buffer);
 }
 
+bool wlr_query_dmabuf_modifiers(struct xdpw_screencast_context *ctx, uint32_t drm_format,
+		uint32_t num_modifiers, uint64_t *modifiers, uint32_t *max_modifiers) {
+	if (wl_list_empty(&ctx->format_modifier_pairs))
+		return false;
+	struct xdpw_format_modifier_pair *fm_pair;
+	if (num_modifiers == 0) {
+		*max_modifiers = 0;
+		wl_list_for_each(fm_pair, &ctx->format_modifier_pairs, link) {
+			if (fm_pair->fourcc == drm_format &&
+					(fm_pair->modifier == DRM_FORMAT_MOD_INVALID ||
+					gbm_device_get_format_modifier_plane_count(ctx->gbm, fm_pair->fourcc, fm_pair->modifier) > 0))
+				*max_modifiers += 1;
+		}
+		return true;
+	}
+
+	uint32_t i = 0;
+	wl_list_for_each(fm_pair, &ctx->format_modifier_pairs, link) {
+		if (i == num_modifiers)
+			break;
+		if (fm_pair->fourcc == drm_format &&
+				(fm_pair->modifier == DRM_FORMAT_MOD_INVALID ||
+				gbm_device_get_format_modifier_plane_count(ctx->gbm, fm_pair->fourcc, fm_pair->modifier) > 0)) {
+			modifiers[i] = fm_pair->modifier;
+			i++;
+		}
+	}
+	*max_modifiers = num_modifiers;
+	return true;
+}
+
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format) {
 	switch (format) {
 	case DRM_FORMAT_ARGB8888:
