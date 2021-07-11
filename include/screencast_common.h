@@ -42,17 +42,22 @@ struct xdpw_frame_damage {
 };
 
 struct xdpw_frame {
-	uint32_t width;
-	uint32_t height;
 	uint32_t size;
 	uint32_t stride;
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
-	enum wl_shm_format format;
 	struct xdpw_frame_damage damage;
 	struct wl_buffer *buffer;
-	void *data;
+	struct pw_buffer *current_pw_buffer;
+};
+
+struct xdpw_screencopy_frame {
+	uint32_t width;
+	uint32_t height;
+	uint32_t size;
+	uint32_t stride;
+	enum wl_shm_format format;
 };
 
 struct xdpw_screencast_context {
@@ -83,9 +88,9 @@ struct xdpw_screencast_instance {
 	uint32_t refcount;
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
+	struct xdpw_frame simple_frame;
 
 	// pipewire
-	struct spa_source *event;
 	struct pw_stream *stream;
 	struct spa_hook stream_listener;
 	struct spa_video_info_raw pwr_format;
@@ -99,10 +104,11 @@ struct xdpw_screencast_instance {
 	struct xdpw_wlr_output *target_output;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_frame simple_frame;
+	struct xdpw_screencopy_frame screencopy_frame;
 	bool with_cursor;
 	int err;
 	bool quit;
+	bool copied;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
@@ -123,6 +129,8 @@ struct xdpw_wlr_output {
 
 void randname(char *buf);
 int anonymous_shm_open(void);
+struct wl_buffer *import_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
+	enum wl_shm_format fmt, int width, int height, int stride);
 enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 
