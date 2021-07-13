@@ -23,10 +23,12 @@ add_project_arguments('-DSYSCONFDIR="@0@"'.format(join_paths(prefix, sysconfdir)
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
-pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
+pipewire = dependency('libpipewire-0.3', version: '>= 0.3.29')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 iniparser = dependency('inih')
+gbm = dependency('gbm')
+drm = dependency('libdrm')
 
 epoll = dependency('', required: false)
 if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
@@ -75,6 +77,7 @@ xdpw_files = files([
 	'src/screencast/wlr_screencast.c',
 	'src/screencast/pipewire_screencast.c',
 	'src/screencast/fps_limit.c',
+	'src/screencast/xdpw_gbm.c',
 ])
 
 executable(
@@ -86,6 +89,8 @@ executable(
 		pipewire,
 		rt,
 		iniparser,
+		gbm,
+		drm,
 		epoll,
 	],
 	include_directories: [inc],

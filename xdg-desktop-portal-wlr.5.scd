@@ -71,6 +71,12 @@ These options need to be placed under the **[screencast]** section.
 	- simple, dmenu: xdpw will launch the chooser given by **chooser_cmd**. For more details
 	  see **OUTPUT CHOOSER**.
 
+**force_mod_linear** = _bool_
+	Force buffers with implicit modifiers to be linear
+
+	Setting this option to 1 will force xdpw to allocate linear dma-bufs. This option shouldn't be used,
+	but can increase compatibility in some cases.
+
 ## OUTPUT CHOOSER
 
 The chooser can be any program or script with the following behaviour:

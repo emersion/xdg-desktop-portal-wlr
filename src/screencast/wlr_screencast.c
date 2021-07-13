@@ -1,5 +1,6 @@
 #include "wlr_screencast.h"
 
+#include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
 #include <fcntl.h>
@@ -19,29 +20,11 @@
 #include "xdpw.h"
 #include "logger.h"
 #include "fps_limit.h"
-
-static void wlr_frame_buffer_destroy(struct xdpw_screencast_instance *cast) {
-	// Even though this check may be deemed unnecessary,
-	// this has been found to cause SEGFAULTs, like this one:
-	// https://github.com/emersion/xdg-desktop-portal-wlr/issues/50
-	if (cast->simple_frame.data != NULL) {
-		munmap(cast->simple_frame.data, cast->simple_frame.size);
-		cast->simple_frame.data = NULL;
-	}
-
-	if (cast->simple_frame.buffer != NULL) {
-		wl_buffer_destroy(cast->simple_frame.buffer);
-		cast->simple_frame.buffer = NULL;
-	}
-}
+#include "xdpw_gbm.h"
 
 void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
-	if (cast->quit || cast->err) {
-		wlr_frame_buffer_destroy(cast);
-		logprint(TRACE, "xdpw: simple_frame buffer destroyed");
-	}
 	logprint(TRACE, "wlroots: frame destroyed");
 
 	if (cast->quit || cast->err) {
@@ -52,80 +35,100 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 		return ;
 	}
 
-	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-	if (delay_ns > 0) {
-		xdpw_add_timer(cast->ctx->state, delay_ns,
-			(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
-	} else {
-		xdpw_wlr_register_cb(cast);
-	}
-}
-
-static struct wl_buffer *create_shm_buffer(struct xdpw_screencast_instance *cast,
-		enum wl_shm_format fmt, int width, int height, int stride,
-		void **data_out) {
-	struct xdpw_screencast_context *ctx = cast->ctx;
-	int size = stride * height;
-
-	int fd = anonymous_shm_open();
-	if (fd < 0) {
-		logprint(ERROR, "wlroots: shm_open failed");
-		return NULL;
-	}
-
-	int ret;
-	while ((ret = ftruncate(fd, size)) == EINTR);
-
-	if (ret < 0) {
-		close(fd);
-		logprint(ERROR, "wlroots: ftruncate failed");
-		return NULL;
-	}
-
-	void *data = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (data == MAP_FAILED) {
-		logprint(ERROR, "wlroots: mmap failed: %m");
-		close(fd);
-		return NULL;
-	}
-
-	struct wl_shm_pool *pool = wl_shm_create_pool(ctx->shm, fd, size);
-	close(fd);
-	struct wl_buffer *buffer =
-		wl_shm_pool_create_buffer(pool, 0, width, height, stride, fmt);
-	wl_shm_pool_destroy(pool);
-
-	*data_out = data;
-	return buffer;
-}
-
-static void wlr_frame_buffer_chparam(struct xdpw_screencast_instance *cast,
-		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
-	logprint(DEBUG, "wlroots: reset buffer");
-	cast->simple_frame.width = width;
-	cast->simple_frame.height = height;
-	cast->simple_frame.stride = stride;
-	cast->simple_frame.size = stride * height;
-	cast->simple_frame.format = format;
-	wlr_frame_buffer_destroy(cast);
-
 	if (cast->pwr_stream_state) {
-		logprint(DEBUG, "wlroots: request pipewire param change");
-		pwr_update_stream_param(cast);
+		if (cast->copied) {
+			uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+			cast->copied = false;
+			if (delay_ns > 0) {
+				xdpw_add_timer(cast->ctx->state, delay_ns,
+					(xdpw_event_loop_timer_func_t) xdpw_wlr_register_cb, cast);
+			} else {
+				xdpw_wlr_register_cb(cast);
+			}
+		} else {
+				xdpw_wlr_register_cb(cast);
+		}
 	}
 }
 
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
+	struct xdpw_screencast_instance *cast = data;
+
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
+
+	cast->screencopy_dmabuf_frame.width = width;
+	cast->screencopy_dmabuf_frame.height = height;
+	cast->screencopy_dmabuf_frame.fourcc = format;
 }
 
 static void wlr_frame_buffer_done(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
 	struct xdpw_screencast_instance *cast = data;
+	bool changed = false;
+	bool incompatible = false;
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
+	if (cast->pwr_stream_state) {
+		xdpw_pwr_import_buffer(cast);
+	}
+
+	if (!cast->simple_frame.current_pw_buffer) {
+		logprint(WARN, "wlroots: failed to import buffer");
+		xdpw_wlr_frame_free(cast);
+		return;
+	}
+
+	// Check if announced screencopy information is compatible with pipewire meta
+	switch (cast->screencopy_type) {
+	case XDPW_SCREENCOPY_SHM:
+		changed = !(cast->pwr_format.format == xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame.format) ||
+			cast->pwr_format.format == xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame.format))) ||
+			cast->pwr_format.size.width != cast->screencopy_frame.width ||
+			cast->pwr_format.size.height != cast->screencopy_frame.height;
+		break;
+	case XDPW_SCREENCOPY_DMABUF:
+		changed = cast->pwr_format.format != xdpw_format_pw_from_drm_fourcc(cast->screencopy_dmabuf_frame.fourcc) ||
+			cast->pwr_format.size.width != cast->screencopy_dmabuf_frame.width ||
+			cast->pwr_format.size.height != cast->screencopy_dmabuf_frame.height;
+		break;
+	default:
+		abort();
+	}
+	if (changed) {
+		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
+
+		xdpw_pwr_export_buffer(cast);
+		if (cast->pwr_stream_state) {
+			pwr_update_stream_param(cast);
+		}
+		xdpw_wlr_frame_free(cast);
+		return;
+	}
+
+	// Check if imported buffer is compatible with announced buffer
+	switch (cast->screencopy_type) {
+	case XDPW_SCREENCOPY_SHM:
+		incompatible = cast->simple_frame.size != cast->screencopy_frame.size ||
+			cast->simple_frame.stride != cast->screencopy_frame.stride;
+		break;
+	case XDPW_SCREENCOPY_DMABUF:
+		break;
+	default:
+		abort();
+	}
+	if (incompatible) {
+		logprint(DEBUG, "wlroots: imported buffer has wrong dimensions");
+		xdpw_pwr_export_buffer(cast);
+		xdpw_wlr_frame_free(cast);
+		return;
+	}
+
+	if (cast->simple_frame.buffer == NULL) {
+		logprint(ERROR, "wlroots: imported buffer doesn't contain a wlr_buffer");
+		abort();
+	}
 
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->simple_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
@@ -139,26 +142,12 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
-	if (cast->simple_frame.width != width ||
-			cast->simple_frame.height != height ||
-			cast->simple_frame.stride != stride ||
-			cast->simple_frame.format != format) {
-		logprint(TRACE, "wlroots: buffer properties changed");
-		wlr_frame_buffer_chparam(cast, format, width, height, stride);
-	}
 
-	if (cast->simple_frame.buffer == NULL) {
-		logprint(DEBUG, "wlroots: create shm buffer");
-		cast->simple_frame.buffer = create_shm_buffer(cast, format, width, height,
-			stride, &cast->simple_frame.data);
-	} else {
-		logprint(TRACE,"wlroots: shm buffer exists");
-	}
-
-	if (cast->simple_frame.buffer == NULL) {
-		logprint(ERROR, "wlroots: failed to create buffer");
-		abort();
-	}
+	cast->screencopy_frame.width = width;
+	cast->screencopy_frame.height = height;
+	cast->screencopy_frame.stride = stride;
+	cast->screencopy_frame.size = stride * height;
+	cast->screencopy_frame.format = xdpw_format_drm_fourcc_from_wl_shm(format);
 
 	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast,frame);
@@ -181,11 +170,9 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	cast->simple_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	cast->simple_frame.tv_nsec = tv_nsec;
+	cast->copied = true;
 
-	if (!cast->quit && !cast->err && cast->pwr_stream_state) {
-		pw_loop_signal_event(cast->ctx->state->pw_loop, cast->event);
-		return;
-	}
+	xdpw_pwr_export_buffer(cast);
 
 	xdpw_wlr_frame_free(cast);
 }
@@ -196,6 +183,8 @@ static void wlr_frame_failed(void *data,
 
 	logprint(TRACE, "wlroots: failed event handler");
 	cast->err = true;
+
+	xdpw_pwr_export_buffer(cast);
 
 	xdpw_wlr_frame_free(cast);
 }
@@ -545,6 +534,33 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out);
 }
 
+static void linux_dmabuf_handle_modifier(void *data,
+		struct zwp_linux_dmabuf_v1 *zwp_linux_dmabuf_v1,
+		uint32_t format, uint32_t modifier_hi, uint32_t modifier_lo) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(TRACE, "wlroots: linux_dmabuf_handle_modifier called");
+
+	struct xdpw_format_modifier_pair *fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
+
+	fm_pair->fourcc = format;
+	fm_pair->modifier = ((((uint64_t)modifier_hi) << 32) | modifier_lo);
+
+	logprint(TRACE, "wlroots: format %u (%u)", fm_pair->fourcc, fm_pair->modifier);
+
+	wl_list_insert(&ctx->format_modifier_pairs, &fm_pair->link);
+}
+
+static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_listener = {
+	.format = noop,
+	.modifier = linux_dmabuf_handle_modifier,
+};
+
+static void wlr_remove_format_modifier_pair(struct xdpw_format_modifier_pair *fm_pair) {
+	wl_list_remove(&fm_pair->link);
+	free(fm_pair);
+}
+
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
@@ -586,6 +602,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		ctx->xdg_output_manager =
 			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
+	if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, LINUX_DMABUF_VERSION);
+		ctx->linux_dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, LINUX_DMABUF_VERSION);
+
+		zwp_linux_dmabuf_v1_add_listener(ctx->linux_dmabuf, &linux_dmabuf_listener, ctx);
+	}
 }
 
 static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
@@ -610,6 +632,9 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
 	// initialize a list of active screencast instances
 	wl_list_init(&ctx->screencast_instances);
+
+	// initialize a list of format modifier pairs
+	wl_list_init(&ctx->format_modifier_pairs);
 
 	// retrieve registry
 	ctx->registry = wl_display_get_registry(state->wl_display);
@@ -645,10 +670,22 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 		return -1;
 	}
 
+	// make sure we have a gbm device
+	ctx->gbm = create_gbm_device();
+	if (!ctx->gbm) {
+		logprint(ERROR, "system doesn't support %s!", "gbm");
+	}
+
 	return 0;
 }
 
 void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
+	struct xdpw_format_modifier_pair *fm_pair, *tmp_fmp;
+	wl_list_for_each_safe(fm_pair, tmp_fmp, &ctx->format_modifier_pairs, link) {
+		wl_list_remove(&fm_pair->link);
+		wlr_remove_format_modifier_pair(fm_pair);
+	}
+
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
@@ -667,8 +704,14 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);
 	}
+	if (ctx->gbm) {
+		destroy_gbm_device(ctx->gbm);
+	}
 	if (ctx->xdg_output_manager) {
 		zxdg_output_manager_v1_destroy(ctx->xdg_output_manager);
+	}
+	if (ctx->linux_dmabuf) {
+		zwp_linux_dmabuf_v1_destroy(ctx->linux_dmabuf);
 	}
 	if (ctx->registry) {
 		wl_registry_destroy(ctx->registry);

@@ -16,6 +16,7 @@ void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
 	logprint(loglevel, "config: exec_after:  %s", config->screencast_conf.exec_after);
 	logprint(loglevel, "config: chooser_cmd: %s", config->screencast_conf.chooser_cmd);
 	logprint(loglevel, "config: chooser_type: %s", chooser_type_str(config->screencast_conf.chooser_type));
+	logprint(loglevel, "config: force_mod_linear: %d", config->screencast_conf.force_mod_linear);
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
@@ -47,6 +48,18 @@ static void parse_double(double *dest, const char* value) {
 	*dest = strtod(value, (char**)NULL);
 }
 
+static void parse_bool(bool *dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
+		return;
+	}
+	if (strcmp(value, "1") == 0) {
+		*dest = true;
+	} else {
+		*dest = false;
+	}
+}
+
 static int handle_ini_screencast(struct config_screencast *screencast_conf, const char *key, const char *value) {
 	if (strcmp(key, "output_name") == 0) {
 		parse_string(&screencast_conf->output_name, value);
@@ -63,6 +76,8 @@ static int handle_ini_screencast(struct config_screencast *screencast_conf, cons
 		parse_string(&chooser_type, value);
 		screencast_conf->chooser_type = get_chooser_type(chooser_type);
 		free(chooser_type);
+	} else if (strcmp(key, "force_mod_linear") == 0) {
+		parse_bool(&screencast_conf->force_mod_linear, value);
 	} else {
 		logprint(TRACE, "config: skipping invalid key in config file");
 		return 0;

@@ -6,6 +6,7 @@
 #include <wayland-client-protocol.h>
 
 #include "fps_limit.h"
+#include "xdpw_gbm.h"
 
 // this seems to be right based on
 // https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
@@ -41,18 +42,41 @@ struct xdpw_frame_damage {
 	uint32_t height;
 };
 
+enum xdpw_screencopy_type {
+	XDPW_SCREENCOPY_NONE,
+	XDPW_SCREENCOPY_SHM,
+	XDPW_SCREENCOPY_DMABUF,
+};
+
 struct xdpw_frame {
-	uint32_t width;
-	uint32_t height;
 	uint32_t size;
 	uint32_t stride;
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
-	enum wl_shm_format format;
 	struct xdpw_frame_damage damage;
 	struct wl_buffer *buffer;
-	void *data;
+	struct pw_buffer *current_pw_buffer;
+};
+
+struct xdpw_screencopy_frame {
+	uint32_t width;
+	uint32_t height;
+	uint32_t size;
+	uint32_t stride;
+	uint32_t format;
+};
+
+struct xdpw_screencopy_dmabuf_frame {
+	uint32_t width;
+	uint32_t height;
+	uint32_t fourcc;
+};
+
+struct xdpw_format_modifier_pair {
+	struct wl_list link;
+	uint32_t fourcc;
+	uint64_t modifier;
 };
 
 struct xdpw_screencast_context {
@@ -70,6 +94,11 @@ struct xdpw_screencast_context {
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
+	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
+	struct wl_list format_modifier_pairs;
+
+	// gbm
+	struct gbm_device *gbm;
 
 	// sessions
 	struct wl_list screencast_instances;
@@ -83,9 +112,9 @@ struct xdpw_screencast_instance {
 	uint32_t refcount;
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
+	struct xdpw_frame simple_frame;
 
 	// pipewire
-	struct spa_source *event;
 	struct pw_stream *stream;
 	struct spa_hook stream_listener;
 	struct spa_video_info_raw pwr_format;
@@ -99,10 +128,13 @@ struct xdpw_screencast_instance {
 	struct xdpw_wlr_output *target_output;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_frame simple_frame;
+	struct xdpw_screencopy_frame screencopy_frame;
+	struct xdpw_screencopy_dmabuf_frame screencopy_dmabuf_frame;
 	bool with_cursor;
 	int err;
 	bool quit;
+	bool copied;
+	enum xdpw_screencopy_type screencopy_type;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
@@ -123,7 +155,13 @@ struct xdpw_wlr_output {
 
 void randname(char *buf);
 int anonymous_shm_open(void);
-enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format);
+struct wl_buffer *import_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
+	enum wl_shm_format fmt, int width, int height, int stride);
+bool wlr_query_dmabuf_modifiers(struct xdpw_screencast_context *ctx, uint32_t drm_format,
+		uint32_t num_modifiers, uint64_t *modifiers, uint32_t *max_modifiers);
+enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
+uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
+enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 
 enum xdpw_chooser_types get_chooser_type(const char *chooser_type);

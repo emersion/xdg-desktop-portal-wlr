@@ -98,6 +98,8 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 		return false;
 	}
 
+	// Disable screencast sharing to avoid sharing between dmabuf and shm capable clients
+	/*
 	struct xdpw_screencast_instance *cast, *tmp_c;
 	wl_list_for_each_reverse_safe(cast, tmp_c, &ctx->screencast_instances, link) {
 		logprint(INFO, "xdpw: existing screencast instance: %d %s cursor",
@@ -118,6 +120,7 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 				cast, cast->refcount);
 		}
 	}
+	*/
 
 	if (!sess->screencast_instance) {
 		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
@@ -436,7 +439,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		"streams", "a(ua{sv})", 1,
 		cast->node_id, 2,
 		"position", "(ii)", 0, 0,
-		"size", "(ii)", cast->simple_frame.width, cast->simple_frame.height);
+		"size", "(ii)", cast->screencopy_frame.width, cast->screencopy_frame.height);
 
 	if (ret < 0) {
 		return ret;
