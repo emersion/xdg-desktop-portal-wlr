@@ -157,13 +157,22 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
-	if (spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier) != NULL) {
-		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
+	const struct spa_pod_prop *prop_modifier;
+	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
+		cast->buffer_type = DMABUF;
+		data_type = 1<<SPA_DATA_DmaBuf;
+		assert(cast->pwr_format.format == xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format));
+		if ((prop_modifier->flags & SPA_POD_PROP_FLAG_DONT_FIXATE) > 0) {
+			// TODO: fixate
 			abort();
 		}
-		cast->buffer_type = DMABUF;
-		blocks = 1;
-		data_type = 1<<SPA_DATA_DmaBuf;
+
+		if (cast->pwr_format.modifier == DRM_FORMAT_MOD_INVALID) {
+			blocks = 1;
+		} else {
+			blocks = gbm_device_get_format_modifier_plane_count(cast->ctx->gbm,
+				cast->screencopy_frame_info[DMABUF].format, cast->pwr_format.modifier);
+		}
 	} else {
 		cast->buffer_type = WL_SHM;
 		blocks = 1;
