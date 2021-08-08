@@ -13,6 +13,27 @@
 #include "xdpw.h"
 #include "logger.h"
 
+static struct spa_pod *build_buffer(struct spa_pod_builder *b, uint32_t blocks, uint32_t size,
+		uint32_t stride, uint32_t datatype) {
+	assert(blocks > 0);
+	assert(datatype > 0);
+	struct spa_pod_frame f[1];
+
+	spa_pod_builder_push_object(b, &f[0], SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers);
+	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_buffers,
+			SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, XDPW_PWR_BUFFERS_MIN, 32), 0);
+	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_blocks, SPA_POD_Int(blocks), 0);
+	if (size > 0) {
+		spa_pod_builder_add(b, SPA_PARAM_BUFFERS_size, SPA_POD_Int(size), 0);
+	}
+	if (stride > 0) {
+		spa_pod_builder_add(b, SPA_PARAM_BUFFERS_stride, SPA_POD_Int(stride), 0);
+	}
+	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_align, SPA_POD_Int(XDPW_PWR_ALIGN), 0);
+	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_dataType, SPA_POD_CHOICE_FLAGS_Int(datatype), 0);
+	return spa_pod_builder_pop(b, &f[0]);
+}
+
 static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_format format,
 		uint32_t width, uint32_t height, uint32_t framerate) {
 	struct spa_pod_frame f[1];
@@ -110,14 +131,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
 
-	params[0] = spa_pod_builder_add_object(&b,
-		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
-		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, XDPW_PWR_BUFFERS_MIN, 32),
-		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
-		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->screencopy_frame_info.size),
-		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->screencopy_frame_info.stride),
-		SPA_PARAM_BUFFERS_align,   SPA_POD_Int(XDPW_PWR_ALIGN),
-		SPA_PARAM_BUFFERS_dataType,SPA_POD_CHOICE_FLAGS_Int(1<<SPA_DATA_MemFd));
+	params[0] = build_buffer(&b, 1, cast->screencopy_frame_info.size,
+			cast->screencopy_frame_info.stride, 1<<SPA_DATA_MemFd);
 
 	params[1] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
