@@ -111,7 +111,7 @@ static void pwr_handle_stream_state_changed(void *data,
 
 	logprint(INFO, "pipewire: stream state changed to \"%s\"",
 		pw_stream_state_as_string(state));
-	logprint(INFO, "pipewire: node id is %d", cast->node_id);
+	logprint(INFO, "pipewire: node id is %d", (int)cast->node_id);
 
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
