@@ -59,6 +59,7 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	cast->framerate = cast->max_framerate;
 	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
+	cast->node_id = SPA_ID_INVALID;
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
 	logprint(INFO, "xdpw: %d active screencast instances",
@@ -419,7 +420,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		start_screencast(cast);
 	}
 
-	while (cast->node_id == 0) {
+	while (cast->node_id == SPA_ID_INVALID) {
 		int ret = pw_loop_iterate(state->pw_loop, 0);
 		if (ret != 0) {
 			logprint(ERROR, "pipewire_loop_iterate failed: %s", spa_strerror(ret));
@@ -432,6 +433,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
+	logprint(DEBUG, "dbus: start: returning node %d", (int)cast->node_id);
 	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
 		"streams", "a(ua{sv})", 1,
 		cast->node_id, 2,
