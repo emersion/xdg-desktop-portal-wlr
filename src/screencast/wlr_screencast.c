@@ -49,6 +49,27 @@ void xdpw_wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	}
 }
 
+static void wlr_frame_buffer_done(void *data,
+		struct zwlr_screencopy_frame_v1 *frame);
+
+static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
+		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: buffer event handler");
+	cast->wlr_frame = frame;
+
+	cast->screencopy_frame.width = width;
+	cast->screencopy_frame.height = height;
+	cast->screencopy_frame.stride = stride;
+	cast->screencopy_frame.size = stride * height;
+	cast->screencopy_frame.format = format;
+
+	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
+		wlr_frame_buffer_done(cast, frame);
+	}
+}
+
 static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
@@ -105,30 +126,24 @@ static void wlr_frame_buffer_done(void *data,
 	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 }
 
-static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
-		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
-	struct xdpw_screencast_instance *cast = data;
-
-	logprint(TRACE, "wlroots: buffer event handler");
-	cast->wlr_frame = frame;
-
-	cast->screencopy_frame.width = width;
-	cast->screencopy_frame.height = height;
-	cast->screencopy_frame.stride = stride;
-	cast->screencopy_frame.size = stride * height;
-	cast->screencopy_frame.format = format;
-
-	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
-		wlr_frame_buffer_done(cast,frame);
-	}
-}
-
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t flags) {
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: flags event handler");
 	cast->current_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
+}
+
+static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
+		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: damage event handler");
+
+	cast->current_frame.damage.x = x;
+	cast->current_frame.damage.y = y;
+	cast->current_frame.damage.width = width;
+	cast->current_frame.damage.height = height;
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
@@ -156,18 +171,6 @@ static void wlr_frame_failed(void *data,
 	xdpw_pwr_enqueue_buffer(cast);
 
 	xdpw_wlr_frame_free(cast);
-}
-
-static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
-		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-	struct xdpw_screencast_instance *cast = data;
-
-	logprint(TRACE, "wlroots: damage event handler");
-
-	cast->current_frame.damage.x = x;
-	cast->current_frame.damage.y = y;
-	cast->current_frame.damage.width = width;
-	cast->current_frame.damage.height = height;
 }
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
