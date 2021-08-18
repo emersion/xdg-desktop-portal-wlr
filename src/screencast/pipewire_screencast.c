@@ -201,10 +201,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	struct pw_buffer *pw_buf = cast->current_frame.current_pw_buffer;
 	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
 
-	if (!pw_buf) {
-		logprint(TRACE, "pipewire: no pipewire buffer to queue");
-		return;
-	}
+	assert(pw_buf);
 
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
