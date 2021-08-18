@@ -199,6 +199,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: exporting buffer");
 
 	struct pw_buffer *pw_buf = cast->current_frame.current_pw_buffer;
+	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
 
 	if (!pw_buf) {
 		logprint(TRACE, "pipewire: no pipewire buffer to queue");
@@ -207,17 +208,25 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
+
+	if (cast->current_frame.y_invert) {
+		//TODO: Flip buffer or set stride negative
+		buffer_corrupt = true;
+		cast->err = 1;
+	}
+
 	struct spa_meta_header *h;
 	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
 		h->pts = -1;
-		h->flags = 0;
+		h->flags = buffer_corrupt ? SPA_META_HEADER_FLAG_CORRUPTED : 0;
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
 	}
 
-	if (cast->current_frame.y_invert) {
-		//TODO: Flip buffer or set stride negative
-		cast->err = 1;
+	if (buffer_corrupt) {
+		d[0].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
+	} else {
+		d[0].chunk->flags = SPA_CHUNK_FLAG_NONE;
 	}
 
 	logprint(TRACE, "********************");
