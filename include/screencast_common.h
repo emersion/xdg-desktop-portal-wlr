@@ -29,6 +29,13 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_DMENU,
 };
 
+enum xdpw_frame_state {
+  XDPW_FRAME_STATE_NONE,
+  XDPW_FRAME_STATE_RENEG,
+  XDPW_FRAME_STATE_FAILED,
+  XDPW_FRAME_STATE_SUCCESS,
+};
+
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
@@ -89,6 +96,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
 	struct xdpw_frame current_frame;
+	enum xdpw_frame_state frame_state;
 
 	// pipewire
 	struct pw_stream *stream;
@@ -108,7 +116,6 @@ struct xdpw_screencast_instance {
 	bool with_cursor;
 	int err;
 	bool quit;
-	bool copied;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
