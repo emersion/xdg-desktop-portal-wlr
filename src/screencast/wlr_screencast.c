@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <assert.h>
 #include <wayland-client-protocol.h>
 
 #include "screencast.h"
@@ -151,10 +152,7 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
-	if (cast->current_frame.buffer == NULL) {
-		logprint(ERROR, "wlroots: imported buffer doesn't contain a wlr_buffer");
-		abort();
-	}
+	assert(cast->current_frame.buffer);
 
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.buffer);
 	logprint(TRACE, "wlroots: frame copied");
