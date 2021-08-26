@@ -19,20 +19,30 @@ static const char object_path[] = "/org/freedesktop/portal/desktop";
 static const char interface_name[] = "org.freedesktop.impl.portal.ScreenCast";
 
 void exec_with_shell(char *command) {
-	pid_t pid = fork();
-	if (pid < 0) {
+	pid_t pid1 = fork();
+	if (pid1 < 0) {
 		perror("fork");
-	} else if (pid == 0) {
-		char *const argv[] = {
-			"sh",
-			"-c",
-			command,
-			NULL,
-		};
-		execvp("sh", argv);
-
-		perror("execvp");
-		exit(127);
+		return;
+	} else if (pid1 == 0) {
+		pid_t pid2 = fork();
+		if (pid2 < 0) {
+			perror("fork");
+		} else if (pid2 == 0) {
+			char *const argv[] = {
+				"sh",
+				"-c",
+				command,
+				NULL,
+			};
+			execvp("sh", argv);
+			perror("execvp");
+			_exit(127);
+		}
+		_exit(0);
+	}
+	int stat;
+	if (waitpid(pid1, &stat, 0) < 0) {
+		perror("waitpid");
 	}
 }
 
