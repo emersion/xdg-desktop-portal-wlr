@@ -23,7 +23,7 @@ add_project_arguments('-DSYSCONFDIR="@0@"'.format(join_paths(prefix, sysconfdir)
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
-pipewire = dependency('libpipewire-0.3', version: '>= 0.3.2')
+pipewire = dependency('libpipewire-0.3', version: '>= 0.3.34')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.14')
 iniparser = dependency('inih')
