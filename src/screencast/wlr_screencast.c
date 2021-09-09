@@ -53,17 +53,17 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 		return ;
 	}
 
-	if (cast->pwr_stream_state) {
+	if (cast->pwr_stream_state && xdpw_pwr_is_driving(cast)) {
 		if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
 			uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 			if (delay_ns > 0) {
 				xdpw_add_timer(cast->ctx->state, delay_ns,
-					(xdpw_event_loop_timer_func_t) xdpw_wlr_frame_start, cast);
+					(xdpw_event_loop_timer_func_t) xdpw_pwr_trigger_process, cast);
 			} else {
-				xdpw_wlr_frame_start(cast);
+				xdpw_pwr_trigger_process(cast);
 			}
 		} else {
-			xdpw_wlr_frame_start(cast);
+			xdpw_pwr_trigger_process(cast);
 		}
 	}
 }
