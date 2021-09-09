@@ -3,7 +3,7 @@
 
 #include "screencast_common.h"
 
-#define XDPW_PWR_BUFFERS 1
+#define XDPW_PWR_BUFFERS 4
 #define XDPW_PWR_ALIGN 16
 
 void xdpw_pwr_trigger_process(struct xdpw_screencast_instance *cast);
