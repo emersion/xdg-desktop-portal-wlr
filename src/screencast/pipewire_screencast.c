@@ -150,9 +150,16 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 }
 
 static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer) {
+	struct xdpw_screencast_instance *cast = data;
+
 	logprint(TRACE, "pipewire: remove buffer event handle");
 
 	struct spa_data *d = buffer->buffer->datas;
+	if (cast->current_frame.current_pw_buffer == buffer) {
+		logprint(TRACE, "pipewire: remove buffer currently in use");
+		cast->current_frame.current_pw_buffer = NULL;
+		cast->current_frame.buffer = NULL;
+	}
 	switch (d[0].type) {
 	case SPA_DATA_MemFd:
 		wl_buffer_destroy(buffer->user_data);
