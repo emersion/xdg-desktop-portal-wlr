@@ -69,6 +69,12 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 
 void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "wlroots: start screencopy");
+	if (cast->err) {
+		logprint(ERROR, "wlroots: nonrecoverable error has happened. shutting down instance");
+		xdpw_screencast_instance_destroy(cast);
+		return ;
+	}
+
 	if (cast->pwr_stream_state) {
 		xdpw_pwr_dequeue_buffer(cast);
 
@@ -195,7 +201,6 @@ static void wlr_frame_failed(void *data,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: failed event handler");
-	cast->err = true;
 
 	cast->frame_state = XDPW_FRAME_STATE_FAILED;
 
