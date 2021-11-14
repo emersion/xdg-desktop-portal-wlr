@@ -17,6 +17,11 @@ void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
 	logprint(loglevel, "config: chooser_cmd: %s", config->screencast_conf.chooser_cmd);
 	logprint(loglevel, "config: chooser_type: %s", chooser_type_str(config->screencast_conf.chooser_type));
 	logprint(loglevel, "config: force_mod_linear: %d", config->screencast_conf.force_mod_linear);
+	logprint(loglevel, "config: cropmode: %s", cropmode_str(config->screencast_conf.cropmode));
+	logprint(loglevel, "config: cropping_region x: %u", config->screencast_conf.region.x);
+	logprint(loglevel, "config: cropping_region y: %u", config->screencast_conf.region.y);
+	logprint(loglevel, "config: cropping_region width: %u", config->screencast_conf.region.width);
+	logprint(loglevel, "config: cropping_region height: %u", config->screencast_conf.region.height);
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
@@ -60,6 +65,28 @@ static void parse_bool(bool *dest, const char* value) {
 	}
 }
 
+static void parse_region(struct xdpw_frame_crop *dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
+		return;
+	}
+	sscanf(value, "%u,%u:%ux%u", &dest->x, &dest->y, &dest->width, &dest->height);
+}
+
+static void parse_cropmode(enum xdpw_cropmode *dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
+		return;
+	}
+	if (strcmp(value, "none") == 0) {
+		*dest = XDPW_CROP_NONE;
+	} else if (strcmp(value, "wlroots") == 0) {
+		*dest = XDPW_CROP_WLROOTS;
+	} else if (strcmp(value, "pipewire") == 0) {
+		*dest = XDPW_CROP_PIPEWIRE;
+	}
+}
+
 static int handle_ini_screencast(struct config_screencast *screencast_conf, const char *key, const char *value) {
 	if (strcmp(key, "output_name") == 0) {
 		parse_string(&screencast_conf->output_name, value);
@@ -78,6 +105,10 @@ static int handle_ini_screencast(struct config_screencast *screencast_conf, cons
 		free(chooser_type);
 	} else if (strcmp(key, "force_mod_linear") == 0) {
 		parse_bool(&screencast_conf->force_mod_linear, value);
+	} else if (strcmp(key, "cropmode") == 0) {
+		parse_cropmode(&screencast_conf->cropmode, value);
+	} else if (strcmp(key, "region") == 0) {
+		parse_region(&screencast_conf->region, value);
 	} else {
 		logprint(TRACE, "config: skipping invalid key in config file");
 		return 0;
@@ -100,6 +131,11 @@ static int handle_ini_config(void *data, const char* section, const char *key, c
 static void default_config(struct xdpw_config *config) {
 	config->screencast_conf.max_fps = 0;
 	config->screencast_conf.chooser_type = XDPW_CHOOSER_DEFAULT;
+	config->screencast_conf.cropmode = XDPW_CROP_NONE;
+	config->screencast_conf.region.x = 0;
+	config->screencast_conf.region.y = 0;
+	config->screencast_conf.region.width = 0;
+	config->screencast_conf.region.height = 0;
 }
 
 static bool file_exists(const char *path) {

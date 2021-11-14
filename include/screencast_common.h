@@ -234,4 +234,5 @@ enum xdpw_chooser_types get_chooser_type(const char *chooser_type);
 const char *chooser_type_str(enum xdpw_chooser_types chooser_type);
 
 struct xdpw_frame_damage merge_damage(struct xdpw_frame_damage *damage1, struct xdpw_frame_damage *damage2);
+const char *cropmode_str(enum xdpw_cropmode cropmode);
 #endif /* SCREENCAST_COMMON_H */

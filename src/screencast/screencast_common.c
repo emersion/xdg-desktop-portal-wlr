@@ -424,3 +424,16 @@ struct xdpw_frame_damage merge_damage(struct xdpw_frame_damage *damage1, struct 
 
 	return damage;
 }
+
+const char *cropmode_str(enum xdpw_cropmode cropmode) {
+	switch (cropmode) {
+	case XDPW_CROP_NONE:
+		return "none";
+	case XDPW_CROP_WLROOTS:
+		return "wlroots";
+	case XDPW_CROP_PIPEWIRE:
+		return "pipewire";
+	}
+	fprintf(stderr, "Could not find chooser type %d\n", cropmode);
+	abort();
+}

@@ -80,6 +80,17 @@ These options need to be placed under the **[screencast]** section.
 
 	This option is experimental and can be removed or replaced in future versions.
 
+**cropmode** = _type_
+	Specifies the mode to crop the output to the defined region.
+
+	The supported types are:
+	- none: No cropping, ignore region.
+	- wlroots: Crop inside the compositor. Better performance.
+	- pipewire: Send cropping information via PipeWire.
+
+**region** = _offset_x_,_offset_y_:_width_x_height_
+	Specifies the region the output is cropped to. Only works with **chooser_type** = none.
+
 ## OUTPUT CHOOSER
 
 The chooser can be any program or script with the following behaviour:
