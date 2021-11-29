@@ -6,6 +6,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "logger.h"
+
 void randname(char *buf) {
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -73,7 +75,25 @@ enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format) {
 		return SPA_VIDEO_FORMAT_xRGB;
 	case WL_SHM_FORMAT_NV12:
 		return SPA_VIDEO_FORMAT_NV12;
+	case WL_SHM_FORMAT_XRGB2101010:
+		return SPA_VIDEO_FORMAT_xRGB_210LE;
+	case WL_SHM_FORMAT_XBGR2101010:
+		return SPA_VIDEO_FORMAT_xBGR_210LE;
+	case WL_SHM_FORMAT_RGBX1010102:
+		return SPA_VIDEO_FORMAT_RGBx_102LE;
+	case WL_SHM_FORMAT_BGRX1010102:
+		return SPA_VIDEO_FORMAT_BGRx_102LE;
+	case WL_SHM_FORMAT_ARGB2101010:
+		return SPA_VIDEO_FORMAT_ARGB_210LE;
+	case WL_SHM_FORMAT_ABGR2101010:
+		return SPA_VIDEO_FORMAT_ABGR_210LE;
+	case WL_SHM_FORMAT_RGBA1010102:
+		return SPA_VIDEO_FORMAT_RGBA_102LE;
+	case WL_SHM_FORMAT_BGRA1010102:
+		return SPA_VIDEO_FORMAT_BGRA_102LE;
 	default:
+		logprint(ERROR, "xdg-desktop-portal-wlr: failed to convert wl_shm "
+			"format 0x%08x to spa_video_format", format);
 		abort();
 	}
 }
