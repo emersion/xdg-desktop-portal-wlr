@@ -71,6 +71,9 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 			if (cast->frame_state == XDPW_FRAME_STATE_NONE) {
 				logprint(TRACE, "xdpw: screencast instance not streaming, destroy it");
 				xdpw_screencast_instance_destroy(cast);
+			} else if (cast->teardown) {
+				logprint(TRACE, "xdpw: screencast instance marked for teardown, destroy it");
+				xdpw_screencast_instance_destroy(cast);
 			} else {
 				logprint(TRACE, "xdpw: screencast instance still streaming, set quit flag");
 				cast->quit = true;

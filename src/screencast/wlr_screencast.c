@@ -24,6 +24,9 @@
 #include "fps_limit.h"
 
 void wlr_frame_free(struct xdpw_screencast_instance *cast) {
+	if (!cast->wlr_frame) {
+		return;
+	}
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
@@ -89,6 +92,9 @@ static void wlr_frame_buffer_done(void *data,
 static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
@@ -108,6 +114,9 @@ static void wlr_frame_linux_dmabuf(void *data,
 		struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t format, uint32_t width, uint32_t height) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
 
@@ -119,6 +128,9 @@ static void wlr_frame_linux_dmabuf(void *data,
 static void wlr_frame_buffer_done(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
 
@@ -171,6 +183,9 @@ static void wlr_frame_buffer_done(void *data,
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t flags) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: flags event handler");
 	cast->current_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
@@ -179,6 +194,9 @@ static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
 static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: damage event handler");
 
@@ -191,6 +209,9 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 		uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: ready event handler");
 
@@ -205,6 +226,9 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 static void wlr_frame_failed(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
 	struct xdpw_screencast_instance *cast = data;
+	if (!frame) {
+		return;
+	}
 
 	logprint(TRACE, "wlroots: failed event handler");
 
@@ -783,6 +807,23 @@ static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 	struct xdpw_screencast_context *ctx = data;
 	struct xdpw_wlr_output *output = xdpw_wlr_output_find(ctx, NULL, id);
 	if (output) {
+		logprint(DEBUG, "wlroots: output removed (%s)", output->name);
+		struct xdpw_screencast_instance *cast, *tmp;
+		wl_list_for_each_safe(cast, tmp, &ctx->screencast_instances, link) {
+			if (cast->target_output == output) {
+				// screencopy might be in process for this instance
+				wlr_frame_free(cast);
+				// instance might be waiting for wakeup by the frame limiter
+				struct xdpw_timer *timer, *ttmp;
+				wl_list_for_each_safe(timer, ttmp, &cast->ctx->state->timers, link) {
+					if (timer->user_data == cast) {
+						xdpw_destroy_timer(timer);
+					}
+				}
+				cast->teardown = true;
+				xdpw_screencast_instance_teardown(cast);
+			}
+		}
 		wlr_remove_output(output);
 	}
 }

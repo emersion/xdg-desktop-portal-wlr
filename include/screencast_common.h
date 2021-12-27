@@ -162,6 +162,7 @@ struct xdpw_screencast_instance {
 	bool with_cursor;
 	int err;
 	bool quit;
+	bool teardown;
 	enum buffer_type buffer_type;
 
 	// fps limit

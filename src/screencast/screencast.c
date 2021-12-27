@@ -71,6 +71,7 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	cast->refcount = 1;
 	cast->node_id = SPA_ID_INVALID;
 	cast->avoid_dmabufs = false;
+	cast->teardown = false;
 	wl_list_init(&cast->buffer_list);
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
@@ -95,6 +96,15 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	xdpw_pwr_stream_destroy(cast);
 	assert(wl_list_length(&cast->buffer_list) == 0);
 	free(cast);
+}
+
+void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast) {
+	struct xdpw_session *sess, *tmp;
+	wl_list_for_each_safe(sess, tmp, &cast->ctx->state->xdpw_sessions, link) {
+		if (sess->screencast_instance == cast) {
+			xdpw_session_destroy(sess);
+		}
+	}
 }
 
 bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
