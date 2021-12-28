@@ -108,6 +108,14 @@ enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format) {
 		return SPA_VIDEO_FORMAT_RGBx;
 	case SPA_VIDEO_FORMAT_ARGB:
 		return SPA_VIDEO_FORMAT_xRGB;
+	case SPA_VIDEO_FORMAT_ARGB_210LE:
+		return SPA_VIDEO_FORMAT_xRGB_210LE;
+	case SPA_VIDEO_FORMAT_ABGR_210LE:
+		return SPA_VIDEO_FORMAT_xBGR_210LE;
+	case SPA_VIDEO_FORMAT_RGBA_102LE:
+		return SPA_VIDEO_FORMAT_RGBx_102LE;
+	case SPA_VIDEO_FORMAT_BGRA_102LE:
+		return SPA_VIDEO_FORMAT_BGRx_102LE;
 	default:
 		return SPA_VIDEO_FORMAT_UNKNOWN;
 	}
