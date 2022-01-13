@@ -260,7 +260,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		return ret;
 	}
-	sd_bus_message_enter_container(msg, 'a', "{sv}");
+	ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
 	if (ret < 0) {
 		return ret;
 	}
