@@ -3,11 +3,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "screencast_common.h"
 #include "xdpw.h"
 #include "screencast.h"
 #include "logger.h"
 
 static const char interface_name[] = "org.freedesktop.impl.portal.Session";
+
+void print_session(struct xdpw_session *sess) {
+	logprint(DEBUG, "Session:");
+	logprint(DEBUG, "Pointer %p", sess);
+	logprint(DEBUG, "Handle %s", sess->session_handle);
+	print_screencast_data(&sess->screencast_data);
+}
 
 static int method_close(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
@@ -61,7 +69,7 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 	if (!sess) {
 		return;
 	}
-	struct xdpw_screencast_instance *cast = sess->screencast_instance;
+	struct xdpw_screencast_instance *cast = sess->screencast_data.screencast_instance;
 	if (cast) {
 		assert(cast->refcount > 0);
 		--cast->refcount;
@@ -80,6 +88,7 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 			}
 		}
 	}
+	free(sess->screencast_data.output_name);
 
 	sd_bus_slot_unref(sess->slot);
 	wl_list_remove(&sess->link);

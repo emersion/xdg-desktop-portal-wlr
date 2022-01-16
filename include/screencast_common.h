@@ -11,7 +11,8 @@
 
 // this seems to be right based on
 // https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
-#define XDP_CAST_PROTO_VER 3
+#define XDP_CAST_PROTO_VER 4
+#define XDP_CAST_DATA_VER 1
 
 enum cursor_modes {
   HIDDEN = 1,
@@ -168,6 +169,14 @@ struct xdpw_screencast_instance {
 	struct fps_limit_state fps_limit;
 };
 
+struct xdpw_screencast_session_data {
+	uint32_t version;
+	struct xdpw_screencast_instance *screencast_instance;
+	char *output_name;
+	uint32_t cursor_mode;
+	uint32_t persist_mode;
+};
+
 struct xdpw_wlr_output {
 	struct wl_list link;
 	uint32_t id;
@@ -195,4 +204,5 @@ enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 
 enum xdpw_chooser_types get_chooser_type(const char *chooser_type);
 const char *chooser_type_str(enum xdpw_chooser_types chooser_type);
+void print_screencast_data(struct xdpw_screencast_session_data *data);
 #endif /* SCREENCAST_COMMON_H */

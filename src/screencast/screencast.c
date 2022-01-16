@@ -102,13 +102,13 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast) {
 	struct xdpw_session *sess, *tmp;
 	wl_list_for_each_safe(sess, tmp, &cast->ctx->state->xdpw_sessions, link) {
-		if (sess->screencast_instance == cast) {
+		if (sess->screencast_data.screencast_instance == cast) {
 			xdpw_session_destroy(sess);
 		}
 	}
 }
 
-bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
+bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess) {
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -116,12 +116,20 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 			output->make, output->model, output->id, output->name);
 	}
 
-	struct xdpw_wlr_output *out;
-	out = xdpw_wlr_output_chooser(ctx);
+	struct xdpw_wlr_output *out = NULL;
+	if (sess->screencast_data.output_name) {
+		out = xdpw_wlr_output_find_by_name(&ctx->output_list, sess->screencast_data.output_name);
+	}
+	if (!out) {
+		out = xdpw_wlr_output_chooser(ctx);
+	}
 	if (!out) {
 		logprint(ERROR, "wlroots: no output found");
 		return false;
 	}
+
+	// default to embedded cursor mode if not specified
+	bool with_cursor = sess->screencast_data.cursor_mode & HIDDEN ? false : true;
 
 	// Disable screencast sharing to avoid sharing between dmabuf and shm capable clients
 	/*
@@ -138,7 +146,7 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 					"but is already scheduled for destruction, skipping");
 			}
 			else {
-				sess->screencast_instance = cast;
+				sess->screencast_data.screencast_instance = cast;
 				++cast->refcount;
 			}
 			logprint(INFO, "xdpw: screencast instance %p now has %d references",
@@ -147,13 +155,13 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 	}
 	*/
 
-	if (!sess->screencast_instance) {
-		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
-		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
+	if (!sess->screencast_data.screencast_instance) {
+		sess->screencast_data.screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
+		xdpw_screencast_instance_init(ctx, sess->screencast_data.screencast_instance,
 			out, with_cursor);
 	}
-	logprint(INFO, "wlroots: output: %s",
-		sess->screencast_instance->target_output->name);
+	sess->screencast_data.output_name = strdup(sess->screencast_data.screencast_instance->target_output->name);
+	logprint(INFO, "wlroots: output: %s", sess->screencast_data.output_name);
 
 	return true;
 
@@ -276,9 +284,6 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 
 	logprint(INFO, "dbus: select sources method invoked");
 
-	// default to embedded cursor mode if not specified
-	bool cursor_embedded = true;
-
 	char *request_handle, *session_handle, *app_id;
 	ret = sd_bus_message_read(msg, "oos", &request_handle, &session_handle, &app_id);
 	if (ret < 0) {
@@ -292,6 +297,19 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: request_handle: %s", request_handle);
 	logprint(INFO, "dbus: session_handle: %s", session_handle);
 	logprint(INFO, "dbus: app_id: %s", app_id);
+
+	sess = NULL;
+	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
+				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
+				break;
+		}
+	}
+
+	if (!sess) {
+		logprint(WARN, "dbus: select sources: no matching session %s found", sess->session_handle);
+		goto error;
+	}
 
 	char *key;
 	int innerRet = 0;
@@ -314,16 +332,90 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 			}
 			logprint(INFO, "dbus: option types:%x", mask);
 		} else if (strcmp(key, "cursor_mode") == 0) {
-			uint32_t cursor_mode;
-			sd_bus_message_read(msg, "v", "u", &cursor_mode);
-			if (cursor_mode & HIDDEN) {
-				cursor_embedded = false;
-			}
-			if (cursor_mode & METADATA) {
+			sd_bus_message_read(msg, "v", "u", &sess->screencast_data.cursor_mode);
+			if (sess->screencast_data.cursor_mode & METADATA) {
 				logprint(ERROR, "dbus: unsupported cursor mode requested, cancelling");
 				goto error;
 			}
-			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
+			logprint(INFO, "dbus: option cursor_mode:%x", sess->screencast_data.cursor_mode);
+		} else if (strcmp(key, "restore_data") == 0) {
+			logprint(INFO, "dbus: restore data available");
+			char *portal_vendor;
+			uint32_t restore_data_version;
+			innerRet = sd_bus_message_enter_container(msg, 'v', "(suv)");
+			if (innerRet < 0) {
+				logprint(ERROR, "dbus: error entering variant");
+				return innerRet;
+			}
+			innerRet = sd_bus_message_enter_container(msg, 'r', "suv");
+			if (innerRet < 0) {
+				logprint(ERROR, "dbus: error entering struct");
+				return innerRet;
+			}
+			sd_bus_message_read(msg, "s", &portal_vendor);
+			if (strcmp(portal_vendor, "wlroots") != 0) {
+				logprint(INFO, "dbus: skipping restore_data from another vendor (%s)", portal_vendor);
+				continue;
+			}
+			sd_bus_message_read(msg, "u", &restore_data_version);
+			if (restore_data_version == 1) {
+				innerRet = sd_bus_message_enter_container(msg, 'v', "a{sv}");
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_enter_container(msg, 'a', "{sv}");
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				logprint(INFO, "dbus: restoring session from data");
+				int rdRet;
+				char *rdKey;
+				while ((innerRet = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
+					rdRet = sd_bus_message_read(msg, "s", &rdKey);
+					if (rdRet < 0) {
+						return rdRet;
+					}
+					if (strcmp(rdKey, "output_name") == 0) {
+						char *output_name;
+						sd_bus_message_read(msg, "v", "s", &output_name);
+						if (output_name) {
+							sess->screencast_data.output_name = strdup(output_name);
+						}
+						logprint(INFO, "dbus: option restore_data.output_name:%s", sess->screencast_data.output_name);
+					} else {
+						logprint(WARN, "dbus: unknown option %s", rdKey);
+						sd_bus_message_skip(msg, "v");
+					}
+					innerRet = sd_bus_message_exit_container(msg); // dictionary
+					if (innerRet < 0) {
+						return innerRet;
+					}
+				}
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_exit_container(msg); //array
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_exit_container(msg); //variant
+				if (innerRet < 0) {
+					return innerRet;
+				}
+			} else {
+				logprint(ERROR, "Unknown restore_data version: %u", restore_data_version);
+			}
+			innerRet = sd_bus_message_exit_container(msg); // struct
+			if (innerRet < 0) {
+				return innerRet;
+			}
+			innerRet = sd_bus_message_exit_container(msg); // variant
+			if (innerRet < 0) {
+				return innerRet;
+			}
+		} else if (strcmp(key, "persist_mode") == 0) {
+			sd_bus_message_read(msg, "v", "u", &sess->screencast_data.persist_mode);
+			logprint(INFO, "dbus: option persist_mode:%u", sess->screencast_data.persist_mode);
 		} else {
 			logprint(WARN, "dbus: unknown option %s", key);
 			sd_bus_message_skip(msg, "v");
@@ -341,14 +433,10 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		return ret;
 	}
+	print_session(sess);
 
 	bool output_selection_canceled = 1;
-	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
-		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
-				output_selection_canceled = !setup_outputs(ctx, sess, cursor_embedded);
-		}
-	}
+	output_selection_canceled = !setup_outputs(ctx, sess);
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
@@ -370,11 +458,8 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	return 0;
 
 error:
-	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
-		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(DEBUG, "dbus: select sources error: destroying matching session %s", sess->session_handle);
-				xdpw_session_destroy(sess);
-		}
+	if (sess) {
+		xdpw_session_destroy(sess);
 	}
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
@@ -443,13 +528,13 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: start: found matching session %s", sess->session_handle);
-				cast = sess->screencast_instance;
+				cast = sess->screencast_data.screencast_instance;
+				break;
 		}
 	}
 	if (!cast) {
 		return -1;
 	}
-
 	if (!cast->initialized) {
 		ret = start_screencast(cast);
 	}
@@ -472,12 +557,32 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 
 	logprint(DEBUG, "dbus: start: returning node %d", (int)cast->node_id);
-	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
-		"streams", "a(ua{sv})", 1,
-		cast->node_id, 3,
-		"position", "(ii)", 0, 0,
-		"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height);
-		"source_type", "u", 1 << MONITOR);
+	logprint(ERROR, "dbus: start: returning output (%s)", sess->screencast_data.output_name);
+	logprint(ERROR, "dbus: start: returning output (%s)", cast->target_output->name);
+	switch (sess->screencast_data.persist_mode) {
+	case 1:
+	case 2:
+		logprint(DEBUG, "Persistmode");
+		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 3,
+			"streams", "a(ua{sv})", 1,
+			cast->node_id, 3,
+			"position", "(ii)", 0, 0,
+			"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height,
+			"source_type", "u", 1 << MONITOR,
+			"persist_mode", "u", sess->screencast_data.persist_mode,
+			"restore_data", "(suv)",
+			"wlroots", XDP_CAST_DATA_VER,
+			"a{sv}", 1, "output_name", "s", sess->screencast_data.output_name);
+		break;
+	default:
+		logprint(DEBUG, "No persistmode");
+		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
+			"streams", "a(ua{sv})", 1,
+			cast->node_id, 3,
+			"position", "(ii)", 0, 0,
+			"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height,
+			"source_type", "u", 1 << MONITOR);
+	}
 
 	if (ret < 0) {
 		return ret;

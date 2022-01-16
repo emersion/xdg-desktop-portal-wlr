@@ -1,5 +1,6 @@
 #include "xdpw.h"
 #include "screencast_common.h"
+#include "logger.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <string.h>
@@ -403,4 +404,11 @@ const char *chooser_type_str(enum xdpw_chooser_types chooser_type) {
 	}
 	fprintf(stderr, "Could not find chooser type %d\n", chooser_type);
 	abort();
+}
+
+void print_screencast_data(struct xdpw_screencast_session_data *data) {
+	logprint(DEBUG, "Session data:");
+	logprint(DEBUG, "Cursormode: %u", data->cursor_mode);
+	logprint(DEBUG, "Persistmode: %u", data->persist_mode);
+	logprint(DEBUG, "Outputname: %s", data->output_name);
 }
