@@ -19,6 +19,8 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state);
 void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx);
 
 bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target);
+bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
+		struct xdpw_screencast_restore_data *data);
 
 void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast);
 void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast);

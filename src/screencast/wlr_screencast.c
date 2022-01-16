@@ -535,6 +535,18 @@ bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_sc
 	return target->output != NULL;
 }
 
+bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
+		struct xdpw_screencast_restore_data *data) {
+	struct xdpw_wlr_output *out = NULL;
+	out = xdpw_wlr_output_find_by_name(&ctx->output_list, data->output_name);
+
+	if (!out) {
+		return false;
+	}
+	target->output = out;
+	return true;
+}
+
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out->name);
 	free(out->make);
