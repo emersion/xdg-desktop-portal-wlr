@@ -108,7 +108,8 @@ void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast) {
 	}
 }
 
-bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess) {
+bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data) {
+	bool target_initialized = false;
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -122,7 +123,15 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 		return false;
 	}
 	target->with_cursor = sess->screencast_data.cursor_mode == EMBEDDED;
-	if (!xdpw_wlr_target_chooser(ctx, target)) {
+	if (data) {
+		target_initialized = xdpw_wlr_target_from_data(ctx, target, data);
+	}
+	if (!target_initialized) {
+		target_initialized = xdpw_wlr_target_chooser(ctx, target);
+		//TODO: Chooser option to confirm the persist mode
+		sess->screencast_data.persist_mode = PERSIST_NONE;
+	}
+	if (!target_initialized) {
 		logprint(ERROR, "wlroots: no output found");
 		free(target);
 		return false;
@@ -309,9 +318,12 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 
 	// default to embedded cursor mode if not specified
 	sess->screencast_data.cursor_mode = EMBEDDED;
+	// default to no persist if not specified
+	sess->screencast_data.persist_mode = PERSIST_NONE;
 
 	char *key;
 	int innerRet = 0;
+	struct xdpw_screencast_restore_data restore_data = {0};
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
 		if (innerRet < 0) {
@@ -337,6 +349,81 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 				goto error;
 			}
 			logprint(INFO, "dbus: option cursor_mode:%x", sess->screencast_data.cursor_mode);
+		} else if (strcmp(key, "restore_data") == 0) {
+			logprint(INFO, "dbus: restore data available");
+			char *portal_vendor;
+			innerRet = sd_bus_message_enter_container(msg, 'v', "(suv)");
+			if (innerRet < 0) {
+				logprint(ERROR, "dbus: error entering variant");
+				return innerRet;
+			}
+			innerRet = sd_bus_message_enter_container(msg, 'r', "suv");
+			if (innerRet < 0) {
+				logprint(ERROR, "dbus: error entering struct");
+				return innerRet;
+			}
+			sd_bus_message_read(msg, "s", &portal_vendor);
+			if (strcmp(portal_vendor, "wlroots") != 0) {
+				logprint(INFO, "dbus: skipping restore_data from another vendor (%s)", portal_vendor);
+				sd_bus_message_skip(msg, "uv");
+				continue;
+			}
+			sd_bus_message_read(msg, "u", &restore_data.version);
+			if (restore_data.version == 1) {
+				innerRet = sd_bus_message_enter_container(msg, 'v', "a{sv}");
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_enter_container(msg, 'a', "{sv}");
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				logprint(INFO, "dbus: restoring session from data");
+				int rdRet;
+				char *rdKey;
+				while ((innerRet = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
+					rdRet = sd_bus_message_read(msg, "s", &rdKey);
+					if (rdRet < 0) {
+						return rdRet;
+					}
+					if (strcmp(rdKey, "output_name") == 0) {
+						sd_bus_message_read(msg, "v", "s", &restore_data.output_name);
+						logprint(INFO, "dbus: option restore_data.output_name: %s", restore_data.output_name);
+					} else {
+						logprint(WARN, "dbus: unknown option %s", rdKey);
+						sd_bus_message_skip(msg, "v");
+					}
+					innerRet = sd_bus_message_exit_container(msg); // dictionary
+					if (innerRet < 0) {
+						return innerRet;
+					}
+				}
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_exit_container(msg); //array
+				if (innerRet < 0) {
+					return innerRet;
+				}
+				innerRet = sd_bus_message_exit_container(msg); //variant
+				if (innerRet < 0) {
+					return innerRet;
+				}
+			} else {
+				sd_bus_message_skip(msg, "v");
+				logprint(ERROR, "Unknown restore_data version: %u", restore_data.version);
+			}
+			innerRet = sd_bus_message_exit_container(msg); // struct
+			if (innerRet < 0) {
+				return innerRet;
+			}
+			innerRet = sd_bus_message_exit_container(msg); // variant
+			if (innerRet < 0) {
+				return innerRet;
+			}
+		} else if (strcmp(key, "persist_mode") == 0) {
+			sd_bus_message_read(msg, "v", "u", &sess->screencast_data.persist_mode);
+			logprint(INFO, "dbus: option persist_mode:%u", sess->screencast_data.persist_mode);
 		} else {
 			logprint(WARN, "dbus: unknown option %s", key);
 			sd_bus_message_skip(msg, "v");
@@ -355,7 +442,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	bool output_selection_canceled = !setup_target(ctx, sess);
+	bool output_selection_canceled = !setup_target(ctx, sess, restore_data.version > 0 ? &restore_data : NULL);
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
@@ -476,13 +563,41 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 
 	logprint(DEBUG, "dbus: start: returning node %d", (int)cast->node_id);
-	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1,
+	ret = sd_bus_message_append(reply, "u", PORTAL_RESPONSE_SUCCESS);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'a', "{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "{sv}",
 		"streams", "a(ua{sv})", 1,
 		cast->node_id, 3,
 		"position", "(ii)", 0, 0,
 		"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height,
 		"source_type", "u", 1 << MONITOR);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "{sv}",
+		"persist_mode", "u", sess->screencast_data.persist_mode);
+	if (ret < 0) {
+		return ret;
+	}
+	if (sess->screencast_data.persist_mode != PERSIST_NONE) {
+		struct xdpw_screencast_restore_data restore_data;
+		restore_data.output_name = cast->target->output->name;
+		ret = sd_bus_message_append(reply, "{sv}",
+			"restore_data", "(suv)",
+			"wlroots", XDP_CAST_DATA_VER,
+			"a{sv}", 1, "output_name", "s", restore_data.output_name);
+		if (ret < 0) {
+			return ret;
+		}
+	}
 
+	ret = sd_bus_message_close_container(reply);
 	if (ret < 0) {
 		return ret;
 	}

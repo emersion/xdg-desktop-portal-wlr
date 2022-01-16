@@ -11,7 +11,8 @@
 
 // this seems to be right based on
 // https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
-#define XDP_CAST_PROTO_VER 3
+#define XDP_CAST_PROTO_VER 4
+#define XDP_CAST_DATA_VER 1
 
 enum cursor_modes {
   HIDDEN = 1,
@@ -22,6 +23,12 @@ enum cursor_modes {
 enum source_types {
   MONITOR = 1,
   WINDOW = 2,
+};
+
+enum persist_modes {
+  PERSIST_NONE = 0,
+  PERSIST_TRANSIENT = 1,
+  PERSIST_PERMANENT = 2,
 };
 
 enum buffer_type {
@@ -134,6 +141,11 @@ struct xdpw_screencast_target {
 	bool with_cursor;
 };
 
+struct xdpw_screencast_restore_data {
+	uint32_t version;
+	const char *output_name;
+};
+
 struct xdpw_screencast_instance {
 	// list
 	struct wl_list link;
@@ -174,6 +186,7 @@ struct xdpw_screencast_instance {
 struct xdpw_screencast_session_data {
 	struct xdpw_screencast_instance *screencast_instance;
 	uint32_t cursor_mode;
+	uint32_t persist_mode;
 };
 
 struct xdpw_wlr_output {
