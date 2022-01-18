@@ -432,8 +432,9 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 
 	while (cast->node_id == SPA_ID_INVALID) {
 		int ret = pw_loop_iterate(state->pw_loop, 0);
-		if (ret != 0) {
+		if (ret < 0) {
 			logprint(ERROR, "pipewire_loop_iterate failed: %s", spa_strerror(ret));
+			return ret;
 		}
 	}
 
