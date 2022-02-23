@@ -84,6 +84,10 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
 
+	if (cast->ctx->ext_screencopy_manager) {
+		xdpw_wlr_ext_screencopy_surface_destroy(cast);
+	}
+
 	// make sure this is the last running instance that is being destroyed
 	if (wl_list_length(&cast->link) == 1) {
 		char *exec_after = cast->ctx->state->config->screencast_conf.exec_after;
@@ -160,22 +164,32 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 }
 
 static int start_screencast(struct xdpw_screencast_instance *cast) {
-	xdpw_wlr_register_cb(cast);
+	if (cast->ctx->ext_screencopy_manager) {
+		xdpw_wlr_ext_screencopy_surface_create(cast);
 
-	// process at least one frame so that we know
-	// some of the metadata required for the pipewire
-	// remote state connected event
-	wl_display_dispatch(cast->ctx->state->wl_display);
-	wl_display_roundtrip(cast->ctx->state->wl_display);
+		// process at least one frame so that we know
+		// some of the metadata required for the pipewire
+		// remote state connected event
+		wl_display_dispatch(cast->ctx->state->wl_display);
+		wl_display_roundtrip(cast->ctx->state->wl_display);
+	} else {
+		xdpw_wlr_register_cb(cast);
 
-	if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
-			(cast->ctx->state->screencast_version >= 3 &&
-			 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
-		logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
-		return -1;
+		// process at least one frame so that we know
+		// some of the metadata required for the pipewire
+		// remote state connected event
+		wl_display_dispatch(cast->ctx->state->wl_display);
+		wl_display_roundtrip(cast->ctx->state->wl_display);
+
+		if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
+				(cast->ctx->state->screencast_version >= 3 &&
+				 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
+			logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
+			return -1;
+		}
+
+		xdpw_pwr_stream_create(cast);
 	}
-
-	xdpw_pwr_stream_create(cast);
 
 	cast->initialized = true;
 	return 0;

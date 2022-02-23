@@ -116,6 +116,7 @@ struct xdpw_screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
+	struct ext_screencopy_manager_v1 *ext_screencopy_manager;
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
@@ -163,6 +164,9 @@ struct xdpw_screencast_instance {
 	bool quit;
 	bool teardown;
 	enum buffer_type buffer_type;
+
+	// ext_screencopy
+	struct ext_screencopy_surface_v1 *surface_capture;
 
 	// fps limit
 	struct fps_limit_state fps_limit;

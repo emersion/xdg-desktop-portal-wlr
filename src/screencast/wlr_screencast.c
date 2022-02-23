@@ -3,6 +3,7 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
+#include "ext-screencopy-v1-client-protocol.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -30,6 +31,22 @@ void wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
+}
+
+static void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "wlroots: start screencopy");
+	if (cast->quit || cast->err) {
+		xdpw_screencast_instance_destroy(cast);
+		return;
+	}
+
+	if (cast->initialized && !cast->pwr_stream_state) {
+		cast->frame_state = XDPW_FRAME_STATE_NONE;
+		return;
+	}
+
+	cast->frame_state = XDPW_FRAME_STATE_STARTED;
+	xdpw_wlr_register_cb(cast);
 }
 
 void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
@@ -61,22 +78,6 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
 		xdpw_pwr_enqueue_buffer(cast);
 	}
-}
-
-void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "wlroots: start screencopy");
-	if (cast->quit || cast->err) {
-		xdpw_screencast_instance_destroy(cast);
-		return;
-	}
-
-	if (cast->initialized && !cast->pwr_stream_state) {
-		cast->frame_state = XDPW_FRAME_STATE_NONE;
-		return;
-	}
-
-	cast->frame_state = XDPW_FRAME_STATE_STARTED;
-	xdpw_wlr_register_cb(cast);
 }
 
 static void wlr_frame_buffer_done(void *data,
@@ -244,6 +245,159 @@ void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
 		&wlr_frame_listener, cast);
 	logprint(TRACE, "wlroots: callbacks registered");
+}
+
+static void ext_surface_buffer_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t type, uint32_t drm_format, uint32_t width, uint32_t height, uint32_t stride) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: buffer_info event handler");
+
+	cast->screencopy_frame_info[type].format = drm_format;
+	cast->screencopy_frame_info[type].width = width;
+	cast->screencopy_frame_info[type].height = height;
+	cast->screencopy_frame_info[type].stride = stride;
+	cast->screencopy_frame_info[type].size = stride * height;
+}
+
+static void ext_surface_cursor_buffer_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type, uint32_t buffer_type,
+		uint32_t drm_format, uint32_t width, uint32_t height, uint32_t stride) {
+	logprint(TRACE, "wlroots: cursor_buffer_info event handler");
+}
+
+static void ext_surface_init_done(void *data, struct ext_screencopy_surface_v1 *surface) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: init_done event handler");
+
+	if (cast->stream) {
+		pwr_update_stream_param(cast);
+	} else {
+		xdpw_pwr_stream_create(cast);
+	}
+}
+
+static void ext_surface_transform(void *data, struct ext_screencopy_surface_v1 *surface,
+		int32_t transform) {
+	logprint(TRACE, "wlroots: transform event handler");
+}
+
+static void ext_surface_damage(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	logprint(TRACE, "wlroots: damage event handler");
+}
+
+static void ext_surface_cursor_enter(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type) {
+	logprint(TRACE, "wlroots: cursor_enter event handler");
+}
+
+static void ext_surface_cursor_leave(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type) {
+	logprint(TRACE, "wlroots: cursor_leave event handler");
+}
+
+static void ext_surface_cursor_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type, int32_t has_damage,
+		int32_t position_x, int32_t position_y, int32_t width, int32_t height,
+		int32_t hotspot_x, int32_t hotspot_y) {
+	logprint(TRACE, "wlroots: cursor_info event handler");
+}
+
+static void ext_surface_failed(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t reason) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: failed event handler");
+
+	enum failure_reason {
+		EXT_SCREENCOPY_FAILURE_REASON_UNSPEC = 0,
+		EXT_SCREENCOPY_FAILURE_REASON_INVALID_MAIN_BUFFER,
+		EXT_SCREENCOPY_FAILURE_REASON_INVALID_CURSOR_BUFFER,
+		EXT_SCREENCOPY_FAILURE_REASON_OUTPUT_MISSING,
+		EXT_SCREENCOPY_FAILURE_REASON_OUTPUT_DISABLED,
+		EXT_SCREENCOPY_FAILURE_REASON_UNKOWN_INPUT,
+	};
+
+	switch (reason) {
+	case EXT_SCREENCOPY_FAILURE_REASON_INVALID_MAIN_BUFFER:
+	case EXT_SCREENCOPY_FAILURE_REASON_INVALID_CURSOR_BUFFER:
+		ext_screencopy_surface_v1_destroy(cast->surface_capture);
+		xdpw_wlr_ext_screencopy_surface_create(cast);
+		break;
+	default:
+		xdpw_screencast_instance_destroy(cast);
+	}
+}
+
+static void ext_surface_commit_time(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: commit_time event handler");
+
+	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
+	cast->current_frame.tv_nsec = tv_nsec;
+	logprint(TRACE, "wlroots: timestamp %"PRIu64":%"PRIu32, cast->current_frame.tv_sec, cast->current_frame.tv_nsec);
+}
+
+static void ext_surface_ready(void *data, struct ext_screencopy_surface_v1 *surface) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: ready event handler");
+
+	xdpw_pwr_enqueue_buffer(cast);
+}
+
+static const struct ext_screencopy_surface_v1_listener ext_screencopy_surface_listener = {
+	.buffer_info = ext_surface_buffer_info,
+	.cursor_buffer_info = ext_surface_cursor_buffer_info,
+	.init_done = ext_surface_init_done,
+	.transform = ext_surface_transform,
+	.damage = ext_surface_damage,
+	.cursor_enter = ext_surface_cursor_enter,
+	.cursor_leave = ext_surface_cursor_leave,
+	.cursor_info = ext_surface_cursor_info,
+	.failed = ext_surface_failed,
+	.commit_time = ext_surface_commit_time,
+	.ready = ext_surface_ready,
+};
+
+void wlr_ext_screencopy_frame_submit(struct xdpw_screencast_instance *cast) {
+	enum ext_screencopy_surface_v1_options {
+		EXT_SCREENCOPY_OPTIONS_ON_DAMAGE = 1,
+	};
+
+	ext_screencopy_surface_v1_attach_buffer(cast->surface_capture, cast->current_frame.xdpw_buffer->buffer);
+	ext_screencopy_surface_v1_damage_buffer(cast->surface_capture, 0, 0,
+		cast->current_frame.xdpw_buffer->width, cast->current_frame.xdpw_buffer->height);
+	ext_screencopy_surface_v1_commit(cast->surface_capture, EXT_SCREENCOPY_OPTIONS_ON_DAMAGE);
+	logprint(TRACE, "wlroots: frame commited");
+	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
+}
+
+void xdpw_wlr_ext_screencopy_surface_create(struct xdpw_screencast_instance *cast) {
+	enum ext_screencopy_manager_v1_options options = 0;
+	if (cast->with_cursor) {
+		options = 1;
+	}
+	cast->surface_capture = ext_screencopy_manager_v1_capture_output(cast->ctx->ext_screencopy_manager,
+			cast->target_output->output, options);
+
+	ext_screencopy_surface_v1_add_listener(cast->surface_capture, &ext_screencopy_surface_listener, cast);
+}
+
+void xdpw_wlr_ext_screencopy_surface_destroy(struct xdpw_screencast_instance *cast) {
+	ext_screencopy_surface_v1_destroy(cast->surface_capture);
+}
+
+void xdpw_wlr_handle_frame(struct xdpw_screencast_instance *cast) {
+	if (cast->ctx->ext_screencopy_manager) {
+		wlr_ext_screencopy_frame_submit(cast);
+	} else {
+		xdpw_wlr_frame_start(cast);
+	}
 }
 
 static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
@@ -750,6 +904,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
 		ctx->screencopy_manager = wl_registry_bind(
 			reg, id, &zwlr_screencopy_manager_v1_interface, version);
+	}
+
+	if (!strcmp(interface, ext_screencopy_manager_v1_interface.name)) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, 1);
+		ctx->ext_screencopy_manager = wl_registry_bind(
+			reg, id, &ext_screencopy_manager_v1_interface, 1);
 	}
 
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
