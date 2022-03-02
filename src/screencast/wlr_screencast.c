@@ -95,11 +95,11 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_frame = frame;
 
-	cast->screencopy_frame.width = width;
-	cast->screencopy_frame.height = height;
-	cast->screencopy_frame.stride = stride;
-	cast->screencopy_frame.size = stride * height;
-	cast->screencopy_frame.format = format;
+	cast->screencopy_frame_info.width = width;
+	cast->screencopy_frame_info.height = height;
+	cast->screencopy_frame_info.stride = stride;
+	cast->screencopy_frame_info.size = stride * height;
+	cast->screencopy_frame_info.format = format;
 
 	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast, frame);
@@ -124,10 +124,10 @@ static void wlr_frame_buffer_done(void *data,
 	}
 
 	// Check if announced screencopy information is compatible with pipewire meta
-	if ((cast->pwr_format.format != xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format) &&
-			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_wl_shm(cast->screencopy_frame.format))) ||
-			cast->pwr_format.size.width != cast->screencopy_frame.width ||
-			cast->pwr_format.size.height != cast->screencopy_frame.height) {
+	if ((cast->pwr_format.format != xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format) &&
+			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_wl_shm(cast->screencopy_frame_info.format))) ||
+			cast->pwr_format.size.width != cast->screencopy_frame_info.width ||
+			cast->pwr_format.size.height != cast->screencopy_frame_info.height) {
 		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
 		cast->frame_state = XDPW_FRAME_STATE_RENEG;
 		xdpw_wlr_frame_finish(cast);
@@ -135,8 +135,8 @@ static void wlr_frame_buffer_done(void *data,
 	}
 
 	// Check if dequeued buffer is compatible with announced buffer
-	if (cast->current_frame.size != cast->screencopy_frame.size ||
-			cast->current_frame.stride != cast->screencopy_frame.stride) {
+	if (cast->current_frame.size != cast->screencopy_frame_info.size ||
+			cast->current_frame.stride != cast->screencopy_frame_info.stride) {
 		logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");
 		cast->frame_state = XDPW_FRAME_STATE_FAILED;
 		xdpw_wlr_frame_finish(cast);

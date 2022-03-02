@@ -60,7 +60,7 @@ struct xdpw_frame {
 	struct pw_buffer *current_pw_buffer;
 };
 
-struct xdpw_screencopy_frame {
+struct xdpw_screencopy_frame_info {
 	uint32_t width;
 	uint32_t height;
 	uint32_t size;
@@ -113,7 +113,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_wlr_output *target_output;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
-	struct xdpw_screencopy_frame screencopy_frame;
+	struct xdpw_screencopy_frame_info screencopy_frame_info;
 	bool with_cursor;
 	int err;
 	bool quit;
