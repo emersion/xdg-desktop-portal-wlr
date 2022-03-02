@@ -130,6 +130,7 @@ static void wlr_frame_buffer_done(void *data,
 		xdpw_pwr_dequeue_buffer(cast);
 	}
 
+	cast->need_buffer = false;
 	if (!cast->current_frame.xdpw_buffer) {
 		logprint(WARN, "wlroots: no current buffer");
 		xdpw_wlr_frame_finish(cast);

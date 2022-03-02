@@ -44,6 +44,18 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
+static void pwr_handle_stream_on_process(void *data) {
+	logprint(TRACE, "pipewire: stream process");
+	struct xdpw_screencast_instance *cast = data;
+
+	if (cast->need_buffer) {
+		xdpw_pwr_dequeue_buffer(cast);
+		if (cast->current_frame.pw_buffer) {
+			cast->need_buffer = false;
+		}
+	}
+}
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -166,6 +178,7 @@ static const struct pw_stream_events pwr_stream_events = {
 	.param_changed = pwr_handle_stream_param_changed,
 	.add_buffer = pwr_handle_stream_add_buffer,
 	.remove_buffer = pwr_handle_stream_remove_buffer,
+	.process = pwr_handle_stream_on_process,
 };
 
 void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
@@ -240,7 +253,11 @@ void xdpw_pwr_swap_buffer(struct xdpw_screencast_instance *cast) {
 
 dequeue_buffer:
 	assert(!cast->current_frame.pw_buffer);
+	cast->need_buffer = false;
 	xdpw_pwr_dequeue_buffer(cast);
+	if (!cast->current_frame.pw_buffer) {
+		cast->need_buffer = true;
+	}
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
