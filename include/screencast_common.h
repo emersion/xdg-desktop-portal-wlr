@@ -31,6 +31,7 @@ enum xdpw_chooser_types {
 
 enum xdpw_frame_state {
   XDPW_FRAME_STATE_NONE,
+  XDPW_FRAME_STATE_STARTED,
   XDPW_FRAME_STATE_RENEG,
   XDPW_FRAME_STATE_FAILED,
   XDPW_FRAME_STATE_SUCCESS,

@@ -6,8 +6,6 @@
 #define XDPW_PWR_BUFFERS 4
 #define XDPW_PWR_ALIGN 16
 
-void xdpw_pwr_trigger_process(struct xdpw_screencast_instance *cast);
-bool xdpw_pwr_is_driving(struct xdpw_screencast_instance *cast);
 void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast);
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast);
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast);
