@@ -19,7 +19,7 @@ void randname(char *buf) {
 	}
 }
 
-int anonymous_shm_open(void) {
+static int anonymous_shm_open(void) {
 	char name[] = "/xdpw-shm-XXXXXX";
 	int retries = 100;
 
@@ -38,7 +38,7 @@ int anonymous_shm_open(void) {
 	return -1;
 }
 
-struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
+static struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
 		enum wl_shm_format fmt, int width, int height, int stride) {
 	struct xdpw_screencast_context *ctx = cast->ctx;
 	int size = stride * height;
@@ -53,6 +53,48 @@ struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *cast, in
 	wl_shm_pool_destroy(pool);
 
 	return buffer;
+}
+
+struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
+		struct xdpw_screencopy_frame_info *frame_info) {
+	struct xdpw_buffer *buffer = calloc(1, sizeof(struct xdpw_buffer));
+	buffer->width = frame_info->width;
+	buffer->height = frame_info->height;
+	buffer->format = frame_info->format;
+	buffer->size = frame_info->size;
+	buffer->stride = frame_info->stride;
+	buffer->offset = 0;
+	buffer->fd = anonymous_shm_open();
+	if (buffer->fd == -1) {
+		logprint(ERROR, "xdpw: unable to create anonymous filedescriptor");
+		free(buffer);
+		return NULL;
+	}
+
+	if (ftruncate(buffer->fd, buffer->size) < 0) {
+		logprint(ERROR, "xdpw: unable to truncate filedescriptor");
+		close(buffer->fd);
+		free(buffer);
+		return NULL;
+	}
+
+	buffer->buffer = import_wl_shm_buffer(cast, buffer->fd, frame_info->format,
+			frame_info->width, frame_info->height, frame_info->stride);
+	if (buffer->buffer == NULL) {
+		logprint(ERROR, "xdpw: unable to create wl_buffer");
+		close(buffer->fd);
+		free(buffer);
+		return NULL;
+	}
+
+	return buffer;
+}
+
+void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
+	wl_buffer_destroy(buffer->buffer);
+	close(buffer->fd);
+	wl_list_remove(&buffer->link);
+	free(buffer);
 }
 
 enum spa_video_format xdpw_format_pw_from_wl_shm(enum wl_shm_format format) {

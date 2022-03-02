@@ -118,35 +118,24 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	}
 
 	logprint(TRACE, "pipewire: selected buffertype %u", d[0].type);
-	// Prepare buffer for choosen type
-	if (d[0].type == SPA_DATA_MemFd) {
-		d[0].maxsize = cast->screencopy_frame_info.size;
-		d[0].mapoffset = 0;
-		d[0].chunk->size = cast->screencopy_frame_info.size;
-		d[0].chunk->stride = cast->screencopy_frame_info.stride;
-		d[0].chunk->offset = 0;
-		d[0].flags = 0;
-		d[0].fd = anonymous_shm_open();
-		d[0].data = NULL;
 
-		if (d[0].fd == -1) {
-			logprint(ERROR, "pipewire: unable to create anonymous filedescriptor");
-			cast->err = 1;
-			return;
-		}
-
-		if (ftruncate(d[0].fd, d[0].maxsize) < 0) {
-			logprint(ERROR, "pipewire: unable to truncate filedescriptor");
-			close(d[0].fd);
-			d[0].fd = -1;
-			cast->err = 1;
-			return;
-		}
-
-		// create wl_buffer
-		buffer->user_data = import_wl_shm_buffer(cast, d[0].fd, cast->screencopy_frame_info.format,
-			cast->screencopy_frame_info.width, cast->screencopy_frame_info.height, cast->screencopy_frame_info.stride);
+	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, &cast->screencopy_frame_info);
+	if (xdpw_buffer == NULL) {
+		logprint(ERROR, "pipewire: failed to create xdpw buffer");
+		cast->err = 1;
+		return;
 	}
+	wl_list_insert(&cast->buffer_list, &xdpw_buffer->link);
+	buffer->user_data = xdpw_buffer;
+
+	d[0].maxsize = xdpw_buffer->size;
+	d[0].mapoffset = 0;
+	d[0].chunk->size = xdpw_buffer->size;
+	d[0].chunk->stride = xdpw_buffer->stride;
+	d[0].chunk->offset = xdpw_buffer->offset;
+	d[0].flags = 0;
+	d[0].fd = xdpw_buffer->fd;
+	d[0].data = NULL;
 }
 
 static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer) {
@@ -154,20 +143,18 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 
 	logprint(TRACE, "pipewire: remove buffer event handle");
 
-	struct spa_data *d = buffer->buffer->datas;
 	if (cast->current_frame.current_pw_buffer == buffer) {
 		logprint(TRACE, "pipewire: remove buffer currently in use");
 		cast->current_frame.current_pw_buffer = NULL;
-		cast->current_frame.buffer = NULL;
+		cast->current_frame.xdpw_buffer = NULL;
 	}
-	switch (d[0].type) {
-	case SPA_DATA_MemFd:
-		wl_buffer_destroy(buffer->user_data);
-		close(d[0].fd);
-		break;
-	default:
-		break;
+	struct xdpw_buffer *xdpw_buffer = buffer->user_data;
+	if (xdpw_buffer) {
+		xdpw_buffer_destroy(xdpw_buffer);
+		buffer->user_data = NULL;
 	}
+	buffer->buffer->datas[0].fd = -1;
+	buffer->user_data = NULL;
 }
 
 static const struct pw_stream_events pwr_stream_events = {
@@ -184,15 +171,11 @@ void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	assert(cast->current_frame.current_pw_buffer == NULL);
 	if ((cast->current_frame.current_pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
 		logprint(WARN, "pipewire: out of buffers");
-		cast->current_frame.buffer = NULL;
+		cast->current_frame.xdpw_buffer = NULL;
 		return;
 	}
 
-	struct spa_buffer *spa_buf = cast->current_frame.current_pw_buffer->buffer;
-	struct spa_data *d = spa_buf->datas;
-	cast->current_frame.size = d[0].chunk->size;
-	cast->current_frame.stride = d[0].chunk->stride;
-	cast->current_frame.buffer = cast->current_frame.current_pw_buffer->user_data;
+	cast->current_frame.xdpw_buffer = cast->current_frame.current_pw_buffer->user_data;
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
@@ -230,15 +213,15 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: fd %u", d[0].fd);
 	logprint(TRACE, "pipewire: size %d", d[0].maxsize);
 	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: width %d", cast->screencopy_frame_info.width);
-	logprint(TRACE, "pipewire: height %d", cast->screencopy_frame_info.height);
+	logprint(TRACE, "pipewire: width %d", cast->current_frame.xdpw_buffer->width);
+	logprint(TRACE, "pipewire: height %d", cast->current_frame.xdpw_buffer->height);
 	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);
 	logprint(TRACE, "********************");
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
 
 	cast->current_frame.current_pw_buffer = NULL;
-	cast->current_frame.buffer = NULL;
+	cast->current_frame.xdpw_buffer = NULL;
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
