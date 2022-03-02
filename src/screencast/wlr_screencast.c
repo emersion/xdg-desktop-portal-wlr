@@ -134,18 +134,18 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
+	assert(cast->current_frame.xdpw_buffer);
+
 	// Check if dequeued buffer is compatible with announced buffer
-	if (cast->current_frame.size != cast->screencopy_frame_info.size ||
-			cast->current_frame.stride != cast->screencopy_frame_info.stride) {
+	if (cast->current_frame.xdpw_buffer->size != cast->screencopy_frame_info.size ||
+			cast->current_frame.xdpw_buffer->stride != cast->screencopy_frame_info.stride) {
 		logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");
 		cast->frame_state = XDPW_FRAME_STATE_FAILED;
 		xdpw_wlr_frame_finish(cast);
 		return;
 	}
 
-	assert(cast->current_frame.buffer);
-
-	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.buffer);
+	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.xdpw_buffer->buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
 	fps_limit_measure_start(&cast->fps_limit, cast->framerate);

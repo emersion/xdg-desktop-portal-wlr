@@ -70,6 +70,7 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
 	cast->node_id = SPA_ID_INVALID;
+	wl_list_init(&cast->buffer_list);
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
 	logprint(INFO, "xdpw: %d active screencast instances",
@@ -91,6 +92,7 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
+	assert(wl_list_length(&cast->buffer_list) == 0);
 	free(cast);
 }
 
