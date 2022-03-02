@@ -40,11 +40,6 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 		return;
 	}
 
-	// Check if we have a buffer
-	if (cast->current_frame.current_pw_buffer) {
-		xdpw_pwr_enqueue_buffer(cast);
-	}
-
 	if (!cast->pwr_stream_state) {
 		cast->frame_state = XDPW_FRAME_STATE_NONE;
 		return;
@@ -55,6 +50,7 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 	}
 
 	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
+		xdpw_pwr_swap_buffer(cast);
 		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 		if (delay_ns > 0) {
 			xdpw_add_timer(cast->ctx->state, delay_ns,
@@ -67,18 +63,14 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 
 void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "wlroots: start screencopy");
-	if (cast->err) {
-		logprint(ERROR, "wlroots: nonrecoverable error has happened. shutting down instance");
+	if (cast->quit || cast->err) {
 		xdpw_screencast_instance_destroy(cast);
 		return;
 	}
 
-	if (cast->pwr_stream_state) {
-		xdpw_pwr_dequeue_buffer(cast);
-
-		if (!cast->current_frame.current_pw_buffer) {
-			logprint(WARN, "wlroots: failed to dequeue buffer");
-		}
+	if (cast->initialized && !cast->pwr_stream_state) {
+		cast->frame_state = XDPW_FRAME_STATE_NONE;
+		return;
 	}
 
 	cast->frame_state = XDPW_FRAME_STATE_STARTED;
@@ -117,8 +109,8 @@ static void wlr_frame_buffer_done(void *data,
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
-	if (!cast->current_frame.current_pw_buffer) {
-		logprint(WARN, "wlroots: no current buffer");
+
+	if (!cast->initialized) {
 		xdpw_wlr_frame_finish(cast);
 		return;
 	}
@@ -130,6 +122,16 @@ static void wlr_frame_buffer_done(void *data,
 			cast->pwr_format.size.height != cast->screencopy_frame_info.height) {
 		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
 		cast->frame_state = XDPW_FRAME_STATE_RENEG;
+		xdpw_wlr_frame_finish(cast);
+		return;
+	}
+
+	if (!cast->current_frame.xdpw_buffer) {
+		xdpw_pwr_dequeue_buffer(cast);
+	}
+
+	if (!cast->current_frame.xdpw_buffer) {
+		logprint(WARN, "wlroots: no current buffer");
 		xdpw_wlr_frame_finish(cast);
 		return;
 	}

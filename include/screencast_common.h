@@ -55,7 +55,7 @@ struct xdpw_frame {
 	uint32_t tv_nsec;
 	struct xdpw_frame_damage damage;
 	struct xdpw_buffer *xdpw_buffer;
-	struct pw_buffer *current_pw_buffer;
+	struct pw_buffer *pw_buffer;
 };
 
 struct xdpw_screencopy_frame_info {

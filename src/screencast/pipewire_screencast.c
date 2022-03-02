@@ -60,6 +60,11 @@ static void pwr_handle_stream_state_changed(void *data,
 			xdpw_wlr_frame_start(cast);
 		}
 		break;
+	case PW_STREAM_STATE_PAUSED:
+		if (old == PW_STREAM_STATE_STREAMING) {
+			xdpw_pwr_enqueue_buffer(cast);
+		}
+		// fall through
 	default:
 		cast->pwr_stream_state = false;
 		break;
@@ -83,9 +88,10 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
+
 	params[0] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers,
-		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, 1, 32),
+		SPA_PARAM_BUFFERS_buffers, SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, XDPW_PWR_BUFFERS_MIN, 32),
 		SPA_PARAM_BUFFERS_blocks,  SPA_POD_Int(1),
 		SPA_PARAM_BUFFERS_size,    SPA_POD_Int(cast->screencopy_frame_info.size),
 		SPA_PARAM_BUFFERS_stride,  SPA_POD_Int(cast->screencopy_frame_info.stride),
@@ -143,15 +149,12 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 
 	logprint(TRACE, "pipewire: remove buffer event handle");
 
-	if (cast->current_frame.current_pw_buffer == buffer) {
-		logprint(TRACE, "pipewire: remove buffer currently in use");
-		cast->current_frame.current_pw_buffer = NULL;
-		cast->current_frame.xdpw_buffer = NULL;
-	}
 	struct xdpw_buffer *xdpw_buffer = buffer->user_data;
 	if (xdpw_buffer) {
 		xdpw_buffer_destroy(xdpw_buffer);
-		buffer->user_data = NULL;
+	}
+	if (cast->current_frame.pw_buffer == buffer) {
+		cast->current_frame.pw_buffer = NULL;
 	}
 	buffer->buffer->datas[0].fd = -1;
 	buffer->user_data = NULL;
@@ -168,26 +171,27 @@ static const struct pw_stream_events pwr_stream_events = {
 void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: dequeueing buffer");
 
-	assert(cast->current_frame.current_pw_buffer == NULL);
-	if ((cast->current_frame.current_pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
+	assert(!cast->current_frame.pw_buffer);
+	if ((cast->current_frame.pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
 		logprint(WARN, "pipewire: out of buffers");
-		cast->current_frame.xdpw_buffer = NULL;
 		return;
 	}
 
-	cast->current_frame.xdpw_buffer = cast->current_frame.current_pw_buffer->user_data;
+	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: exporting buffer");
+	logprint(TRACE, "pipewire: enqueueing buffer");
 
-	struct pw_buffer *pw_buf = cast->current_frame.current_pw_buffer;
-	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
-
-	assert(pw_buf);
-
+	if (!cast->current_frame.pw_buffer) {
+		logprint(WARN, "pipewire: no buffer to queue");
+		goto done;
+	}
+	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
+
+	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
 
 	if (cast->current_frame.y_invert) {
 		//TODO: Flip buffer or set stride negative
@@ -220,8 +224,23 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 
 	pw_stream_queue_buffer(cast->stream, pw_buf);
 
-	cast->current_frame.current_pw_buffer = NULL;
+done:
 	cast->current_frame.xdpw_buffer = NULL;
+	cast->current_frame.pw_buffer = NULL;
+}
+
+void xdpw_pwr_swap_buffer(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: swapping buffers");
+
+	if (!cast->current_frame.pw_buffer) {
+		goto dequeue_buffer;
+	}
+
+	xdpw_pwr_enqueue_buffer(cast);
+
+dequeue_buffer:
+	assert(!cast->current_frame.pw_buffer);
+	xdpw_pwr_dequeue_buffer(cast);
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
