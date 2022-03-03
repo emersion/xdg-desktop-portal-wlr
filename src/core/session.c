@@ -68,7 +68,13 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 		logprint(DEBUG, "xdpw: screencast instance %p now has %d references",
 			cast, cast->refcount);
 		if (cast->refcount < 1) {
-			cast->quit = true;
+			if (cast->frame_state == XDPW_FRAME_STATE_NONE) {
+				logprint(TRACE, "xdpw: screencast instance not streaming, destroy it");
+				xdpw_screencast_instance_destroy(cast);
+			} else {
+				logprint(TRACE, "xdpw: screencast instance still streaming, set quit flag");
+				cast->quit = true;
+			}
 		}
 	}
 
