@@ -233,6 +233,12 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	d[0].flags = 0;
 	d[0].fd = xdpw_buffer->fd;
 	d[0].data = NULL;
+
+	// clients have implemented to check chunk->size if the buffer is valid instead
+	// of using the flags. Until they are patched we should use some arbitrary value.
+	if (xdpw_buffer->buffer_type == DMABUF && d[0].chunk->size == 0) {
+		d[0].chunk->size = 9; // This was choosen by a fair d20.
+	}
 }
 
 static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer) {
