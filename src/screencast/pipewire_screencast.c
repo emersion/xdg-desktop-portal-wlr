@@ -88,11 +88,25 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 }
 
 static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_instance *cast,
-		const struct spa_pod *params[static 1]) {
-	uint32_t param_count = 1;
-	params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
-			cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
-			NULL, 0);
+		const struct spa_pod *params[static 2]) {
+	uint32_t param_count;
+	uint32_t modifier_count = 1;
+	uint64_t modifier = DRM_FORMAT_MOD_INVALID;
+
+	if (cast->ctx->gbm) {
+		param_count = 2;
+		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
+				cast->screencopy_frame_info[DMABUF].width, cast->screencopy_frame_info[DMABUF].height, cast->framerate,
+				&modifier, modifier_count);
+		params[1] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
+				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
+				NULL, 0);
+	} else {
+		param_count = 1;
+		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
+				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
+				NULL, 0);
+	}
 
 	return param_count;
 }
@@ -156,7 +170,12 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
 	if (spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier) != NULL) {
-		abort();
+		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
+			abort();
+		}
+		cast->buffer_type = DMABUF;
+		blocks = 1;
+		data_type = 1<<SPA_DATA_DmaBuf;
 	} else {
 		cast->buffer_type = WL_SHM;
 		blocks = 1;
@@ -326,7 +345,7 @@ void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	uint8_t params_buffer[1024];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
-	const struct spa_pod *params[1];
+	const struct spa_pod *params[2];
 
 	uint32_t n_params = build_formats(&b, cast, params);
 
@@ -341,7 +360,7 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 
 	uint8_t buffer[1024];
 	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
-	const struct spa_pod *params[1];
+	const struct spa_pod *params[2];
 
 	char name[] = "xdpw-stream-XXXXXX";
 	randname(name + strlen(name) - 6);
