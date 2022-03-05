@@ -1,3 +1,4 @@
+#include "xdpw.h"
 #include "screencast_common.h"
 #include <assert.h>
 #include <fcntl.h>
@@ -135,10 +136,14 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			return NULL;
 		}
 		break;
-	case DMABUF:
-		buffer->bo = gbm_bo_create(cast->ctx->gbm,
-				frame_info->width, frame_info->height, frame_info->format,
-				GBM_BO_USE_RENDERING);
+	case DMABUF:;
+		uint32_t flags = GBM_BO_USE_RENDERING;
+		if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
+			flags |= GBM_BO_USE_LINEAR;
+		}
+
+		buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
+				frame_info->format, flags);
 		if (buffer->bo == NULL) {
 			logprint(ERROR, "xdpw: failed to create gbm_bo");
 			free(buffer);
