@@ -11,6 +11,7 @@ struct config_screencast {
 	char *exec_after;
 	char *chooser_cmd;
 	enum xdpw_chooser_types chooser_type;
+	bool force_mod_linear;
 };
 
 struct xdpw_config {
