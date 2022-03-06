@@ -241,6 +241,9 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 					flags = cast->ctx->state->config->screencast_conf.force_mod_linear ?
 						GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR : GBM_BO_USE_RENDERING;
 					break;
+				case DRM_FORMAT_MOD_LINEAR:
+					flags = GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR;
+					break;
 				default:
 					continue;
 				}
