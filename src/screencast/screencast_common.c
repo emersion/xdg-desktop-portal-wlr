@@ -153,6 +153,12 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 				frame_info->format, flags);
 		}
 
+		// Fallback for linear buffers via the implicit api
+		if (buffer->bo == NULL && cast->pwr_format.modifier == DRM_FORMAT_MOD_LINEAR) {
+			buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
+					frame_info->format, flags | GBM_BO_USE_LINEAR);
+		}
+
 		if (buffer->bo == NULL) {
 			logprint(ERROR, "xdpw: failed to create gbm_bo");
 			free(buffer);
