@@ -34,6 +34,12 @@ if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
 	epoll = dependency('epoll-shim')
 endif
 
+if pipewire.version() == '0.3.49'
+        add_project_arguments(cc.get_supported_arguments([
+                '-D_GNU_SOURCE',
+        ]), language: 'c')
+endif
+
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
 	sdbus = dependency('libsystemd',
