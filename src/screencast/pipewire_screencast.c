@@ -220,19 +220,21 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	wl_list_insert(&cast->buffer_list, &xdpw_buffer->link);
 	buffer->user_data = xdpw_buffer;
 
-	d[0].maxsize = xdpw_buffer->size;
-	d[0].mapoffset = 0;
-	d[0].chunk->size = xdpw_buffer->size;
-	d[0].chunk->stride = xdpw_buffer->stride;
-	d[0].chunk->offset = xdpw_buffer->offset;
-	d[0].flags = 0;
-	d[0].fd = xdpw_buffer->fd;
-	d[0].data = NULL;
-
-	// clients have implemented to check chunk->size if the buffer is valid instead
-	// of using the flags. Until they are patched we should use some arbitrary value.
-	if (xdpw_buffer->buffer_type == DMABUF && d[0].chunk->size == 0) {
-		d[0].chunk->size = 9; // This was choosen by a fair d20.
+	assert(xdpw_buffer->plane_count >= 0 && buffer->buffer->n_datas == (uint32_t)xdpw_buffer->plane_count);
+	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
+		d[plane].maxsize = xdpw_buffer->size[plane];
+		d[plane].mapoffset = 0;
+		d[plane].chunk->size = xdpw_buffer->size[plane];
+		d[plane].chunk->stride = xdpw_buffer->stride[plane];
+		d[plane].chunk->offset = xdpw_buffer->offset[plane];
+		d[plane].flags = 0;
+		d[plane].fd = xdpw_buffer->fd[plane];
+		d[plane].data = NULL;
+		// clients have implemented to check chunk->size if the buffer is valid instead
+		// of using the flags. Until they are patched we should use some arbitrary value.
+		if (xdpw_buffer->buffer_type == DMABUF && d[plane].chunk->size == 0) {
+			d[plane].chunk->size = 9; // This was choosen by a fair d20.
+		}
 	}
 }
 
@@ -248,7 +250,9 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	if (cast->current_frame.pw_buffer == buffer) {
 		cast->current_frame.pw_buffer = NULL;
 	}
-	buffer->buffer->datas[0].fd = -1;
+	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
+		buffer->buffer->datas[plane].fd = -1;
+	}
 	buffer->user_data = NULL;
 }
 
@@ -300,18 +304,25 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	}
 
 	if (buffer_corrupt) {
-		d[0].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
+		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+			d[plane].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
+		}
 	} else {
-		d[0].chunk->flags = SPA_CHUNK_FLAG_NONE;
+		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+			d[plane].chunk->flags = SPA_CHUNK_FLAG_NONE;
+		}
 	}
 
 	logprint(TRACE, "********************");
-	logprint(TRACE, "pipewire: fd %u", d[0].fd);
-	logprint(TRACE, "pipewire: maxsize %d", d[0].maxsize);
-	logprint(TRACE, "pipewire: size %d", d[0].chunk->size);
-	logprint(TRACE, "pipewire: stride %d", d[0].chunk->stride);
-	logprint(TRACE, "pipewire: offset %d", d[0].chunk->offset);
-	logprint(TRACE, "pipewire: chunk flags %d", d[0].chunk->flags);
+	for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+		logprint(TRACE, "pipewire: plane %d", plane);
+		logprint(TRACE, "pipewire: fd %u", d[plane].fd);
+		logprint(TRACE, "pipewire: maxsize %d", d[plane].maxsize);
+		logprint(TRACE, "pipewire: size %d", d[plane].chunk->size);
+		logprint(TRACE, "pipewire: stride %d", d[plane].chunk->stride);
+		logprint(TRACE, "pipewire: offset %d", d[plane].chunk->offset);
+		logprint(TRACE, "pipewire: chunk flags %d", d[plane].chunk->flags);
+	}
 	logprint(TRACE, "pipewire: width %d", cast->current_frame.xdpw_buffer->width);
 	logprint(TRACE, "pipewire: height %d", cast->current_frame.xdpw_buffer->height);
 	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);

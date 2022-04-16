@@ -151,8 +151,8 @@ static void wlr_frame_buffer_done(void *data,
 
 	// Check if dequeued buffer is compatible with announced buffer
 	if (( cast->buffer_type == WL_SHM &&
-				(cast->current_frame.xdpw_buffer->size != cast->screencopy_frame_info[cast->buffer_type].size ||
-				cast->current_frame.xdpw_buffer->stride != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
+				(cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
+				cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
 			cast->current_frame.xdpw_buffer->width != cast->screencopy_frame_info[cast->buffer_type].width ||
 			cast->current_frame.xdpw_buffer->height != cast->screencopy_frame_info[cast->buffer_type].height) {
 		logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");

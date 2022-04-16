@@ -110,28 +110,29 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 
 	switch (buffer_type) {
 	case WL_SHM:
-		buffer->size = frame_info->size;
-		buffer->stride = frame_info->stride;
-		buffer->offset = 0;
-		buffer->fd = anonymous_shm_open();
-		if (buffer->fd == -1) {
+		buffer->plane_count = 1;
+		buffer->size[0] = frame_info->size;
+		buffer->stride[0] = frame_info->stride;
+		buffer->offset[0] = 0;
+		buffer->fd[0] = anonymous_shm_open();
+		if (buffer->fd[0] == -1) {
 			logprint(ERROR, "xdpw: unable to create anonymous filedescriptor");
 			free(buffer);
 			return NULL;
 		}
 
-		if (ftruncate(buffer->fd, buffer->size) < 0) {
+		if (ftruncate(buffer->fd[0], buffer->size[0]) < 0) {
 			logprint(ERROR, "xdpw: unable to truncate filedescriptor");
-			close(buffer->fd);
+			close(buffer->fd[0]);
 			free(buffer);
 			return NULL;
 		}
 
-		buffer->buffer = import_wl_shm_buffer(cast, buffer->fd, xdpw_format_wl_shm_from_drm_fourcc(frame_info->format),
-				frame_info->width, frame_info->height, frame_info->stride);
+		buffer->buffer = import_wl_shm_buffer(cast, buffer->fd[0], xdpw_format_wl_shm_from_drm_fourcc(frame_info->format),
+			frame_info->width, frame_info->height, frame_info->stride);
 		if (buffer->buffer == NULL) {
 			logprint(ERROR, "xdpw: unable to create wl_buffer");
-			close(buffer->fd);
+			close(buffer->fd[0]);
 			free(buffer);
 			return NULL;
 		}
@@ -149,6 +150,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			free(buffer);
 			return NULL;
 		}
+		buffer->plane_count = gbm_bo_get_plane_count(buffer->bo);
 
 		struct zwp_linux_buffer_params_v1 *params;
 		params = zwp_linux_dmabuf_v1_create_params(cast->ctx->linux_dmabuf);
@@ -159,22 +161,27 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			return NULL;
 		}
 
-		buffer->size = 0;
-		buffer->stride = gbm_bo_get_stride(buffer->bo);
-		buffer->offset = gbm_bo_get_offset(buffer->bo, 0);
-		uint64_t mod = gbm_bo_get_modifier(buffer->bo);
-		buffer->fd = gbm_bo_get_fd(buffer->bo);
+		for (int plane = 0; plane < buffer->plane_count; plane++) {
+			buffer->size[plane] = 0;
+			buffer->stride[plane] = gbm_bo_get_stride_for_plane(buffer->bo, plane);
+			buffer->offset[plane] = gbm_bo_get_offset(buffer->bo, plane);
+			uint64_t mod = gbm_bo_get_modifier(buffer->bo);
+			buffer->fd[plane] = gbm_bo_get_fd_for_plane(buffer->bo, plane);
 
-		if (buffer->fd < 0) {
-			logprint(ERROR, "xdpw: failed to get file descriptor");
-			zwp_linux_buffer_params_v1_destroy(params);
-			gbm_bo_destroy(buffer->bo);
-			free(buffer);
-			return NULL;
+			if (buffer->fd[plane] < 0) {
+				logprint(ERROR, "xdpw: failed to get file descriptor");
+				zwp_linux_buffer_params_v1_destroy(params);
+				gbm_bo_destroy(buffer->bo);
+				for (int plane_tmp = 0; plane_tmp < plane; plane_tmp++) {
+					close(buffer->fd[plane_tmp]);
+				}
+				free(buffer);
+				return NULL;
+			}
+
+			zwp_linux_buffer_params_v1_add(params, buffer->fd[plane], plane,
+				buffer->offset[plane], buffer->stride[plane], mod >> 32, mod & 0xffffffff);
 		}
-
-		zwp_linux_buffer_params_v1_add(params, buffer->fd, 0, buffer->offset, buffer->stride,
-			mod >> 32, mod & 0xffffffff);
 		buffer->buffer = zwp_linux_buffer_params_v1_create_immed(params,
 			buffer->width, buffer->height,
 			buffer->format, /* flags */ 0);
@@ -183,7 +190,9 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		if (!buffer->buffer) {
 			logprint(ERROR, "xdpw: failed to create buffer");
 			gbm_bo_destroy(buffer->bo);
-			close(buffer->fd);
+			for (int plane = 0; plane < buffer->plane_count; plane++) {
+				close(buffer->fd[plane]);
+			}
 			free(buffer);
 			return NULL;
 		}
@@ -197,7 +206,9 @@ void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	if (buffer->buffer_type == DMABUF) {
 		gbm_bo_destroy(buffer->bo);
 	}
-	close(buffer->fd);
+	for (int plane = 0; plane < buffer->plane_count; plane++) {
+		close(buffer->fd[plane]);
+	}
 	wl_list_remove(&buffer->link);
 	free(buffer);
 }
