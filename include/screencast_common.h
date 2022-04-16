@@ -79,11 +79,12 @@ struct xdpw_buffer {
 	uint32_t width;
 	uint32_t height;
 	uint32_t format;
+	int plane_count;
 
-	int fd;
-	uint32_t size;
-	uint32_t stride;
-	uint32_t offset;
+	int fd[4];
+	uint32_t size[4];
+	uint32_t stride[4];
+	uint32_t offset[4];
 
 	struct gbm_bo *bo;
 
