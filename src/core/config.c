@@ -185,7 +185,7 @@ void init_config(char ** const configfile, struct xdpw_config *config) {
 
 	default_config(config);
 	if (*configfile == NULL) {
-		logprint(ERROR, "config: no config file found");
+		logprint(INFO, "config: no config file found, using the default config");
 		return;
 	}
 	if (ini_parse(*configfile, handle_ini_config, config) < 0) {
