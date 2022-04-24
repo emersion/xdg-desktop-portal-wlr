@@ -126,6 +126,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_frame current_frame;
 	enum xdpw_frame_state frame_state;
 	struct wl_list buffer_list;
+	bool avoid_dmabufs;
 
 	// pipewire
 	struct pw_stream *stream;
