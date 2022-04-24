@@ -94,11 +94,7 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 				SPA_POD_CHOICE_ENUM_Id(3, format, format, format_without_alpha), 0);
 	}
 	/* modifiers */
-	if (modifier_count == 1 && modifiers[0] == DRM_FORMAT_MOD_INVALID) {
-		// we only support implicit modifiers, use shortpath to skip fixation phase
-		spa_pod_builder_prop(b, SPA_FORMAT_VIDEO_modifier, SPA_POD_PROP_FLAG_MANDATORY);
-		spa_pod_builder_long(b, modifiers[0]);
-	} else if (modifier_count > 0) {
+	if (modifier_count > 0) {
 		// build an enumeration of modifiers
 		spa_pod_builder_prop(b, SPA_FORMAT_VIDEO_modifier, SPA_POD_PROP_FLAG_MANDATORY | SPA_POD_PROP_FLAG_DONT_FIXATE);
 		spa_pod_builder_push_choice(b, &f[1], SPA_CHOICE_Enum, 0);
@@ -131,7 +127,7 @@ static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_
 	uint32_t modifier_count = 1;
 	uint64_t modifier = DRM_FORMAT_MOD_INVALID;
 
-	if (cast->ctx->gbm) {
+	if (cast->ctx->gbm && !cast->avoid_dmabufs) {
 		param_count = 2;
 		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
 				cast->screencopy_frame_info[DMABUF].width, cast->screencopy_frame_info[DMABUF].height, cast->framerate,
@@ -208,6 +204,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			modifiers++;
 			uint32_t flags = GBM_BO_USE_RENDERING;
 			uint64_t modifier;
+			uint32_t n_params;
 
 			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
 				cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
@@ -239,14 +236,18 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 				}
 			}
 
-			logprint(ERROR, "pipewire: unable to allocate a dmabuf");
-			abort();
+			logprint(WARN, "pipewire: unable to allocate a dmabuf. Falling back to shm");
+			cast->avoid_dmabufs = true;
+
+			n_params = build_formats(&b, cast, &params[0]);
+			pw_stream_update_params(stream, params, n_params);
+			return;
 
 fixate_format:
 			params[0] = fixate_format(&b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format),
 					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height, cast->framerate, &modifier);
 
-			uint32_t n_params = build_formats(&b, cast, &params[1]);
+			n_params = build_formats(&b, cast, &params[1]);
 			n_params++;
 
 			pw_stream_update_params(stream, params, n_params);
