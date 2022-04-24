@@ -50,6 +50,10 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 		pwr_update_stream_param(cast);
 	}
 
+	if (cast->frame_state == XDPW_FRAME_STATE_FAILED) {
+		xdpw_pwr_enqueue_buffer(cast);
+	}
+
 	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
 		xdpw_pwr_enqueue_buffer(cast);
 		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
