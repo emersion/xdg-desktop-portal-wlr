@@ -1,3 +1,5 @@
+wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
+
 wayland_scanner_dep = dependency('wayland-scanner', required: false, native: true)
 if wayland_scanner_dep.found()
 	wayland_scanner = find_program(
@@ -9,9 +11,9 @@ else
 endif
 
 client_protocols = [
-	'linux-dmabuf-unstable-v1.xml',
+	wl_protocol_dir / 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
+	wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
-	'xdg-output-unstable-v1.xml',
 ]
 
 wl_proto_files = []
