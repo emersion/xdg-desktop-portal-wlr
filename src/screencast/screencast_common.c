@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <libdrm/drm_fourcc.h>
-#include <xf86drm.h>
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 #include "logger.h"
@@ -23,13 +22,16 @@ void randname(char *buf) {
 	}
 }
 
-static char *gbm_find_render_node() {
+static char *gbm_find_render_node(drmDevice *device) {
 	drmDevice *devices[64];
 	char *render_node = NULL;
 
 	int n = drmGetDevices2(0, devices, sizeof(devices) / sizeof(devices[0]));
 	for (int i = 0; i < n; ++i) {
 		drmDevice *dev = devices[i];
+		if (device && !drmDevicesEqual(device, dev)) {
+				continue;
+		}
 		if (!(dev->available_nodes & (1 << DRM_NODE_RENDER)))
 			continue;
 
@@ -41,11 +43,11 @@ static char *gbm_find_render_node() {
 	return render_node;
 }
 
-struct gbm_device *xdpw_gbm_device_create(void) {
+struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
 	struct gbm_device *gbm;
 	char *render_node = NULL;
 
-	render_node = gbm_find_render_node();
+	render_node = gbm_find_render_node(device);
 	if (render_node == NULL) {
 		logprint(ERROR, "xdpw: Could not find render node");
 		return NULL;

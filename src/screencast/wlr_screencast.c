@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include <wayland-client-protocol.h>
+#include <xf86drm.h>
 
 #include "screencast.h"
 #include "pipewire_screencast.h"
@@ -545,6 +546,26 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out);
 }
 
+static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx,
+		uint32_t format, uint64_t modifier) {
+	struct xdpw_format_modifier_pair *fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
+
+	fm_pair->fourcc = format;
+	fm_pair->modifier = modifier;
+
+	logprint(TRACE, "wlroots: format %u (%lu)", fm_pair->fourcc, fm_pair->modifier);
+
+	wl_list_insert(&ctx->format_modifier_pairs, &fm_pair->link);
+}
+
+static void wlr_format_modifier_pair_emtpy_list(struct xdpw_screencast_context *ctx) {
+	struct xdpw_format_modifier_pair *fm_pair, *tmp;
+	wl_list_for_each_safe(fm_pair, tmp, &ctx->format_modifier_pairs, link) {
+		wl_list_remove(&fm_pair->link);
+		free(fm_pair);
+	}
+}
+
 static void linux_dmabuf_handle_modifier(void *data,
 		struct zwp_linux_dmabuf_v1 *zwp_linux_dmabuf_v1,
 		uint32_t format, uint32_t modifier_hi, uint32_t modifier_lo) {
@@ -552,19 +573,141 @@ static void linux_dmabuf_handle_modifier(void *data,
 
 	logprint(TRACE, "wlroots: linux_dmabuf_handle_modifier called");
 
-	struct xdpw_format_modifier_pair *fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
-
-	fm_pair->fourcc = format;
-	fm_pair->modifier = ((((uint64_t)modifier_hi) << 32) | modifier_lo);
-
-	logprint(TRACE, "wlroots: format %u (%u)", fm_pair->fourcc, fm_pair->modifier);
-
-	wl_list_insert(&ctx->format_modifier_pairs, &fm_pair->link);
+	uint64_t modifier = (((uint64_t)modifier_hi) << 32) | modifier_lo;
+	wlr_format_modifier_pair_add(ctx, format, modifier);
 }
 
 static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_listener = {
 	.format = noop,
 	.modifier = linux_dmabuf_handle_modifier,
+};
+
+static void linux_dmabuf_feedback_handle_main_device(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *device_arr) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_handle_main_device called");
+
+	assert(ctx->gbm == NULL);
+
+	dev_t device;
+	assert(device_arr->size == sizeof(device));
+	memcpy(&device, device_arr->data, sizeof(device));
+
+	drmDevice *drmDev;
+	if (drmGetDeviceFromDevId(device, /* flags */ 0, &drmDev) != 0) {
+		logprint(WARN, "wlroots: unable to open main device");
+		ctx->state->config->screencast_conf.force_mod_linear = true;
+		return;
+	}
+	ctx->gbm = xdpw_gbm_device_create(drmDev);
+}
+
+static void linux_dmabuf_feedback_format_table(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, int fd, uint32_t size) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_format_table called");
+
+	wlr_format_modifier_pair_emtpy_list(ctx);
+
+	ctx->feedback_data.format_table_data = mmap(NULL , size, PROT_READ, MAP_PRIVATE, fd, 0);
+	if (ctx->feedback_data.format_table_data == MAP_FAILED) {
+		ctx->feedback_data.format_table_data = NULL;
+		ctx->feedback_data.format_table_size = 0;
+		return;
+	}
+	ctx->feedback_data.format_table_size = size;
+}
+
+static void linux_dmabuf_feedback_handle_done(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_handle_done called");
+
+	if (ctx->feedback_data.format_table_data) {
+		munmap(ctx->feedback_data.format_table_data, ctx->feedback_data.format_table_size);
+	}
+	ctx->feedback_data.format_table_data = NULL;
+	ctx->feedback_data.format_table_size = 0;
+}
+
+static void linux_dmabuf_feedback_tranche_target_devices(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *device_arr) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_target_devices called");
+
+	dev_t device;
+	assert(device_arr->size == sizeof(device));
+	memcpy(&device, device_arr->data, sizeof(device));
+
+	drmDevice *drmDev;
+	if (drmGetDeviceFromDevId(device, /* flags */ 0, &drmDev) != 0) {
+		return;
+	}
+
+	if (ctx->gbm) {
+		drmDevice *drmDevRenderer = NULL;
+		drmGetDevice2(gbm_device_get_fd(ctx->gbm), /* flags */ 0, &drmDevRenderer);
+		ctx->feedback_data.device_used = drmDevicesEqual(drmDevRenderer, drmDev);
+	} else {
+		ctx->gbm = xdpw_gbm_device_create(drmDev);
+		ctx->feedback_data.device_used = ctx->gbm != NULL;
+	}
+}
+
+static void linux_dmabuf_feedback_tranche_flags(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, uint32_t flags) {
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_flags called");
+}
+
+static void linux_dmabuf_feedback_tranche_formats(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *indices) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_format_table called");
+
+	if (!ctx->feedback_data.device_used || !ctx->feedback_data.format_table_data) {
+		return;
+	}
+	struct fm_entry {
+		uint32_t format;
+		uint32_t padding;
+		uint64_t modifier;
+	};
+	// An entry in the table has to be 16 bytes long
+	assert(sizeof(struct fm_entry) == 16);
+
+	uint32_t n_modifiers = ctx->feedback_data.format_table_size/sizeof(struct fm_entry);
+	struct fm_entry *fm_entry = ctx->feedback_data.format_table_data;
+	uint16_t *idx;
+	wl_array_for_each(idx, indices) {
+		if (*idx >= n_modifiers) {
+			continue;
+		}
+		wlr_format_modifier_pair_add(ctx, (fm_entry + *idx)->format, (fm_entry + *idx)->modifier);
+	}
+}
+
+static void linux_dmabuf_feedback_tranche_done(void *data,
+		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_done called");
+
+	ctx->feedback_data.device_used = false;
+}
+
+static const struct zwp_linux_dmabuf_feedback_v1_listener linux_dmabuf_listener_feedback = {
+	.main_device = linux_dmabuf_feedback_handle_main_device,
+	.format_table = linux_dmabuf_feedback_format_table,
+	.done = linux_dmabuf_feedback_handle_done,
+	.tranche_target_device = linux_dmabuf_feedback_tranche_target_devices,
+	.tranche_flags = linux_dmabuf_feedback_tranche_flags,
+	.tranche_formats = linux_dmabuf_feedback_tranche_formats,
+	.tranche_done = linux_dmabuf_feedback_tranche_done,
 };
 
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
@@ -609,10 +752,22 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 			wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
 	}
 	if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
-		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, LINUX_DMABUF_VERSION);
-		ctx->linux_dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, LINUX_DMABUF_VERSION);
+		uint32_t version = ver;
+		if (LINUX_DMABUF_VERSION < ver) {
+			version = LINUX_DMABUF_VERSION;
+		} else if (LINUX_DMABUF_VERSION_MIN > ver) {
+			logprint(INFO, "wlroots: interface %s (Version %u) is required for DMA-BUF screencast", interface, LINUX_DMABUF_VERSION_MIN);
+			return;
+		}
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
+		ctx->linux_dmabuf = wl_registry_bind(reg, id, &zwp_linux_dmabuf_v1_interface, version);
 
-		zwp_linux_dmabuf_v1_add_listener(ctx->linux_dmabuf, &linux_dmabuf_listener, ctx);
+		if (version >= 4) {
+			ctx->linux_dmabuf_feedback = zwp_linux_dmabuf_v1_get_default_feedback(ctx->linux_dmabuf);
+			zwp_linux_dmabuf_feedback_v1_add_listener(ctx->linux_dmabuf_feedback, &linux_dmabuf_listener_feedback, ctx);
+		} else {
+			zwp_linux_dmabuf_v1_add_listener(ctx->linux_dmabuf, &linux_dmabuf_listener, ctx);
+		}
 	}
 }
 
@@ -677,20 +832,18 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	}
 
 	// make sure we have a gbm device
-	ctx->gbm = xdpw_gbm_device_create();
-	if (!ctx->gbm) {
-		logprint(ERROR, "System doesn't support gbm!");
+	if (ctx->linux_dmabuf && !ctx->gbm) {
+		ctx->gbm = xdpw_gbm_device_create(NULL);
+		if (!ctx->gbm) {
+			logprint(ERROR, "System doesn't support gbm!");
+		}
 	}
 
 	return 0;
 }
 
 void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
-	struct xdpw_format_modifier_pair *fm_pair, *tmp_fmp;
-	wl_list_for_each_safe(fm_pair, tmp_fmp, &ctx->format_modifier_pairs, link) {
-		wl_list_remove(&fm_pair->link);
-		free(fm_pair);
-	}
+	wlr_format_modifier_pair_emtpy_list(ctx);
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
@@ -717,6 +870,9 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 		int fd = gbm_device_get_fd(ctx->gbm);
 		gbm_device_destroy(ctx->gbm);
 		close(fd);
+	}
+	if (ctx->linux_dmabuf_feedback) {
+		zwp_linux_dmabuf_feedback_v1_destroy(ctx->linux_dmabuf_feedback);
 	}
 	if (ctx->linux_dmabuf) {
 		zwp_linux_dmabuf_v1_destroy(ctx->linux_dmabuf);

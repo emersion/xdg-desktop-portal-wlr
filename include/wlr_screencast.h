@@ -12,7 +12,8 @@
 
 #define XDG_OUTPUT_MANAGER_VERSION 3
 
-#define LINUX_DMABUF_VERSION 3
+#define LINUX_DMABUF_VERSION 4
+#define LINUX_DMABUF_VERSION_MIN 3
 
 struct xdpw_state;
 
