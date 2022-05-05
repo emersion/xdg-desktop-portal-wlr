@@ -5,6 +5,7 @@
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
+#include <xf86drm.h>
 
 #include "fps_limit.h"
 
@@ -97,6 +98,12 @@ struct xdpw_format_modifier_pair {
 	uint64_t modifier;
 };
 
+struct xdpw_dmabuf_feedback_data {
+	void *format_table_data;
+	uint32_t format_table_size;
+	bool device_used;
+};
+
 struct xdpw_screencast_context {
 
 	// xdpw
@@ -113,6 +120,8 @@ struct xdpw_screencast_context {
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
+	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
+	struct xdpw_dmabuf_feedback_data feedback_data;
 	struct wl_list format_modifier_pairs;
 
 	// gbm
@@ -173,7 +182,7 @@ struct xdpw_wlr_output {
 };
 
 void randname(char *buf);
-struct gbm_device *xdpw_gbm_device_create(void);
+struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
