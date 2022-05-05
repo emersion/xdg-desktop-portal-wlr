@@ -3,7 +3,7 @@ project(
 	'c',
 	version: '0.5.0',
 	license: 'MIT',
-	meson_version: '>=0.50.0',
+	meson_version: '>=0.58.0',
 	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
 )
 
@@ -25,7 +25,7 @@ inc = include_directories('include')
 rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.41')
 wayland_client = dependency('wayland-client')
-wayland_protos = dependency('wayland-protocols', version: '>=1.14')
+wayland_protos = dependency('wayland-protocols', version: '>=1.24')
 iniparser = dependency('inih')
 gbm = dependency('gbm')
 drm = dependency('libdrm')
@@ -112,8 +112,8 @@ systemd = dependency('systemd', required: get_option('systemd'))
 
 if systemd.found()
 	systemd_service_file = 'xdg-desktop-portal-wlr.service'
-	user_unit_dir = systemd.get_pkgconfig_variable('systemduserunitdir',
-		define_variable: ['prefix', get_option('prefix')])
+	user_unit_dir = systemd.get_variable(pkgconfig: 'systemduserunitdir',
+		pkgconfig_define: ['prefix', get_option('prefix')])
 	conf_data.set('systemd_service', 'SystemdService=' + systemd_service_file)
 
 	configure_file(
@@ -149,7 +149,7 @@ if scdoc.found()
 			input: files(src),
 			output: output,
 			command: [
-				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_pkgconfig_variable('scdoc'), output)
+				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_variable(pkgconfig: 'scdoc'), output)
 			],
 			install: true,
 			install_dir: join_paths(get_option('mandir'), 'man' + section),
