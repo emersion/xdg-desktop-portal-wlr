@@ -238,16 +238,15 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			for (uint32_t i = 0; i < n_modifiers; i++) {
 				switch (modifiers[i]) {
 				case DRM_FORMAT_MOD_INVALID:
-					modifiers = NULL;
-					n_modifiers = 0;
-					flags = GBM_BO_USE_RENDERING;
+					flags = cast->ctx->state->config->screencast_conf.force_mod_linear ?
+						GBM_BO_USE_RENDERING | GBM_BO_USE_LINEAR : GBM_BO_USE_RENDERING;
 					break;
 				default:
 					continue;
 				}
-				bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
+				bo = gbm_bo_create(cast->ctx->gbm,
 					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
-					cast->screencopy_frame_info[cast->buffer_type].format, modifiers, n_modifiers, flags);
+					cast->screencopy_frame_info[cast->buffer_type].format, flags);
 				if (bo) {
 					modifier = gbm_bo_get_modifier(bo);
 					gbm_bo_destroy(bo);
