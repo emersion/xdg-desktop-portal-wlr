@@ -548,8 +548,15 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 
 static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx,
 		uint32_t format, uint64_t modifier) {
-	struct xdpw_format_modifier_pair *fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
+	struct xdpw_format_modifier_pair *fm_pair;
+	wl_list_for_each(fm_pair, &ctx->format_modifier_pairs, link) {
+		if (fm_pair->fourcc == format && fm_pair->modifier == modifier) {
+			logprint(TRACE, "wlroots: skipping duplicated format %u (%lu)", fm_pair->fourcc, fm_pair->modifier);
+			return;
+		}
+	}
 
+	fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
 	fm_pair->fourcc = format;
 	fm_pair->modifier = modifier;
 
