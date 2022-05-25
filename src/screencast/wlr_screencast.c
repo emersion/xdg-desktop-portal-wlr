@@ -549,28 +549,17 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx,
 		uint32_t format, uint64_t modifier) {
 	struct xdpw_format_modifier_pair *fm_pair;
-	wl_list_for_each(fm_pair, &ctx->format_modifier_pairs, link) {
+	wl_array_for_each(fm_pair, &ctx->format_modifier_pairs) {
 		if (fm_pair->fourcc == format && fm_pair->modifier == modifier) {
 			logprint(TRACE, "wlroots: skipping duplicated format %u (%lu)", fm_pair->fourcc, fm_pair->modifier);
 			return;
 		}
 	}
 
-	fm_pair = calloc(1, sizeof(struct xdpw_format_modifier_pair));
+	fm_pair = wl_array_add(&ctx->format_modifier_pairs, sizeof(struct xdpw_format_modifier_pair));
 	fm_pair->fourcc = format;
 	fm_pair->modifier = modifier;
-
 	logprint(TRACE, "wlroots: format %u (%lu)", fm_pair->fourcc, fm_pair->modifier);
-
-	wl_list_insert(&ctx->format_modifier_pairs, &fm_pair->link);
-}
-
-static void wlr_format_modifier_pair_emtpy_list(struct xdpw_screencast_context *ctx) {
-	struct xdpw_format_modifier_pair *fm_pair, *tmp;
-	wl_list_for_each_safe(fm_pair, tmp, &ctx->format_modifier_pairs, link) {
-		wl_list_remove(&fm_pair->link);
-		free(fm_pair);
-	}
 }
 
 static void linux_dmabuf_handle_modifier(void *data,
@@ -616,7 +605,8 @@ static void linux_dmabuf_feedback_format_table(void *data,
 
 	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_format_table called");
 
-	wlr_format_modifier_pair_emtpy_list(ctx);
+	wl_array_release(&ctx->format_modifier_pairs);
+	wl_array_init(&ctx->format_modifier_pairs);
 
 	ctx->feedback_data.format_table_data = mmap(NULL , size, PROT_READ, MAP_PRIVATE, fd, 0);
 	if (ctx->feedback_data.format_table_data == MAP_FAILED) {
@@ -802,7 +792,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 	wl_list_init(&ctx->screencast_instances);
 
 	// initialize a list of format modifier pairs
-	wl_list_init(&ctx->format_modifier_pairs);
+	wl_array_init(&ctx->format_modifier_pairs);
 
 	// retrieve registry
 	ctx->registry = wl_display_get_registry(state->wl_display);
@@ -850,7 +840,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 }
 
 void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
-	wlr_format_modifier_pair_emtpy_list(ctx);
+	wl_array_release(&ctx->format_modifier_pairs);
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {

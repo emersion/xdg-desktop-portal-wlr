@@ -93,7 +93,6 @@ struct xdpw_buffer {
 };
 
 struct xdpw_format_modifier_pair {
-	struct wl_list link;
 	uint32_t fourcc;
 	uint64_t modifier;
 };
@@ -122,7 +121,7 @@ struct xdpw_screencast_context {
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
 	struct xdpw_dmabuf_feedback_data feedback_data;
-	struct wl_list format_modifier_pairs;
+	struct wl_array format_modifier_pairs;
 
 	// gbm
 	struct gbm_device *gbm;
