@@ -674,7 +674,7 @@ static void linux_dmabuf_feedback_tranche_formats(void *data,
 		struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *indices) {
 	struct xdpw_screencast_context *ctx = data;
 
-	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_format_table called");
+	logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_formats called");
 
 	if (!ctx->feedback_data.device_used || !ctx->feedback_data.format_table_data) {
 		return;
