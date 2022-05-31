@@ -409,12 +409,14 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		cast->err = 1;
 	}
 
+	logprint(TRACE, "********************");
 	struct spa_meta_header *h;
 	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
-		h->pts = -1;
+		h->pts = SPA_TIMESPEC_TO_NSEC(&cast->current_frame);
 		h->flags = buffer_corrupt ? SPA_META_HEADER_FLAG_CORRUPTED : 0;
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
+		logprint(TRACE, "pipewire: timestamp %"PRId64, h->pts);
 	}
 
 	if (buffer_corrupt) {
@@ -427,7 +429,6 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		}
 	}
 
-	logprint(TRACE, "********************");
 	for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
 		logprint(TRACE, "pipewire: plane %d", plane);
 		logprint(TRACE, "pipewire: fd %u", d[plane].fd);
