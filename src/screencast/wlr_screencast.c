@@ -217,6 +217,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	cast->current_frame.tv_nsec = tv_nsec;
+	logprint(TRACE, "wlroots: timestamp %"PRIu64":%"PRIu32, cast->current_frame.tv_sec, cast->current_frame.tv_nsec);
 
 	cast->frame_state = XDPW_FRAME_STATE_SUCCESS;
 
