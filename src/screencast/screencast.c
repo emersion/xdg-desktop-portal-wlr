@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
+#include <drm_fourcc.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <spa/utils/result.h>
@@ -166,6 +167,13 @@ static int start_screencast(struct xdpw_screencast_instance *cast) {
 	// remote state connected event
 	wl_display_dispatch(cast->ctx->state->wl_display);
 	wl_display_roundtrip(cast->ctx->state->wl_display);
+
+	if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
+			(cast->ctx->state->screencast_version >= 3 &&
+			 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
+		logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
+		return -1;
+	}
 
 	xdpw_pwr_stream_create(cast);
 
@@ -443,7 +451,10 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 
 	if (!cast->initialized) {
-		start_screencast(cast);
+		ret = start_screencast(cast);
+	}
+	if (ret < 0) {
+		return ret;
 	}
 
 	while (cast->node_id == SPA_ID_INVALID) {
