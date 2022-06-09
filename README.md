@@ -1,6 +1,6 @@
 # xdg-desktop-portal-wlr
 
-[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits?)
+[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master?)
 
 [xdg-desktop-portal] backend for wlroots
 
