@@ -60,14 +60,7 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 
 	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
 		xdpw_pwr_enqueue_buffer(cast);
-		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-		if (delay_ns > 0) {
-			xdpw_add_timer(cast->ctx->state, delay_ns,
-				(xdpw_event_loop_timer_func_t) xdpw_wlr_frame_start, cast);
-			return;
-		}
 	}
-	xdpw_wlr_frame_start(cast);
 }
 
 void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
@@ -148,10 +141,6 @@ static void wlr_frame_buffer_done(void *data,
 		cast->frame_state = XDPW_FRAME_STATE_RENEG;
 		xdpw_wlr_frame_finish(cast);
 		return;
-	}
-
-	if (!cast->current_frame.xdpw_buffer) {
-		xdpw_pwr_dequeue_buffer(cast);
 	}
 
 	if (!cast->current_frame.xdpw_buffer) {
