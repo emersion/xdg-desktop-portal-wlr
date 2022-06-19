@@ -285,7 +285,32 @@ static void ext_surface_transform(void *data, struct ext_screencopy_surface_v1 *
 
 static void ext_surface_damage(void *data, struct ext_screencopy_surface_v1 *surface,
 		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	struct xdpw_screencast_instance *cast = data;
+
 	logprint(TRACE, "wlroots: damage event handler");
+	cast->current_frame.damage.x = x;
+	cast->current_frame.damage.y = y;
+	cast->current_frame.damage.width = width;
+	cast->current_frame.damage.height = height;
+
+	struct xdpw_damage damage = {
+		.x = x,
+		.y = y,
+		.width = width,
+		.height = height,
+	};
+	struct xdpw_buffer *buffer;
+	wl_list_for_each(buffer, &cast->buffer_list, link) {
+		xdpw_buffer_apply_damage(buffer, &damage);
+	}
+
+	struct xdpw_damage *current_buffer_damage = &cast->current_frame.xdpw_buffer->damage;
+	current_buffer_damage->x = 0;
+	current_buffer_damage->y = 0;
+	current_buffer_damage->width = 0;
+	current_buffer_damage->height = 0;
+
+	logprint(TRACE, "wlroots: damage %u:%u (%u x %u)", x, y, width, height);
 }
 
 static void ext_surface_cursor_enter(void *data, struct ext_screencopy_surface_v1 *surface,
@@ -369,9 +394,10 @@ void wlr_ext_screencopy_frame_submit(struct xdpw_screencast_instance *cast) {
 		EXT_SCREENCOPY_OPTIONS_ON_DAMAGE = 1,
 	};
 
-	ext_screencopy_surface_v1_attach_buffer(cast->surface_capture, cast->current_frame.xdpw_buffer->buffer);
-	ext_screencopy_surface_v1_damage_buffer(cast->surface_capture, 0, 0,
-		cast->current_frame.xdpw_buffer->width, cast->current_frame.xdpw_buffer->height);
+	const struct xdpw_buffer *current_buffer = cast->current_frame.xdpw_buffer;
+	ext_screencopy_surface_v1_attach_buffer(cast->surface_capture, current_buffer->buffer);
+	ext_screencopy_surface_v1_damage_buffer(cast->surface_capture, current_buffer->damage.x, current_buffer->damage.y,
+		current_buffer->damage.width, current_buffer->damage.height);
 	ext_screencopy_surface_v1_commit(cast->surface_capture, EXT_SCREENCOPY_OPTIONS_ON_DAMAGE);
 	logprint(TRACE, "wlroots: frame commited");
 	fps_limit_measure_start(&cast->fps_limit, cast->framerate);

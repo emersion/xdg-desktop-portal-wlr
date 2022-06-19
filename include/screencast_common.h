@@ -49,7 +49,7 @@ struct xdpw_output_chooser {
 	char *cmd;
 };
 
-struct xdpw_frame_damage {
+struct xdpw_damage {
 	uint32_t x;
 	uint32_t y;
 	uint32_t width;
@@ -60,7 +60,7 @@ struct xdpw_frame {
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
-	struct xdpw_frame_damage damage;
+	struct xdpw_damage damage;
 	struct xdpw_buffer *xdpw_buffer;
 	struct pw_buffer *pw_buffer;
 };
@@ -90,6 +90,7 @@ struct xdpw_buffer {
 	struct gbm_bo *bo;
 
 	struct wl_buffer *buffer;
+	struct xdpw_damage damage;
 };
 
 struct xdpw_format_modifier_pair {
@@ -187,6 +188,7 @@ struct xdpw_wlr_output {
 
 void randname(char *buf);
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
+void xdpw_buffer_apply_damage(struct xdpw_buffer *buffer, struct xdpw_damage *damage);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);

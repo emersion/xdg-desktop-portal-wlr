@@ -102,6 +102,36 @@ static struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *c
 	return buffer;
 }
 
+void xdpw_buffer_apply_damage(struct xdpw_buffer *buffer, struct xdpw_damage *damage) {
+	if (!damage) {
+		buffer->damage.x = 0;
+		buffer->damage.y = 0;
+		buffer->damage.width = buffer->width;
+		buffer->damage.height = buffer->height;
+		return;
+	}
+
+	if (damage->x == 0 && damage->y == 0 && damage->width == 0 && damage->height == 0) {
+		buffer->damage.x = damage->x;
+		buffer->damage.y = damage->y;
+		buffer->damage.width = damage->width;
+		buffer->damage.height = damage->height;
+		return;
+	}
+
+	uint32_t x, y, width, height;
+
+	x = SPA_MIN(buffer->damage.x, damage->x);
+	y = SPA_MIN(buffer->damage.y, damage->y);
+	width = SPA_MAX(buffer->damage.x + buffer->damage.width, damage->x + damage->width) - x;
+	height = SPA_MAX(buffer->damage.y + buffer->damage.height, damage->y + damage->height) - y;
+
+	buffer->damage.x = x;
+	buffer->damage.y = y;
+	buffer->damage.width = width;
+	buffer->damage.height = height;
+}
+
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info) {
 	struct xdpw_buffer *buffer = calloc(1, sizeof(struct xdpw_buffer));
@@ -206,6 +236,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		}
 	}
 
+	xdpw_buffer_apply_damage(buffer, NULL);
 	return buffer;
 }
 
