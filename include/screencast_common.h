@@ -44,6 +44,11 @@ enum xdpw_frame_state {
   XDPW_FRAME_STATE_SUCCESS,
 };
 
+enum ext_screencopy_input_type {
+  EXT_SCREENCOPY_INPUT_TYPE_POINTER = 0,
+  EXT_SCREENCOPY_INPUT_TYPE_TABLET = 1,
+};
+
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
@@ -65,12 +70,33 @@ struct xdpw_frame {
 	struct pw_buffer *pw_buffer;
 };
 
+struct xdpw_cursor {
+	char *seat_name;
+	enum ext_screencopy_input_type input_type;
+	bool present;
+	bool damaged;
+	int32_t width;
+	int32_t height;
+	int32_t position_x;
+	int32_t position_y;
+	int32_t hotspot_x;
+	int32_t hotspot_y;
+	struct xdpw_buffer *xdpw_buffer;
+};
+
 struct xdpw_screencopy_frame_info {
 	uint32_t width;
 	uint32_t height;
 	uint32_t size;
 	uint32_t stride;
 	uint32_t format;
+};
+
+struct xdpw_screencopy_cursor_frame_info {
+	char *seat_name;
+	enum ext_screencopy_input_type input_type;
+
+	struct xdpw_screencopy_frame_info frame_info[2];
 };
 
 struct xdpw_buffer {
@@ -143,6 +169,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_frame current_frame;
 	enum xdpw_frame_state frame_state;
 	struct wl_list buffer_list;
+	struct wl_list cursor_buffer_list;
 	bool avoid_dmabufs;
 
 	// pipewire
@@ -160,7 +187,7 @@ struct xdpw_screencast_instance {
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
-	bool with_cursor;
+	enum cursor_modes cursor_mode;
 	int err;
 	bool quit;
 	bool teardown;
@@ -168,6 +195,8 @@ struct xdpw_screencast_instance {
 
 	// ext_screencopy
 	struct ext_screencopy_surface_v1 *surface_capture;
+	struct wl_array screencopy_cursor_frame_infos;
+	struct xdpw_cursor xdpw_cursor;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
