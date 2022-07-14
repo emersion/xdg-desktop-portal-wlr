@@ -159,6 +159,8 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 	}
 	logprint(INFO, "wlroots: output: %s",
 		sess->screencast_instance->target_output->name);
+	logprint(INFO, "wlroots: cursor_mode: %d",
+		sess->screencast_instance->cursor_mode);
 
 	return true;
 
@@ -330,6 +332,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 			logprint(INFO, "dbus: option types:%x", mask);
 		} else if (strcmp(key, "cursor_mode") == 0) {
 			sd_bus_message_read(msg, "v", "u", &cursor_mode);
+			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
 			if (cursor_mode & METADATA) {
 				cursor_mode = METADATA;
 			} else if (cursor_mode & EMBEDDED) {
@@ -519,6 +522,7 @@ int xdpw_screencast_init(struct xdpw_state *state) {
 		goto fail_screencopy;
 	}
 
+	logprint(INFO, "cursor_modes %x", state->screencast_cursor_modes);
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
 		screencast_vtable, state);
 
