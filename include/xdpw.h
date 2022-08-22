@@ -11,6 +11,7 @@
 #endif
 
 #include "screencast_common.h"
+#include "screenshot_common.h"
 #include "config.h"
 
 struct xdpw_state {
@@ -22,6 +23,7 @@ struct xdpw_state {
 	uint32_t screencast_source_types; // bitfield of enum source_types
 	uint32_t screencast_cursor_modes; // bitfield of enum cursor_modes
 	uint32_t screencast_version;
+	uint32_t screenshot_version;
 	struct xdpw_config *config;
 	int timer_poll_fd;
 	struct wl_list timers;
