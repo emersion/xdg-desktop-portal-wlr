@@ -119,12 +119,18 @@ int main(int argc, char *argv[]) {
 		.screencast_source_types = MONITOR,
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 		.screencast_version = XDP_CAST_PROTO_VER,
+		.screenshot_version = XDP_SHOT_PROTO_VER,
 		.config = &config,
 	};
 
 	wl_list_init(&state.xdpw_sessions);
 
-	xdpw_screenshot_init(&state);
+	ret = xdpw_screenshot_init(&state);
+	if (ret < 0) {
+		logprint(ERROR, "xdpw: failed to initialize screenshot");
+		goto error;
+	}
+
 	ret = xdpw_screencast_init(&state);
 	if (ret < 0) {
 		logprint(ERROR, "xdpw: failed to initialize screencast");

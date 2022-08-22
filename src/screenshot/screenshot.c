@@ -286,6 +286,9 @@ static const sd_bus_vtable screenshot_vtable[] = {
 	SD_BUS_VTABLE_START(0),
 	SD_BUS_METHOD("Screenshot", "ossa{sv}", "ua{sv}", method_screenshot, SD_BUS_VTABLE_UNPRIVILEGED),
 	SD_BUS_METHOD("PickColor", "ossa{sv}", "ua{sv}", method_pick_color, SD_BUS_VTABLE_UNPRIVILEGED),
+	SD_BUS_PROPERTY("version", "u", NULL,
+		offsetof(struct xdpw_state, screenshot_version),
+		SD_BUS_VTABLE_PROPERTY_CONST),
 	SD_BUS_VTABLE_END
 };
 
@@ -293,5 +296,5 @@ int xdpw_screenshot_init(struct xdpw_state *state) {
 	// TODO: cleanup
 	sd_bus_slot *slot = NULL;
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
-		screenshot_vtable, NULL);
+		screenshot_vtable, state);
 }
