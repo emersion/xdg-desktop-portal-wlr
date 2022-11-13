@@ -23,7 +23,7 @@ add_project_arguments('-DSYSCONFDIR="@0@"'.format(join_paths(prefix, sysconfdir)
 inc = include_directories('include')
 
 rt = cc.find_library('rt')
-pipewire = dependency('libpipewire-0.3', version: '>= 0.3.41')
+pipewire = dependency('libpipewire-0.3', version: '>= 0.3.62')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.24')
 iniparser = dependency('inih')
@@ -34,12 +34,6 @@ epoll = dependency('', required: false)
 if (not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>') or
     not cc.has_function('signalfd', prefix: '#include <sys/signalfd.h>'))
 	epoll = dependency('epoll-shim')
-endif
-
-if pipewire.version() == '0.3.49'
-        add_project_arguments(cc.get_supported_arguments([
-                '-D_GNU_SOURCE',
-        ]), language: 'c')
 endif
 
 if get_option('sd-bus-provider') == 'auto'

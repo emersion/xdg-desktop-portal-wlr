@@ -1,6 +1,7 @@
 #include "pipewire_screencast.h"
 
 #include <pipewire/pipewire.h>
+#include <spa/buffer/meta.h>
 #include <spa/utils/result.h>
 #include <spa/param/props.h>
 #include <spa/param/format-utils.h>
@@ -302,7 +303,12 @@ fixate_format:
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	pw_stream_update_params(stream, params, 2);
+	params[2] = spa_pod_builder_add_object(&b,
+		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoTransform),
+		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_videotransform)));
+
+	pw_stream_update_params(stream, params, 3);
 }
 
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
@@ -420,6 +426,12 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		h->seq = cast->seq++;
 		h->dts_offset = 0;
 		logprint(TRACE, "pipewire: timestamp %"PRId64, h->pts);
+	}
+
+	struct spa_meta_videotransform *vt;
+	if ((vt = spa_buffer_find_meta_data(spa_buf, SPA_META_VideoTransform, sizeof(*vt)))) {
+		vt->transform = cast->target_output->transformation;
+		logprint(TRACE, "pipewire: transformation %u", vt->transform);
 	}
 
 	if (buffer_corrupt) {

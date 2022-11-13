@@ -177,6 +177,7 @@ struct xdpw_wlr_output {
 	int width;
 	int height;
 	float framerate;
+	enum wl_output_transform transformation;
 };
 
 void randname(char *buf);
