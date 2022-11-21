@@ -14,6 +14,27 @@
 #include "xdpw.h"
 #include "logger.h"
 
+#define CURSOR_META_SIZE(width, height) \
+	(sizeof(struct spa_meta_cursor) + \
+	sizeof(struct spa_meta_bitmap) + \
+	width * height * 4)
+
+static void writeFrameData(void *pwFramePointer, void *wlrFramePointer,
+		uint32_t height, uint32_t stride, bool inverted) {
+	if (!inverted) {
+		memcpy(pwFramePointer, wlrFramePointer, height * stride);
+		return;
+	}
+
+	for (size_t i = 0; i < (size_t)height; ++i) {
+		void *flippedWlrRowPointer = wlrFramePointer + ((height - i - 1) * stride);
+		void *pwRowPointer = pwFramePointer + (i * stride);
+		memcpy(pwRowPointer, flippedWlrRowPointer, stride);
+	}
+
+	return;
+}
+
 static struct spa_pod *build_buffer(struct spa_pod_builder *b, uint32_t blocks, uint32_t size,
 		uint32_t stride, uint32_t datatype) {
 	assert(blocks > 0);
@@ -164,6 +185,134 @@ static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_
 	return param_count;
 }
 
+void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: dequeueing buffer");
+
+	assert(!cast->current_frame.pw_buffer);
+	if ((cast->current_frame.pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
+		logprint(WARN, "pipewire: out of buffers");
+		return;
+	}
+
+	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
+}
+
+static void pwr_handle_cursor(struct spa_meta_cursor *cursor, struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: handle_cursor");
+	if (!cast->xdpw_cursor.present) {
+		cursor->id = 0;
+		logprint(TRACE, "pipewire: handle_cursor: cursor hidden");
+		return;
+	}
+
+	cursor->id = 1;
+	cursor->hotspot.x = cast->xdpw_cursor.hotspot_x;
+	cursor->hotspot.y = cast->xdpw_cursor.hotspot_y;
+	cursor->position.x = cast->xdpw_cursor.position_x;
+	cursor->position.y = cast->xdpw_cursor.position_y;
+	if (cast->xdpw_cursor.damaged) {
+		cursor->bitmap_offset = sizeof(struct spa_meta_cursor);
+
+		struct spa_meta_bitmap *cursor_bitmap;
+		cursor_bitmap = SPA_MEMBER(cursor, cursor->bitmap_offset, struct spa_meta_bitmap);
+		cursor_bitmap->format = xdpw_format_pw_from_drm_fourcc(cast->xdpw_cursor.xdpw_buffer->format);
+		cursor_bitmap->size.width = cast->xdpw_cursor.xdpw_buffer->width;
+		cursor_bitmap->size.height = cast->xdpw_cursor.xdpw_buffer->height;
+		cursor_bitmap->stride = cast->xdpw_cursor.xdpw_buffer->stride[0];
+		cursor_bitmap->offset = sizeof(struct spa_meta_bitmap);
+		uint32_t *bitmap_data = SPA_MEMBER(cursor_bitmap, cursor_bitmap->offset, uint32_t);
+		void *data = mmap(NULL, cast->xdpw_cursor.xdpw_buffer->size[0], PROT_READ | PROT_WRITE, MAP_SHARED, cast->xdpw_cursor.xdpw_buffer->fd[0], cast->xdpw_cursor.xdpw_buffer->offset[0]);
+		if (data != MAP_FAILED) {
+			writeFrameData(bitmap_data, data, cast->xdpw_cursor.xdpw_buffer->height, cast->xdpw_cursor.xdpw_buffer->stride[0], false);
+			munmap(data, cast->xdpw_cursor.xdpw_buffer->size[0]);
+		} else {
+			logprint(WARN, "pipewire: failed to mmap cursor buffer");
+			cursor_bitmap->offset = 0;
+		}
+		cast->xdpw_cursor.damaged = false;
+	} else {
+		logprint(TRACE, "pipewire: handle_cursor: cursor not damaged");
+		cursor->bitmap_offset = 0;
+	}
+}
+
+void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: enqueueing buffer");
+
+	if (!cast->current_frame.pw_buffer) {
+		logprint(WARN, "pipewire: no buffer to queue");
+		goto done;
+	}
+	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
+	struct spa_buffer *spa_buf = pw_buf->buffer;
+	struct spa_data *d = spa_buf->datas;
+
+	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
+
+	if (cast->current_frame.y_invert) {
+		//TODO: Flip buffer or set stride negative
+		buffer_corrupt = true;
+		cast->err = 1;
+	}
+
+	struct spa_meta_header *h;
+	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
+		h->pts = -1;
+		h->flags = buffer_corrupt ? SPA_META_HEADER_FLAG_CORRUPTED : 0;
+		h->seq = cast->seq++;
+		h->dts_offset = 0;
+	}
+
+	if (buffer_corrupt) {
+		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+			d[plane].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
+		}
+	} else {
+		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+			d[plane].chunk->flags = SPA_CHUNK_FLAG_NONE;
+		}
+	}
+
+	struct spa_meta_cursor *cursor;
+	if ((cursor = spa_buffer_find_meta_data(spa_buf, SPA_META_Cursor, sizeof(*cursor)))) {
+		pwr_handle_cursor(cursor, cast);
+	}
+
+	logprint(TRACE, "********************");
+	for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
+		logprint(TRACE, "pipewire: plane %d", plane);
+		logprint(TRACE, "pipewire: fd %u", d[plane].fd);
+		logprint(TRACE, "pipewire: maxsize %d", d[plane].maxsize);
+		logprint(TRACE, "pipewire: size %d", d[plane].chunk->size);
+		logprint(TRACE, "pipewire: stride %d", d[plane].chunk->stride);
+		logprint(TRACE, "pipewire: offset %d", d[plane].chunk->offset);
+		logprint(TRACE, "pipewire: chunk flags %d", d[plane].chunk->flags);
+	}
+	logprint(TRACE, "pipewire: width %d", cast->current_frame.xdpw_buffer->width);
+	logprint(TRACE, "pipewire: height %d", cast->current_frame.xdpw_buffer->height);
+	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);
+	logprint(TRACE, "********************");
+
+	pw_stream_queue_buffer(cast->stream, pw_buf);
+
+done:
+	cast->current_frame.xdpw_buffer = NULL;
+	cast->current_frame.pw_buffer = NULL;
+}
+
+void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "pipewire: stream update parameters");
+	struct pw_stream *stream = cast->stream;
+	uint8_t params_buffer[1024];
+	struct spa_pod_builder b =
+		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
+	const struct spa_pod *params[2];
+
+	uint32_t n_params = build_formats(&b, cast, params);
+
+	pw_stream_update_params(stream, params, n_params);
+}
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -176,9 +325,6 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
-		if (cast->frame_state == XDPW_FRAME_STATE_NONE) {
-			xdpw_wlr_frame_start(cast);
-		}
 		break;
 	case PW_STREAM_STATE_PAUSED:
 		if (old == PW_STREAM_STATE_STREAMING) {
@@ -196,7 +342,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	logprint(TRACE, "pipewire: stream parameters changed");
 	struct xdpw_screencast_instance *cast = data;
 	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
+	uint8_t params_buffer[2048];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[3];
@@ -291,15 +437,23 @@ fixate_format:
 	logprint(DEBUG, "pipewire: size: (%u, %u)", cast->pwr_format.size.width, cast->pwr_format.size.height);
 	logprint(DEBUG, "pipewire: max_framerate: (%u / %u)", cast->pwr_format.max_framerate.num, cast->pwr_format.max_framerate.denom);
 
-	params[0] = build_buffer(&b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
+	uint32_t n_params = 0;
+	params[n_params++] = build_buffer(&b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
 			cast->screencopy_frame_info[cast->buffer_type].stride, data_type);
 
-	params[1] = spa_pod_builder_add_object(&b,
+	params[n_params++] = spa_pod_builder_add_object(&b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	pw_stream_update_params(stream, params, 2);
+	if (cast->cursor_mode == METADATA) {
+		params[n_params++] = spa_pod_builder_add_object(&b,
+			SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
+			SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Cursor),
+			SPA_PARAM_META_size, SPA_POD_Int(CURSOR_META_SIZE(384, 384)));
+	}
+
+	pw_stream_update_params(stream, params, n_params);
 }
 
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
@@ -370,98 +524,45 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	buffer->user_data = NULL;
 }
 
+static void pwr_handle_stream_on_process(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "pipewire: on process event handle");
+
+	if (!cast->pwr_stream_state) {
+		logprint(INFO, "pipewire: not streaming");
+		return;
+	}
+
+	if (cast->current_frame.pw_buffer) {
+		logprint(WARN, "pipewire: buffer already exported");
+		return;
+	}
+
+	xdpw_pwr_dequeue_buffer(cast);
+	if (!cast->current_frame.pw_buffer) {
+		logprint(WARN, "pipewire: unable to export buffer");
+		return;
+	}
+	if (cast->seq > 0) {
+		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+		if (delay_ns > 0) {
+			xdpw_add_timer(cast->ctx->state, delay_ns,
+				(xdpw_event_loop_timer_func_t) xdpw_wlr_handle_frame, cast);
+			return;
+		}
+	}
+	xdpw_wlr_handle_frame(cast);
+}
+
 static const struct pw_stream_events pwr_stream_events = {
 	PW_VERSION_STREAM_EVENTS,
 	.state_changed = pwr_handle_stream_state_changed,
 	.param_changed = pwr_handle_stream_param_changed,
 	.add_buffer = pwr_handle_stream_add_buffer,
 	.remove_buffer = pwr_handle_stream_remove_buffer,
+	.process = pwr_handle_stream_on_process,
 };
-
-void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: dequeueing buffer");
-
-	assert(!cast->current_frame.pw_buffer);
-	if ((cast->current_frame.pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
-		logprint(WARN, "pipewire: out of buffers");
-		return;
-	}
-
-	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
-}
-
-void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: enqueueing buffer");
-
-	if (!cast->current_frame.pw_buffer) {
-		logprint(WARN, "pipewire: no buffer to queue");
-		goto done;
-	}
-	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
-	struct spa_buffer *spa_buf = pw_buf->buffer;
-	struct spa_data *d = spa_buf->datas;
-
-	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
-
-	if (cast->current_frame.y_invert) {
-		//TODO: Flip buffer or set stride negative
-		buffer_corrupt = true;
-		cast->err = 1;
-	}
-
-	logprint(TRACE, "********************");
-	struct spa_meta_header *h;
-	if ((h = spa_buffer_find_meta_data(spa_buf, SPA_META_Header, sizeof(*h)))) {
-		h->pts = SPA_TIMESPEC_TO_NSEC(&cast->current_frame);
-		h->flags = buffer_corrupt ? SPA_META_HEADER_FLAG_CORRUPTED : 0;
-		h->seq = cast->seq++;
-		h->dts_offset = 0;
-		logprint(TRACE, "pipewire: timestamp %"PRId64, h->pts);
-	}
-
-	if (buffer_corrupt) {
-		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
-			d[plane].chunk->flags = SPA_CHUNK_FLAG_CORRUPTED;
-		}
-	} else {
-		for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
-			d[plane].chunk->flags = SPA_CHUNK_FLAG_NONE;
-		}
-	}
-
-	for (uint32_t plane = 0; plane < spa_buf->n_datas; plane++) {
-		logprint(TRACE, "pipewire: plane %d", plane);
-		logprint(TRACE, "pipewire: fd %u", d[plane].fd);
-		logprint(TRACE, "pipewire: maxsize %d", d[plane].maxsize);
-		logprint(TRACE, "pipewire: size %d", d[plane].chunk->size);
-		logprint(TRACE, "pipewire: stride %d", d[plane].chunk->stride);
-		logprint(TRACE, "pipewire: offset %d", d[plane].chunk->offset);
-		logprint(TRACE, "pipewire: chunk flags %d", d[plane].chunk->flags);
-	}
-	logprint(TRACE, "pipewire: width %d", cast->current_frame.xdpw_buffer->width);
-	logprint(TRACE, "pipewire: height %d", cast->current_frame.xdpw_buffer->height);
-	logprint(TRACE, "pipewire: y_invert %d", cast->current_frame.y_invert);
-	logprint(TRACE, "********************");
-
-	pw_stream_queue_buffer(cast->stream, pw_buf);
-
-done:
-	cast->current_frame.xdpw_buffer = NULL;
-	cast->current_frame.pw_buffer = NULL;
-}
-
-void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: stream update parameters");
-	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
-	struct spa_pod_builder b =
-		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
-	const struct spa_pod *params[2];
-
-	uint32_t n_params = build_formats(&b, cast, params);
-
-	pw_stream_update_params(stream, params, n_params);
-}
 
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	struct xdpw_screencast_context *ctx = cast->ctx;
@@ -494,8 +595,7 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	pw_stream_connect(cast->stream,
 		PW_DIRECTION_OUTPUT,
 		PW_ID_ANY,
-		(PW_STREAM_FLAG_DRIVER |
-			PW_STREAM_FLAG_ALLOC_BUFFERS),
+		PW_STREAM_FLAG_ALLOC_BUFFERS,
 		params, param_count);
 }
 

@@ -44,12 +44,17 @@ enum xdpw_frame_state {
   XDPW_FRAME_STATE_SUCCESS,
 };
 
+enum ext_screencopy_input_type {
+  EXT_SCREENCOPY_INPUT_TYPE_POINTER = 0,
+  EXT_SCREENCOPY_INPUT_TYPE_TABLET = 1,
+};
+
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
 };
 
-struct xdpw_frame_damage {
+struct xdpw_damage {
 	uint32_t x;
 	uint32_t y;
 	uint32_t width;
@@ -60,9 +65,23 @@ struct xdpw_frame {
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
-	struct xdpw_frame_damage damage;
+	struct xdpw_damage damage;
 	struct xdpw_buffer *xdpw_buffer;
 	struct pw_buffer *pw_buffer;
+};
+
+struct xdpw_cursor {
+	char *seat_name;
+	enum ext_screencopy_input_type input_type;
+	bool present;
+	bool damaged;
+	int32_t width;
+	int32_t height;
+	int32_t position_x;
+	int32_t position_y;
+	int32_t hotspot_x;
+	int32_t hotspot_y;
+	struct xdpw_buffer *xdpw_buffer;
 };
 
 struct xdpw_screencopy_frame_info {
@@ -71,6 +90,13 @@ struct xdpw_screencopy_frame_info {
 	uint32_t size;
 	uint32_t stride;
 	uint32_t format;
+};
+
+struct xdpw_screencopy_cursor_frame_info {
+	char *seat_name;
+	enum ext_screencopy_input_type input_type;
+
+	struct xdpw_screencopy_frame_info frame_info[2];
 };
 
 struct xdpw_buffer {
@@ -90,6 +116,7 @@ struct xdpw_buffer {
 	struct gbm_bo *bo;
 
 	struct wl_buffer *buffer;
+	struct xdpw_damage damage;
 };
 
 struct xdpw_format_modifier_pair {
@@ -116,6 +143,7 @@ struct xdpw_screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
+	struct ext_screencopy_manager_v1 *ext_screencopy_manager;
 	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
@@ -141,6 +169,7 @@ struct xdpw_screencast_instance {
 	struct xdpw_frame current_frame;
 	enum xdpw_frame_state frame_state;
 	struct wl_list buffer_list;
+	struct wl_list cursor_buffer_list;
 	bool avoid_dmabufs;
 
 	// pipewire
@@ -158,11 +187,16 @@ struct xdpw_screencast_instance {
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
-	bool with_cursor;
+	enum cursor_modes cursor_mode;
 	int err;
 	bool quit;
 	bool teardown;
 	enum buffer_type buffer_type;
+
+	// ext_screencopy
+	struct ext_screencopy_surface_v1 *surface_capture;
+	struct wl_array screencopy_cursor_frame_infos;
+	struct xdpw_cursor xdpw_cursor;
 
 	// fps limit
 	struct fps_limit_state fps_limit;
@@ -183,6 +217,7 @@ struct xdpw_wlr_output {
 
 void randname(char *buf);
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
+void xdpw_buffer_apply_damage(struct xdpw_buffer *buffer, struct xdpw_damage *damage);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);

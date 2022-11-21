@@ -48,7 +48,7 @@ void exec_with_shell(char *command) {
 }
 
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
-		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
+		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, enum cursor_modes cursor_mode) {
 
 	// only run exec_before if there's no other instance running that already ran it
 	if (wl_list_empty(&ctx->screencast_instances)) {
@@ -68,12 +68,13 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 		cast->max_framerate = (uint32_t)out->framerate;
 	}
 	cast->framerate = cast->max_framerate;
-	cast->with_cursor = with_cursor;
+	cast->cursor_mode = cursor_mode;
 	cast->refcount = 1;
 	cast->node_id = SPA_ID_INVALID;
 	cast->avoid_dmabufs = false;
 	cast->teardown = false;
 	wl_list_init(&cast->buffer_list);
+	wl_list_init(&cast->cursor_buffer_list);
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
 	logprint(INFO, "xdpw: %d active screencast instances",
@@ -83,6 +84,10 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
+
+	if (cast->ctx->ext_screencopy_manager) {
+		xdpw_wlr_ext_screencopy_surface_destroy(cast);
+	}
 
 	// make sure this is the last running instance that is being destroyed
 	if (wl_list_length(&cast->link) == 1) {
@@ -108,7 +113,7 @@ void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast) {
 	}
 }
 
-bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
+bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, enum cursor_modes cursor_mode) {
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -150,32 +155,44 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 	if (!sess->screencast_instance) {
 		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
 		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
-			out, with_cursor);
+			out, cursor_mode);
 	}
 	logprint(INFO, "wlroots: output: %s",
 		sess->screencast_instance->target_output->name);
+	logprint(INFO, "wlroots: cursor_mode: %d",
+		sess->screencast_instance->cursor_mode);
 
 	return true;
 
 }
 
 static int start_screencast(struct xdpw_screencast_instance *cast) {
-	xdpw_wlr_register_cb(cast);
+	if (cast->ctx->ext_screencopy_manager) {
+		xdpw_wlr_ext_screencopy_surface_create(cast);
 
-	// process at least one frame so that we know
-	// some of the metadata required for the pipewire
-	// remote state connected event
-	wl_display_dispatch(cast->ctx->state->wl_display);
-	wl_display_roundtrip(cast->ctx->state->wl_display);
+		// process at least one frame so that we know
+		// some of the metadata required for the pipewire
+		// remote state connected event
+		wl_display_dispatch(cast->ctx->state->wl_display);
+		wl_display_roundtrip(cast->ctx->state->wl_display);
+	} else {
+		xdpw_wlr_register_cb(cast);
 
-	if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
-			(cast->ctx->state->screencast_version >= 3 &&
-			 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
-		logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
-		return -1;
+		// process at least one frame so that we know
+		// some of the metadata required for the pipewire
+		// remote state connected event
+		wl_display_dispatch(cast->ctx->state->wl_display);
+		wl_display_roundtrip(cast->ctx->state->wl_display);
+
+		if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
+				(cast->ctx->state->screencast_version >= 3 &&
+				 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
+			logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
+			return -1;
+		}
+
+		xdpw_pwr_stream_create(cast);
 	}
-
-	xdpw_pwr_stream_create(cast);
 
 	cast->initialized = true;
 	return 0;
@@ -277,7 +294,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	logprint(INFO, "dbus: select sources method invoked");
 
 	// default to embedded cursor mode if not specified
-	bool cursor_embedded = true;
+	uint32_t cursor_mode = EMBEDDED;
 
 	char *request_handle, *session_handle, *app_id;
 	ret = sd_bus_message_read(msg, "oos", &request_handle, &session_handle, &app_id);
@@ -314,14 +331,14 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 			}
 			logprint(INFO, "dbus: option types:%x", mask);
 		} else if (strcmp(key, "cursor_mode") == 0) {
-			uint32_t cursor_mode;
 			sd_bus_message_read(msg, "v", "u", &cursor_mode);
-			if (cursor_mode & HIDDEN) {
-				cursor_embedded = false;
-			}
+			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
 			if (cursor_mode & METADATA) {
-				logprint(ERROR, "dbus: unsupported cursor mode requested, cancelling");
-				goto error;
+				cursor_mode = METADATA;
+			} else if (cursor_mode & EMBEDDED) {
+				cursor_mode = EMBEDDED;
+			} else if (cursor_mode & HIDDEN) {
+				cursor_mode = HIDDEN;
 			}
 			logprint(INFO, "dbus: option cursor_mode:%x", cursor_mode);
 		} else {
@@ -346,7 +363,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
-				output_selection_canceled = !setup_outputs(ctx, sess, cursor_embedded);
+				output_selection_canceled = !setup_outputs(ctx, sess, cursor_mode);
 		}
 	}
 
@@ -368,29 +385,6 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	}
 	sd_bus_message_unref(reply);
 	return 0;
-
-error:
-	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
-		if (strcmp(sess->session_handle, session_handle) == 0) {
-				logprint(DEBUG, "dbus: select sources error: destroying matching session %s", sess->session_handle);
-				xdpw_session_destroy(sess);
-		}
-	}
-
-	ret = sd_bus_message_new_method_return(msg, &reply);
-	if (ret < 0) {
-		return ret;
-	}
-	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
-	if (ret < 0) {
-		return ret;
-	}
-	ret = sd_bus_send(NULL, reply, NULL);
-	if (ret < 0) {
-		return ret;
-	}
-	sd_bus_message_unref(reply);
-	return -1;
 }
 
 static int method_screencast_start(sd_bus_message *msg, void *data,
@@ -528,6 +522,7 @@ int xdpw_screencast_init(struct xdpw_state *state) {
 		goto fail_screencopy;
 	}
 
+	logprint(INFO, "cursor_modes %x", state->screencast_cursor_modes);
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path, interface_name,
 		screencast_vtable, state);
 

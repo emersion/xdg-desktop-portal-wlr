@@ -3,6 +3,7 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
+#include "ext-screencopy-v1-client-protocol.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -30,6 +31,22 @@ void wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
 	cast->wlr_frame = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
+}
+
+static void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
+	logprint(TRACE, "wlroots: start screencopy");
+	if (cast->quit || cast->err) {
+		xdpw_screencast_instance_destroy(cast);
+		return;
+	}
+
+	if (cast->initialized && !cast->pwr_stream_state) {
+		cast->frame_state = XDPW_FRAME_STATE_NONE;
+		return;
+	}
+
+	cast->frame_state = XDPW_FRAME_STATE_STARTED;
+	xdpw_wlr_register_cb(cast);
 }
 
 void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
@@ -60,30 +77,7 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 
 	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
 		xdpw_pwr_enqueue_buffer(cast);
-		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-		if (delay_ns > 0) {
-			xdpw_add_timer(cast->ctx->state, delay_ns,
-				(xdpw_event_loop_timer_func_t) xdpw_wlr_frame_start, cast);
-			return;
-		}
 	}
-	xdpw_wlr_frame_start(cast);
-}
-
-void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "wlroots: start screencopy");
-	if (cast->quit || cast->err) {
-		xdpw_screencast_instance_destroy(cast);
-		return;
-	}
-
-	if (cast->initialized && !cast->pwr_stream_state) {
-		cast->frame_state = XDPW_FRAME_STATE_NONE;
-		return;
-	}
-
-	cast->frame_state = XDPW_FRAME_STATE_STARTED;
-	xdpw_wlr_register_cb(cast);
 }
 
 static void wlr_frame_buffer_done(void *data,
@@ -148,10 +142,6 @@ static void wlr_frame_buffer_done(void *data,
 		cast->frame_state = XDPW_FRAME_STATE_RENEG;
 		xdpw_wlr_frame_finish(cast);
 		return;
-	}
-
-	if (!cast->current_frame.xdpw_buffer) {
-		xdpw_pwr_dequeue_buffer(cast);
 	}
 
 	if (!cast->current_frame.xdpw_buffer) {
@@ -250,11 +240,282 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
 	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-		cast->ctx->screencopy_manager, cast->with_cursor, cast->target_output->output);
+		cast->ctx->screencopy_manager, cast->cursor_mode == EMBEDDED ? 1 : 0, cast->target_output->output);
 
 	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
 		&wlr_frame_listener, cast);
 	logprint(TRACE, "wlroots: callbacks registered");
+}
+
+static void ext_surface_buffer_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t type, uint32_t drm_format, uint32_t width, uint32_t height, uint32_t stride) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: buffer_info event handler");
+
+	cast->screencopy_frame_info[type].format = drm_format;
+	cast->screencopy_frame_info[type].width = width;
+	cast->screencopy_frame_info[type].height = height;
+	cast->screencopy_frame_info[type].stride = stride;
+	cast->screencopy_frame_info[type].size = stride * height;
+}
+
+static void ext_surface_cursor_buffer_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type, uint32_t buffer_type,
+		uint32_t drm_format, uint32_t width, uint32_t height, uint32_t stride) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: cursor_buffer_info event handler");
+
+
+	struct xdpw_screencopy_cursor_frame_info *screencopy_cursor_frame_info;
+	wl_array_for_each(screencopy_cursor_frame_info, &cast->screencopy_cursor_frame_infos) {
+		if (screencopy_cursor_frame_info->input_type == input_type &&
+				strcmp(screencopy_cursor_frame_info->seat_name, seat_name) == 0) {
+			goto assign_frame_info;
+		}
+	}
+
+	screencopy_cursor_frame_info = wl_array_add(&cast->screencopy_cursor_frame_infos, sizeof(struct xdpw_screencopy_cursor_frame_info));
+	if (!screencopy_cursor_frame_info)
+		return;
+	memset(screencopy_cursor_frame_info, 0, sizeof(struct xdpw_screencopy_cursor_frame_info));
+	screencopy_cursor_frame_info->seat_name = strdup(seat_name);
+	screencopy_cursor_frame_info->input_type = input_type;
+
+assign_frame_info:
+	screencopy_cursor_frame_info->frame_info[buffer_type].format = drm_format;
+	screencopy_cursor_frame_info->frame_info[buffer_type].width = width;
+	screencopy_cursor_frame_info->frame_info[buffer_type].height = height;
+	screencopy_cursor_frame_info->frame_info[buffer_type].stride = stride;
+	screencopy_cursor_frame_info->frame_info[buffer_type].size = stride * height;
+}
+
+static void ext_surface_init_done(void *data, struct ext_screencopy_surface_v1 *surface) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: init_done event handler");
+
+	if (cast->cursor_mode == METADATA) {
+		struct xdpw_screencopy_cursor_frame_info *screencopy_cursor_frame_info;
+		wl_array_for_each(screencopy_cursor_frame_info, &cast->screencopy_cursor_frame_infos) {
+			if (screencopy_cursor_frame_info->input_type == EXT_SCREENCOPY_INPUT_TYPE_POINTER &&
+					screencopy_cursor_frame_info->frame_info[WL_SHM].format != 0) {
+				cast->xdpw_cursor.seat_name = strdup(screencopy_cursor_frame_info->seat_name);
+				cast->xdpw_cursor.input_type = screencopy_cursor_frame_info->input_type;
+				cast->xdpw_cursor.xdpw_buffer = xdpw_buffer_create(cast, WL_SHM, &screencopy_cursor_frame_info->frame_info[WL_SHM]);
+				cast->xdpw_cursor.damaged = true;
+				wl_list_insert(&cast->cursor_buffer_list, &cast->xdpw_cursor.xdpw_buffer->link);
+				break;
+			}
+		}
+
+	}
+	if (cast->stream) {
+		pwr_update_stream_param(cast);
+	} else {
+		xdpw_pwr_stream_create(cast);
+	}
+}
+
+static void ext_surface_transform(void *data, struct ext_screencopy_surface_v1 *surface,
+		int32_t transform) {
+	logprint(TRACE, "wlroots: transform event handler");
+}
+
+static void ext_surface_damage(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: damage event handler");
+	cast->current_frame.damage.x = x;
+	cast->current_frame.damage.y = y;
+	cast->current_frame.damage.width = width;
+	cast->current_frame.damage.height = height;
+
+	struct xdpw_damage damage = {
+		.x = x,
+		.y = y,
+		.width = width,
+		.height = height,
+	};
+	struct xdpw_buffer *buffer;
+	wl_list_for_each(buffer, &cast->buffer_list, link) {
+		xdpw_buffer_apply_damage(buffer, &damage);
+	}
+
+	struct xdpw_damage *current_buffer_damage = &cast->current_frame.xdpw_buffer->damage;
+	current_buffer_damage->x = 0;
+	current_buffer_damage->y = 0;
+	current_buffer_damage->width = 0;
+	current_buffer_damage->height = 0;
+
+	logprint(TRACE, "wlroots: damage %u:%u (%u x %u)", x, y, width, height);
+}
+
+static void ext_surface_cursor_enter(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: cursor_enter event handler");
+
+	if (!cast->xdpw_cursor.seat_name || strcmp(cast->xdpw_cursor.seat_name, seat_name) != 0 ||
+			cast->xdpw_cursor.input_type != input_type) {
+		return;
+	}
+	cast->xdpw_cursor.present = true;
+}
+
+static void ext_surface_cursor_leave(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: cursor_leave event handler");
+
+	if (!cast->xdpw_cursor.seat_name || strcmp(cast->xdpw_cursor.seat_name, seat_name) != 0 ||
+			cast->xdpw_cursor.input_type != input_type) {
+		return;
+	}
+	cast->xdpw_cursor.present = false;
+}
+
+static void ext_surface_cursor_info(void *data, struct ext_screencopy_surface_v1 *surface,
+		const char* seat_name, uint32_t input_type, int32_t has_damage,
+		int32_t position_x, int32_t position_y, int32_t width, int32_t height,
+		int32_t hotspot_x, int32_t hotspot_y) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: cursor_info event handler");
+
+	if (!cast->xdpw_cursor.seat_name || strcmp(cast->xdpw_cursor.seat_name, seat_name) != 0 ||
+			cast->xdpw_cursor.input_type != input_type) {
+		return;
+	}
+
+	cast->xdpw_cursor.position_x = position_x;
+	cast->xdpw_cursor.position_y = position_y;
+	cast->xdpw_cursor.width = width;
+	cast->xdpw_cursor.height = height;
+	cast->xdpw_cursor.hotspot_x = hotspot_x;
+	cast->xdpw_cursor.hotspot_y = hotspot_y;
+	cast->xdpw_cursor.damaged = has_damage;
+}
+
+static void ext_surface_failed(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t reason) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: failed event handler");
+
+	enum failure_reason {
+		EXT_SCREENCOPY_FAILURE_REASON_UNSPEC = 0,
+		EXT_SCREENCOPY_FAILURE_REASON_INVALID_MAIN_BUFFER,
+		EXT_SCREENCOPY_FAILURE_REASON_INVALID_CURSOR_BUFFER,
+		EXT_SCREENCOPY_FAILURE_REASON_OUTPUT_MISSING,
+		EXT_SCREENCOPY_FAILURE_REASON_OUTPUT_DISABLED,
+		EXT_SCREENCOPY_FAILURE_REASON_UNKOWN_INPUT,
+	};
+
+	switch (reason) {
+	case EXT_SCREENCOPY_FAILURE_REASON_INVALID_MAIN_BUFFER:
+	case EXT_SCREENCOPY_FAILURE_REASON_INVALID_CURSOR_BUFFER:
+		ext_screencopy_surface_v1_destroy(cast->surface_capture);
+		xdpw_wlr_ext_screencopy_surface_create(cast);
+		break;
+	default:
+		xdpw_screencast_instance_destroy(cast);
+	}
+}
+
+static void ext_surface_commit_time(void *data, struct ext_screencopy_surface_v1 *surface,
+		uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: commit_time event handler");
+
+	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
+	cast->current_frame.tv_nsec = tv_nsec;
+	logprint(TRACE, "wlroots: timestamp %"PRIu64":%"PRIu32, cast->current_frame.tv_sec, cast->current_frame.tv_nsec);
+}
+
+static void ext_surface_ready(void *data, struct ext_screencopy_surface_v1 *surface) {
+	struct xdpw_screencast_instance *cast = data;
+
+	logprint(TRACE, "wlroots: ready event handler");
+
+	xdpw_pwr_enqueue_buffer(cast);
+}
+
+static const struct ext_screencopy_surface_v1_listener ext_screencopy_surface_listener = {
+	.buffer_info = ext_surface_buffer_info,
+	.cursor_buffer_info = ext_surface_cursor_buffer_info,
+	.init_done = ext_surface_init_done,
+	.transform = ext_surface_transform,
+	.damage = ext_surface_damage,
+	.cursor_enter = ext_surface_cursor_enter,
+	.cursor_leave = ext_surface_cursor_leave,
+	.cursor_info = ext_surface_cursor_info,
+	.failed = ext_surface_failed,
+	.commit_time = ext_surface_commit_time,
+	.ready = ext_surface_ready,
+};
+
+void wlr_ext_screencopy_frame_submit(struct xdpw_screencast_instance *cast) {
+	enum ext_screencopy_surface_v1_options {
+		EXT_SCREENCOPY_OPTIONS_ON_DAMAGE = 1,
+	};
+
+	const struct xdpw_buffer *current_buffer = cast->current_frame.xdpw_buffer;
+	ext_screencopy_surface_v1_attach_buffer(cast->surface_capture, current_buffer->buffer);
+	ext_screencopy_surface_v1_damage_buffer(cast->surface_capture, current_buffer->damage.x, current_buffer->damage.y,
+		current_buffer->damage.width, current_buffer->damage.height);
+	if (cast->cursor_mode == METADATA && cast->xdpw_cursor.seat_name) {
+		logprint(TRACE, "wlroots: attach cursor buffer");
+		ext_screencopy_surface_v1_attach_cursor_buffer(cast->surface_capture, cast->xdpw_cursor.xdpw_buffer->buffer,
+				cast->xdpw_cursor.seat_name, cast->xdpw_cursor.input_type);
+		if (cast->xdpw_cursor.damaged) {
+			ext_screencopy_surface_v1_damage_cursor_buffer(cast->surface_capture,
+					cast->xdpw_cursor.seat_name, cast->xdpw_cursor.input_type);
+		}
+	}
+	ext_screencopy_surface_v1_commit(cast->surface_capture, EXT_SCREENCOPY_OPTIONS_ON_DAMAGE);
+	logprint(TRACE, "wlroots: frame commited");
+	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
+}
+
+void xdpw_wlr_ext_screencopy_surface_create(struct xdpw_screencast_instance *cast) {
+	enum ext_screencopy_manager_v1_options options = 0;
+	if (cast->cursor_mode == EMBEDDED) {
+		options = 1;
+	}
+	wl_array_init(&cast->screencopy_cursor_frame_infos);
+
+	cast->surface_capture = ext_screencopy_manager_v1_capture_output(cast->ctx->ext_screencopy_manager,
+			cast->target_output->output, options);
+
+	ext_screencopy_surface_v1_add_listener(cast->surface_capture, &ext_screencopy_surface_listener, cast);
+}
+
+void xdpw_wlr_ext_screencopy_surface_destroy(struct xdpw_screencast_instance *cast) {
+	struct xdpw_screencopy_cursor_frame_info *screencopy_cursor_frame_info;
+	wl_array_for_each(screencopy_cursor_frame_info, &cast->screencopy_cursor_frame_infos) {
+		free(screencopy_cursor_frame_info->seat_name);
+	}
+	wl_array_release(&cast->screencopy_cursor_frame_infos);
+
+	if (cast->cursor_mode == METADATA) {
+		xdpw_buffer_destroy(cast->xdpw_cursor.xdpw_buffer);
+		free(cast->xdpw_cursor.seat_name);
+	}
+	ext_screencopy_surface_v1_destroy(cast->surface_capture);
+}
+
+void xdpw_wlr_handle_frame(struct xdpw_screencast_instance *cast) {
+	if (cast->ctx->ext_screencopy_manager) {
+		wlr_ext_screencopy_frame_submit(cast);
+	} else {
+		xdpw_wlr_frame_start(cast);
+	}
 }
 
 static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
@@ -763,6 +1024,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 			reg, id, &zwlr_screencopy_manager_v1_interface, version);
 	}
 
+	if (!strcmp(interface, ext_screencopy_manager_v1_interface.name)) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, 1);
+		ctx->ext_screencopy_manager = wl_registry_bind(
+			reg, id, &ext_screencopy_manager_v1_interface, 1);
+	}
+
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_SHM_VERSION);
 		ctx->shm = wl_registry_bind(reg, id, &wl_shm_interface, WL_SHM_VERSION);
@@ -876,6 +1143,11 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 		if (!ctx->gbm) {
 			logprint(ERROR, "System doesn't support gbm!");
 		}
+	}
+
+	// offer cursor_mode METADATA
+	if (ctx->ext_screencopy_manager) {
+		ctx->state->screencast_cursor_modes |= METADATA;
 	}
 
 	return 0;
