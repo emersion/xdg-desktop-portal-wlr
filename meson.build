@@ -136,7 +136,7 @@ install_data(
 	install_dir: join_paths(get_option('datadir'), 'xdg-desktop-portal', 'portals'),
 )
 
-scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7')
+scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7', native: true)
 if scdoc.found()
 	man_pages = ['xdg-desktop-portal-wlr.5.scd']
 	foreach src : man_pages
