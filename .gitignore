@@ -54,3 +54,7 @@ dkms.conf
 # build folder
 build/
 build-*/
+
+.vscode/
+
+hyprland-share-picker/build/

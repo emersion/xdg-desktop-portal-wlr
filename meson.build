@@ -1,5 +1,5 @@
 project(
-	'xdg-desktop-portal-wlr',
+	'xdg-desktop-portal-hyprland',
 	'c',
 	version: '0.6.0',
 	license: 'MIT',
@@ -86,7 +86,7 @@ xdpw_files = files([
 ])
 
 executable(
-	'xdg-desktop-portal-wlr',
+	'xdg-desktop-portal-hyprland',
 	[xdpw_files, wl_proto_files],
 	dependencies: [
 		wayland_client,
@@ -111,7 +111,7 @@ conf_data.set('systemd_service', '')
 systemd = dependency('systemd', required: get_option('systemd'))
 
 if systemd.found()
-	systemd_service_file = 'xdg-desktop-portal-wlr.service'
+	systemd_service_file = 'xdg-desktop-portal-hyprland.service'
 	user_unit_dir = systemd.get_variable(pkgconfig: 'systemduserunitdir',
 		pkgconfig_define: ['prefix', get_option('prefix')])
 	conf_data.set('systemd_service', 'SystemdService=' + systemd_service_file)
@@ -126,33 +126,13 @@ endif
 
 configure_file(
 	configuration: conf_data,
-	input: 'org.freedesktop.impl.portal.desktop.wlr.service.in',
+	input: 'org.freedesktop.impl.portal.desktop.hyprland.service.in',
 	output: '@BASENAME@',
 	install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'),
 )
 
 install_data(
-	'wlr.portal',
+	'hyprland.portal',
 	install_dir: join_paths(get_option('datadir'), 'xdg-desktop-portal', 'portals'),
 )
 
-scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7', native: true)
-if scdoc.found()
-	man_pages = ['xdg-desktop-portal-wlr.5.scd']
-	foreach src : man_pages
-		topic = src.split('.')[0]
-		section = src.split('.')[1]
-		output = topic + '.' + section
-
-		custom_target(
-			output,
-			input: files(src),
-			output: output,
-			command: [
-				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_variable(pkgconfig: 'scdoc'), output)
-			],
-			install: true,
-			install_dir: join_paths(get_option('mandir'), 'man' + section),
-		)
-	endforeach
-endif

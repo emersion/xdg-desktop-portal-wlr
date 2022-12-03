@@ -1,4 +1,4 @@
 [portal]
-DBusName=org.freedesktop.impl.portal.desktop.wlr
+DBusName=org.freedesktop.impl.portal.desktop.hyprland
 Interfaces=org.freedesktop.impl.portal.Screenshot;org.freedesktop.impl.portal.ScreenCast;
-UseIn=wlroots;sway;Wayfire;river;phosh;Hyprland;
+UseIn=Hyprland;

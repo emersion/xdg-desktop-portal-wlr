@@ -13,6 +13,7 @@ Although `-wlr` **does** work with Hyprland, `-hyprland` offers more features.
 ```sh
 meson build
 ninja -C build
+cd hyprland-share-picker && make all && cd ..
 ```
 
 ## Installing
@@ -21,6 +22,7 @@ ninja -C build
 
 ```sh
 ninja -C build install
+sudo cp ./hyprland-share-picker/build/hyprland-share-picker /usr/bin
 ```
 
 ## License
