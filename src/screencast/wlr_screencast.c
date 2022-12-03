@@ -388,8 +388,8 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 		return res;
     } else if (strncmp(result, "region:", 7) == 0) {
         // find output
-		int atPos = 0;
-		for (int i = 0; i < (int)strlen(result); ++i) {
+		int atPos = 7;
+		for (int i = 7; i < (int)strlen(result); ++i) {
 			if (result[i] == '@'){
 				atPos = i;
 				break;
