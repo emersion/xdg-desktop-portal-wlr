@@ -347,7 +347,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
     FILE *fp;
 	char buf[1024];
 
-    fp = popen("/usr/bin/hyprland-share-picker", "r");
+    fp = popen("bash -c \"hyprland-share-picker\"", "r");
     if (fp == NULL) {
         printf("Failed to run command\n");
         exit(1);
