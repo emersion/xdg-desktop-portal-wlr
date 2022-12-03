@@ -25,7 +25,7 @@ struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list
 struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list);
 struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx,
 	struct wl_output *out, uint32_t id);
-struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx);
+struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx);
 
 void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast);
 void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast);

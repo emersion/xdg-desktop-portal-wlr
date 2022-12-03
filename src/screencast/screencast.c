@@ -48,7 +48,7 @@ void exec_with_shell(char *command) {
 }
 
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
-		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
+		struct xdpw_screencast_instance *cast, struct xdpw_share out, bool with_cursor) {
 
 	// only run exec_before if there's no other instance running that already ran it
 	if (wl_list_empty(&ctx->screencast_instances)) {
@@ -60,12 +60,12 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	}
 
 	cast->ctx = ctx;
-	cast->target_output = out;
+	cast->target = out;
 	if (ctx->state->config->screencast_conf.max_fps > 0) {
-		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out->framerate ?
-			ctx->state->config->screencast_conf.max_fps : (uint32_t)out->framerate;
+		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out.output->framerate ?
+			ctx->state->config->screencast_conf.max_fps : (uint32_t)out.output->framerate;
 	} else {
-		cast->max_framerate = (uint32_t)out->framerate;
+		cast->max_framerate = (uint32_t)out.output->framerate;
 	}
 	cast->framerate = cast->max_framerate;
 	cast->with_cursor = with_cursor;
@@ -116,9 +116,9 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 			output->make, output->model, output->id, output->name);
 	}
 
-	struct xdpw_wlr_output *out;
-	out = xdpw_wlr_output_chooser(ctx);
-	if (!out) {
+    struct xdpw_share out;
+    out = xdpw_wlr_chooser(ctx);
+	if (!out.output) {
 		logprint(ERROR, "wlroots: no output found");
 		return false;
 	}
@@ -153,7 +153,7 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 			out, with_cursor);
 	}
 	logprint(INFO, "wlroots: output: %s",
-		sess->screencast_instance->target_output->name);
+		sess->screencast_instance->target.output->name);
 
 	return true;
 

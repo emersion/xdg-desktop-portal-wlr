@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <wayland-client-protocol.h>
 #include <xf86drm.h>
+#include <string.h>
 
 #include "screencast.h"
 #include "pipewire_screencast.h"
@@ -249,8 +250,16 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 };
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
-	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-		cast->ctx->screencopy_manager, cast->with_cursor, cast->target_output->output);
+
+	if (cast->target.x != -1 && cast->target.y != -1 && cast->target.w != -1 && cast->target.h != -1) {
+		// capture region
+        cast->frame_callback = zwlr_screencopy_manager_v1_capture_output_region(
+			cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output, cast->target.x,
+			cast->target.y, cast->target.w, cast->target.h);
+    } else {
+        cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
+            cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output);
+    }
 
 	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
 		&wlr_frame_listener, cast);
@@ -333,8 +342,8 @@ static void wlr_init_xdg_outputs(struct xdpw_screencast_context *ctx) {
 	}
 }
 
-struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx) {
-	char result[1024];
+struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
+    char result[1024];
     FILE *fp;
 	char buf[1024];
 
@@ -351,27 +360,80 @@ struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *
     pclose(fp);
 
 	// great, let's parse it.
-	
-	// TODO: window & region
+
+    struct xdpw_share res = {NULL, -1, -1, -1, -1};
+
+    // TODO: window & region
 	if (strncmp(result, "screen:", 7) == 0) {
-		// find
+		// find output
 		char* display_name = malloc(strlen(result) - 7);
         strncpy(display_name, result + 7, strlen(result) - 8);
 		display_name[strlen(result) - 8] = 0;
 
 		struct xdpw_wlr_output* out;
+		bool found = false;
         wl_list_for_each(out, &ctx->output_list, link) {
             if (strcmp(out->name, display_name) == 0) {
+				found = true;
 				break;
 			}
         }
 
         free(display_name);
 
-		return out;
+		if (!found)
+			return res;
+
+		res.output = out;
+		return res;
+    } else if (strncmp(result, "region:", 7) == 0) {
+        // find output
+		int atPos = 0;
+		for (int i = 0; i < (int)strlen(result); ++i) {
+			if (result[i] == '@'){
+				atPos = i;
+				break;
+			}
+		}
+
+        char *display_name = malloc(atPos - 6);
+        strncpy(display_name, result + 7, atPos - 7);
+        display_name[atPos - 7] = 0;
+
+        struct xdpw_wlr_output *out;
+        wl_list_for_each(out, &ctx->output_list, link) {
+            if (strcmp(out->name, display_name) == 0) {
+                break;
+            }
+        }
+
+        // then get coords
+		int coordno = 0;
+		int coords[4] = {-1, -1, -1, -1};
+		int coordbegin = 7 + strlen(display_name) + 1;
+		for (int i = 7 + strlen(display_name) + 1; i < (int)strlen(result); ++i) {
+			if (result[i] == ',' || result[i] == '@' || i + 1 == (int)strlen(result)) {
+				char* entire = malloc(i - coordbegin + 1);
+				strncpy(entire, result + coordbegin, i - coordbegin);
+				entire[i - coordbegin] = 0;
+				coords[coordno] = strtol(entire, NULL, 10);
+				free(entire);
+
+				coordno++;
+				coordbegin = i + 1;
+				i++;
+			}
+		}
+
+		free(display_name);
+
+        struct xdpw_share res2 = {out, coords[0], coords[1], coords[2], coords[3]};
+		return res2;
     } else {
-		return NULL;
-	}
+		return res;
+    }
+
+    return res;
 }
 
 struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
@@ -644,7 +706,7 @@ static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "wlroots: output removed (%s)", output->name);
 		struct xdpw_screencast_instance *cast, *tmp;
 		wl_list_for_each_safe(cast, tmp, &ctx->screencast_instances, link) {
-			if (cast->target_output == output) {
+			if (cast->target.output == output) {
 				// screencopy might be in process for this instance
 				wlr_frame_free(cast);
 				// instance might be waiting for wakeup by the frame limiter
