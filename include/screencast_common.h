@@ -6,6 +6,7 @@
 #include <spa/param/video/format-utils.h>
 #include <wayland-client-protocol.h>
 #include <xf86drm.h>
+#include "hyprland-toplevel-export-v1-client-protocol.h"
 
 #include "fps_limit.h"
 
@@ -123,6 +124,9 @@ struct xdpw_screencast_context {
 	struct xdpw_dmabuf_feedback_data feedback_data;
 	struct wl_array format_modifier_pairs;
 
+	// hyprland
+	struct hyprland_toplevel_export_manager_v1 *hyprland_toplevel_manager;
+
 	// gbm
 	struct gbm_device *gbm;
 
@@ -149,6 +153,7 @@ struct xdpw_share {
     int y;
     int w;
     int h;
+	int window_handle;
 };
 
 struct xdpw_screencast_instance {
@@ -184,6 +189,10 @@ struct xdpw_screencast_instance {
 	bool quit;
 	bool teardown;
 	enum buffer_type buffer_type;
+
+	// hyprland
+	struct hyprland_toplevel_export_frame_v1 *frame_callback_hyprland;
+	struct hyprland_toplevel_export_frame_v1 *hyprland_frame;
 
 	// fps limit
 	struct fps_limit_state fps_limit;

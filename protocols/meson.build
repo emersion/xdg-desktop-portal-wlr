@@ -14,6 +14,7 @@ client_protocols = [
 	wl_protocol_dir / 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
 	wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
+	'hyprland-protocols/protocols/hyprland-toplevel-export-v1.xml'
 ]
 
 wl_proto_files = []

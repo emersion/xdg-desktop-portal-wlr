@@ -1,0 +1,3 @@
+[submodule "protocols/hyprland-protocols"]
+	path = protocols/hyprland-protocols
+	url = https://github.com/hyprwm/hyprland-protocols

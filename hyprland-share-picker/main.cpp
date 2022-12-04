@@ -68,6 +68,7 @@ int main(int argc, char *argv[]) {
 
             std::cout << "screen:" << ID << "\n";
             pickerPtr->quit();
+            return 0;
         });
     }
 
@@ -105,6 +106,7 @@ int main(int argc, char *argv[]) {
 
             std::cout << "window:" << HANDLE << "\n";
             pickerPtr->quit();
+            return 0;
         });
 
         windowIterator++;

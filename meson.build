@@ -100,7 +100,7 @@ executable(
 	],
 	include_directories: [inc],
 	install: true,
-	install_dir: get_option('libexecdir'),
+	install_dir: '/usr/lib',
 )
 
 conf_data = configuration_data()
