@@ -111,7 +111,7 @@ static char *config_path(const char *prefix, const char *filename) {
 		return NULL;
 	}
 
-	char *config_folder = "xdg-desktop-portal-wlr";
+	char *config_folder = "xdg-desktop-portal-hyprland";
 
 	size_t size = 3 + strlen(prefix) + strlen(config_folder) + strlen(filename);
 	char *path = calloc(size, sizeof(char));
