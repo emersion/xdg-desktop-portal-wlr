@@ -526,6 +526,7 @@ int xdpw_screencast_init(struct xdpw_state *state) {
 
 	state->screencast = (struct xdpw_screencast_context) { 0 };
 	state->screencast.state = state;
+	state->screencast.hyprland_toplevel_manager = NULL;
 
 	int err;
 	err = xdpw_pwr_context_create(state);

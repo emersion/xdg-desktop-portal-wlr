@@ -601,6 +601,10 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
         struct xdpw_share res2 = {out, coords[0], coords[1], coords[2], coords[3]};
 		return res2;
     } else if (strncmp(result, "window:", 7) == 0) {
+		if (ctx->hyprland_toplevel_manager == NULL) {
+			return res;
+		}
+
         char *display_name = malloc(strlen(result) - 7);
         strncpy(display_name, result + 7, strlen(result) - 8);
         display_name[strlen(result) - 8] = 0;
