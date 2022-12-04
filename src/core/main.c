@@ -18,16 +18,16 @@ enum event_loop_fd {
 	EVENT_LOOP_TIMER,
 };
 
-static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
+static const char service_name[] = "org.freedesktop.impl.portal.desktop.hyprland";
 
 static int xdpw_usage(FILE *stream, int rc) {
 	static const char *usage =
-		"Usage: xdg-desktop-portal-wlr [options]\n"
+		"Usage: xdg-desktop-portal-hyprland [options]\n"
 		"\n"
 		"    -l, --loglevel=<loglevel>        Select log level (default is ERROR).\n"
 		"                                     QUIET, ERROR, WARN, INFO, DEBUG, TRACE\n"
 		"    -c, --config=<config file>	      Select config file.\n"
-		"                                     (default is $XDG_CONFIG_HOME/xdg-desktop-portal-wlr/config)\n"
+		"                                     (default is $XDG_CONFIG_HOME/xdg-desktop-portal-hyprland/config)\n"
 		"    -r, --replace                    Replace a running instance.\n"
 		"    -h, --help                       Get help (this text).\n"
 		"\n";

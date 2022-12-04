@@ -275,7 +275,7 @@ enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format) {
 	case DRM_FORMAT_BGRA1010102:
 		return (enum wl_shm_format)format;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported drm "
+		logprint(ERROR, "xdg-desktop-portal-hyprland: unsupported drm "
 			"format 0x%08x", format);
 		abort();
 	}
@@ -304,7 +304,7 @@ uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format) {
 	case WL_SHM_FORMAT_BGRA1010102:
 		return (uint32_t)format;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported wl_shm "
+		logprint(ERROR, "xdg-desktop-portal-hyprland: unsupported wl_shm "
 			"format 0x%08x", format);
 		abort();
 	}
@@ -347,7 +347,7 @@ enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format) {
 	case DRM_FORMAT_BGRA1010102:
 		return SPA_VIDEO_FORMAT_BGRA_102LE;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: failed to convert drm "
+		logprint(ERROR, "xdg-desktop-portal-hyprland: failed to convert drm "
 			"format 0x%08x to spa_video_format", format);
 		abort();
 	}
