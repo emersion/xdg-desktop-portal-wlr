@@ -3,7 +3,10 @@
   lib,
   cmake,
   qtbase,
+  makeShellWrapper,
   wrapQtAppsHook,
+  grim,
+  slurp,
   version ? "git",
   ...
 }:
@@ -12,6 +15,14 @@ stdenv.mkDerivation {
   inherit version;
   src = ../hyprland-share-picker;
 
-  nativeBuildInputs = [cmake wrapQtAppsHook];
+  nativeBuildInputs = [cmake wrapQtAppsHook makeShellWrapper];
   buildInputs = [qtbase];
+
+  dontWrapQtApps = true;
+
+  postInstall = ''
+    wrapProgramShell $out/bin/hyprland-share-picker \
+      "''${qtWrapperArgs[@]}" \
+      --prefix PATH ":" ${lib.makeBinPath [grim slurp]}
+  '';
 }

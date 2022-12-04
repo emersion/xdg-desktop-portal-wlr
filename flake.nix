@@ -1,13 +1,20 @@
 {
   description = "xdg-desktop-portal-hyprland";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+
+    hyprland-protocols = {
+      url = "github:hyprwm/hyprland-protocols";
+      flake = false;
+    };
+  };
 
   outputs = {
     self,
     nixpkgs,
     ...
-  }: let
+  } @ inputs: let
     inherit (nixpkgs) lib;
     genSystems = lib.genAttrs [
       "aarch64-linux"
@@ -23,6 +30,7 @@
     overlays.default = _: prev: {
       xdg-desktop-portal-hyprland = prev.callPackage ./nix/default.nix {
         version = "0.pre" + "+date=" + (mkDate (self.lastModifiedDate or "19700101")) + "_" + (self.shortRev or "dirty");
+        inherit (inputs) hyprland-protocols;
       };
     };
 

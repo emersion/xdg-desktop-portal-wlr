@@ -61,12 +61,17 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 
 	cast->ctx = ctx;
 	cast->target = out;
-	if (ctx->state->config->screencast_conf.max_fps > 0) {
-		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out.output->framerate ?
-			ctx->state->config->screencast_conf.max_fps : (uint32_t)out.output->framerate;
-	} else {
-		cast->max_framerate = (uint32_t)out.output->framerate;
+	if (out.output == NULL) {
+        cast->max_framerate = 60;  // dirty
+    } else {
+		if (ctx->state->config->screencast_conf.max_fps > 0) {
+			cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out.output->framerate ?
+				ctx->state->config->screencast_conf.max_fps : (uint32_t)out.output->framerate;
+		} else {
+			cast->max_framerate = (uint32_t)out.output->framerate;
+		}
 	}
+	
 	cast->framerate = cast->max_framerate;
 	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
@@ -118,8 +123,8 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 
     struct xdpw_share out;
     out = xdpw_wlr_chooser(ctx);
-	if (!out.output) {
-		logprint(ERROR, "wlroots: no output found");
+	if (!out.output && out.window_handle == -1) {
+		logprint(ERROR, "wlroots: no output / window found");
 		return false;
 	}
 
@@ -152,8 +157,13 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
 			out, with_cursor);
 	}
-	logprint(INFO, "wlroots: output: %s",
-		sess->screencast_instance->target.output->name);
+	if (out.output) {
+        logprint(INFO, "wlroots: output: %s",
+                 sess->screencast_instance->target.output->name);
+	} else {
+		logprint(INFO, "hyprland: window handle %d", sess->screencast_instance->target.window_handle);
+	}
+	
 
 	return true;
 

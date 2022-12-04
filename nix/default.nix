@@ -9,6 +9,7 @@
   wayland-protocols,
   wayland-scanner,
   grim,
+  hyprland-protocols,
   inih,
   libdrm,
   mesa,
@@ -31,6 +32,12 @@ in
     depsBuildBuild = [pkg-config];
     nativeBuildInputs = [meson ninja pkg-config wayland-scanner makeWrapper];
     buildInputs = [inih libdrm mesa pipewire systemd wayland wayland-protocols];
+
+    preConfigure = ''
+      rmdir protocols/hyprland-protocols
+
+      ln -s ${hyprland-protocols.outPath}/ protocols/hyprland-protocols
+    '';
 
     mesonFlags = [
       "-Dsd-bus-provider=libsystemd"
