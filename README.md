@@ -11,7 +11,7 @@ Although `-wlr` **does** work with Hyprland, `-hyprland` offers more features.
 ## Building
 
 ```sh
-meson build
+meson build --prefix=/usr
 ninja -C build
 cd hyprland-share-picker && make all && cd ..
 ```
