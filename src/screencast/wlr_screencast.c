@@ -519,7 +519,13 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
     FILE *fp;
 	char buf[1024] = {0};
 
-    fp = popen("bash -c \"hyprland-share-picker\"", "r");
+	const char* WAYLAND_DISPLAY = getenv("WAYLAND_DISPLAY");
+
+	char cmd[128] = "WAYLAND_DISPLAY=";
+	strcat(cmd, WAYLAND_DISPLAY);
+	strcat(cmd, " hyprland-share-picker");
+
+    fp = popen(cmd, "r");
     if (fp == NULL) {
         printf("Failed to run command\n");
         exit(1);
