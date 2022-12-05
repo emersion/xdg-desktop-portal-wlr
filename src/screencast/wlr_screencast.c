@@ -520,9 +520,12 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 	char buf[1024] = {0};
 
 	const char* WAYLAND_DISPLAY = getenv("WAYLAND_DISPLAY");
+	const char* XCURSOR_SIZE = getenv("XCURSOR_SIZE");
 
-	char cmd[128] = "WAYLAND_DISPLAY=";
+	char cmd[256] = "WAYLAND_DISPLAY=";
 	strcat(cmd, WAYLAND_DISPLAY);
+	strcat(cmd, " XCURSOR_SIZE=");
+	strcat(cmd, XCURSOR_SIZE ? XCURSOR_SIZE : "24");
     strcat(cmd, " QT_QPA_PLATFORM=wayland hyprland-share-picker");
 
     fp = popen(cmd, "r");
