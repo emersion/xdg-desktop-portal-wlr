@@ -528,6 +528,8 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 	strcat(cmd, XCURSOR_SIZE ? XCURSOR_SIZE : "24");
     strcat(cmd, " QT_QPA_PLATFORM=wayland hyprland-share-picker");
 
+    logprint(DEBUG, "Screencast: Picker: Running command \"%s\"", cmd);
+
     fp = popen(cmd, "r");
     if (fp == NULL) {
         printf("Failed to run command\n");
@@ -546,7 +548,9 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
 	if (strncmp(result, "screen:", 7) == 0) {
 		// find output
-		char* display_name = malloc(strlen(result) - 7);
+        logprint(DEBUG, "Screencast: Attempting to find screen for %s", result);
+
+        char* display_name = malloc(strlen(result) - 7);
         strncpy(display_name, result + 7, strlen(result) - 8);
 		display_name[strlen(result) - 8] = 0;
 
@@ -568,7 +572,9 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 		return res;
     } else if (strncmp(result, "region:", 7) == 0) {
         // find output
-		int atPos = 7;
+        logprint(DEBUG, "Screencast: Attempting to find region for %s", result);
+
+        int atPos = 7;
 		for (int i = 7; i < (int)strlen(result); ++i) {
 			if (result[i] == '@'){
 				atPos = i;
@@ -611,8 +617,11 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 		return res2;
     } else if (strncmp(result, "window:", 7) == 0) {
 		if (ctx->hyprland_toplevel_manager == NULL) {
-			return res;
+            logprint(DEBUG, "Screencast: Window sharing attempted but the toplevel protocol is not implemented by the compositor!");
+            return res;
 		}
+
+        logprint(DEBUG, "Screencast: Attempting to find window for %s", result);
 
         char *display_name = malloc(strlen(result) - 7);
         strncpy(display_name, result + 7, strlen(result) - 8);
@@ -623,6 +632,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 		free(display_name);
         return res;
     } else {
+        logprint(DEBUG, "Screencast: Invalid result from hyprland-share-picker: ", result);
         return res;
     }
 
