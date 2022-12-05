@@ -29,6 +29,11 @@ ninja -C build install
 sudo cp ./hyprland-share-picker/build/hyprland-share-picker /usr/bin
 ```
 
+### AUR
+```sh
+yay -S xdg-desktop-portal-hyprland-git
+```
+
 ## Usage
 
 Although should start automatically, consult [the Hyprland wiki](https://wiki.hyprland.org/Useful-Utilities/Hyprland-desktop-portal/)
