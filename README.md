@@ -8,6 +8,10 @@ we have a separate desktop portal impl for Hyprland.
 
 Although `-wlr` **does** work with Hyprland, `-hyprland` offers more features.
 
+## Additional dependencies
+XDPH depends on `qt6` and `qt6-wayland` for the sharing selector. Lack of either will
+cause screensharing to not work at all.
+
 ## Building
 
 ```sh
