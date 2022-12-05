@@ -523,7 +523,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
 	char cmd[128] = "WAYLAND_DISPLAY=";
 	strcat(cmd, WAYLAND_DISPLAY);
-	strcat(cmd, " hyprland-share-picker");
+    strcat(cmd, " QT_QPA_PLATFORM=wayland hyprland-share-picker");
 
     fp = popen(cmd, "r");
     if (fp == NULL) {
