@@ -519,13 +519,16 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
     FILE *fp;
 	char buf[1024] = {0};
 
-	const char* WAYLAND_DISPLAY = getenv("WAYLAND_DISPLAY");
-	const char* XCURSOR_SIZE = getenv("XCURSOR_SIZE");
+	const char *WAYLAND_DISPLAY = getenv("WAYLAND_DISPLAY");
+	const char *XCURSOR_SIZE = getenv("XCURSOR_SIZE");
+    const char *HYPRLAND_INSTANCE_SIGNATURE = getenv("HYPRLAND_INSTANCE_SIGNATURE");
 
-	char cmd[256] = "WAYLAND_DISPLAY=";
+    char cmd[256] = "WAYLAND_DISPLAY=";
 	strcat(cmd, WAYLAND_DISPLAY);
 	strcat(cmd, " XCURSOR_SIZE=");
 	strcat(cmd, XCURSOR_SIZE ? XCURSOR_SIZE : "24");
+	strcat(cmd, " HYPRLAND_INSTANCE_SIGNATURE=");
+	strcat(cmd, HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0");
     strcat(cmd, " QT_QPA_PLATFORM=wayland hyprland-share-picker");
 
     logprint(DEBUG, "Screencast: Picker: Running command \"%s\"", cmd);
