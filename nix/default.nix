@@ -8,13 +8,11 @@
   pkg-config,
   wayland-protocols,
   wayland-scanner,
-  grim,
   hyprland-protocols,
   inih,
   libdrm,
   mesa,
   pipewire,
-  slurp,
   systemd,
   wayland,
   libsForQt5,
@@ -44,9 +42,7 @@ in
     ];
 
     postInstall = ''
-      ln -s ${hyprland-share-picker.outPath}/bin $out/
-
-      wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [grim slurp]}
+      wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [hyprland-share-picker]}
     '';
 
     meta = with lib; {
