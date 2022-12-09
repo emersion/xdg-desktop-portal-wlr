@@ -8,6 +8,7 @@
   pkg-config,
   wayland-protocols,
   wayland-scanner,
+  hyprland-share-picker,
   hyprland-protocols,
   inih,
   libdrm,
@@ -17,39 +18,38 @@
   wayland,
   libsForQt5,
   version ? "git",
-}: let
-  hyprland-share-picker = libsForQt5.callPackage ./hyprland-share-picker.nix {inherit version;};
-in
-  stdenv.mkDerivation {
-    pname = "xdg-desktop-portal-hyprland";
-    inherit version;
+}:
+stdenv.mkDerivation {
+  pname = "xdg-desktop-portal-hyprland";
+  inherit version;
 
-    src = ../.;
+  src = ../.;
 
-    strictDeps = true;
-    depsBuildBuild = [pkg-config];
-    nativeBuildInputs = [meson ninja pkg-config wayland-scanner makeWrapper];
-    buildInputs = [inih libdrm mesa pipewire systemd wayland wayland-protocols];
+  strictDeps = true;
+  depsBuildBuild = [pkg-config];
+  nativeBuildInputs = [meson ninja pkg-config wayland-scanner makeWrapper];
+  buildInputs = [inih libdrm mesa pipewire systemd wayland wayland-protocols];
 
-    preConfigure = ''
-      rmdir protocols/hyprland-protocols
+  preConfigure = ''
+    # for some reason rmdir doesn't work in a dirty tree
+    rmdir protocols/hyprland-protocols || true
 
-      ln -s ${hyprland-protocols.outPath}/ protocols/hyprland-protocols
-    '';
+    ln -s ${hyprland-protocols.outPath}/ protocols/hyprland-protocols
+  '';
 
-    mesonFlags = [
-      "-Dsd-bus-provider=libsystemd"
-    ];
+  mesonFlags = [
+    "-Dsd-bus-provider=libsystemd"
+  ];
 
-    postInstall = ''
-      wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [hyprland-share-picker]}
-    '';
+  postInstall = ''
+    wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [hyprland-share-picker]}
+  '';
 
-    meta = with lib; {
-      homepage = "https://github.com/emersion/xdg-desktop-portal-hyprland";
-      description = "xdg-desktop-portal backend for Hyprland";
-      maintainers = with maintainers; [fufexan];
-      platforms = platforms.linux;
-      license = licenses.mit;
-    };
-  }
+  meta = with lib; {
+    homepage = "https://github.com/emersion/xdg-desktop-portal-hyprland";
+    description = "xdg-desktop-portal backend for Hyprland";
+    maintainers = with maintainers; [fufexan];
+    platforms = platforms.linux;
+    license = licenses.mit;
+  };
+}

@@ -26,12 +26,15 @@
       (builtins.substring 4 2 longDate)
       (builtins.substring 6 2 longDate)
     ]);
+    version = "0.pre" + "+date=" + (mkDate (self.lastModifiedDate or "19700101")) + "_" + (self.shortRev or "dirty");
   in {
-    overlays.default = _: prev: {
+    overlays.default = _: prev: rec {
       xdg-desktop-portal-hyprland = prev.callPackage ./nix/default.nix {
-        version = "0.pre" + "+date=" + (mkDate (self.lastModifiedDate or "19700101")) + "_" + (self.shortRev or "dirty");
         inherit (inputs) hyprland-protocols;
+        inherit hyprland-share-picker version;
       };
+
+      hyprland-share-picker = prev.libsForQt5.callPackage ./nix/hyprland-share-picker.nix {inherit version;};
     };
 
     packages = genSystems (system:

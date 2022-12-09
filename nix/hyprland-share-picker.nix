@@ -5,6 +5,7 @@
   qtbase,
   makeShellWrapper,
   wrapQtAppsHook,
+  hyprland,
   slurp,
   version ? "git",
   ...
@@ -22,6 +23,6 @@ stdenv.mkDerivation {
   postInstall = ''
     wrapProgramShell $out/bin/hyprland-share-picker \
       "''${qtWrapperArgs[@]}" \
-      --prefix PATH ":" ${lib.makeBinPath [slurp]}
+      --prefix PATH ":" ${lib.makeBinPath [slurp hyprland]}
   '';
 }
