@@ -39,6 +39,12 @@ yay -S xdg-desktop-portal-hyprland-git
 Although should start automatically, consult [the Hyprland wiki](https://wiki.hyprland.org/Useful-Utilities/Hyprland-desktop-portal/)
 in case of issues.
 
+## For other wlroots-based compositors
+If you are a developer and wish to support features that XDPH provides, make sure to support those protocols:
+ - `wlr_foreign_toplevel_management_unstable_v1`
+ - `hyprland_toplevel_export_v1` - XDPH uses Rev2 exclusively (`_with_toplevel_handle`)
+
+
 ## License
 MIT
 
