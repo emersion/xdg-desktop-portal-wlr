@@ -46,7 +46,7 @@ stdenv.mkDerivation {
   '';
 
   meta = with lib; {
-    homepage = "https://github.com/emersion/xdg-desktop-portal-hyprland";
+    homepage = "https://github.com/hyprwm/xdg-desktop-portal-hyprland";
     description = "xdg-desktop-portal backend for Hyprland";
     maintainers = with maintainers; [fufexan];
     platforms = platforms.linux;
