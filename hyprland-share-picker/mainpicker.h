@@ -4,6 +4,7 @@
 #include <QMainWindow>
 #include <QObject>
 #include <QEvent>
+#include <unordered_map>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainPicker; }
@@ -18,6 +19,8 @@ public:
     ~MainPicker();
 
     void onMonitorButtonClicked(QObject* target, QEvent* event);
+
+    std::unordered_map<void*, int> windowIDs; // button -> id
 
 private:
     Ui::MainPicker *ui;

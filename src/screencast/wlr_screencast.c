@@ -3,6 +3,7 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
 #include "xdg-output-unstable-v1-client-protocol.h"
+#include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
 #include "hyprland-toplevel-export-v1-client-protocol.h"
 #include <fcntl.h>
 #include <limits.h>
@@ -24,6 +25,117 @@
 #include "xdpw.h"
 #include "logger.h"
 #include "fps_limit.h"
+//
+
+struct SToplevelEntry {
+    struct zwlr_foreign_toplevel_handle_v1 *handle;
+    char name[256];
+    char clazz[256];
+	struct wl_list link;
+};
+
+void handleTitle(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *title) {
+    struct xdpw_screencast_context *ctx = data;
+
+    struct SToplevelEntry *current;
+    wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
+		if (current->handle == handle) {
+			strncpy(current->name, title, 255);
+			current->name[255] = '\0';
+			break;
+		}
+	}
+}
+
+void handleAppID(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, const char *app_id) {
+    struct xdpw_screencast_context *ctx = data;
+
+    struct SToplevelEntry *current;
+    wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
+		if (current->handle == handle) {
+			strncpy(current->clazz, app_id, 255);
+			current->name[255] = '\0';
+            break;
+        }
+	}
+}
+
+void handleOutputEnter(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    ;  // noop
+}
+
+void handleOutputLeave(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_output *output) {
+    ;  // noop
+}
+
+void handleState(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct wl_array *state) {
+    ;  // noop
+}
+
+void handleDone(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    ; // noop
+}
+
+void handleClosed(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle) {
+    struct xdpw_screencast_context *ctx = data;
+
+    struct SToplevelEntry *current;
+    wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
+        if (current->handle == handle) {
+            break;
+        }
+    }
+
+	wl_list_remove(&current->link);
+}
+
+void handleParent(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, struct zwlr_foreign_toplevel_handle_v1 *parent) {
+    ;  // noop
+}
+
+struct zwlr_foreign_toplevel_handle_v1_listener toplevelHandleListener = {
+    .title = handleTitle,
+    .app_id = handleAppID,
+    .output_enter = handleOutputEnter,
+    .output_leave = handleOutputLeave,
+    .state = handleState,
+    .done = handleDone,
+    .closed = handleClosed,
+    .parent = handleParent,
+};
+
+void handleToplevel(void *data, struct zwlr_foreign_toplevel_manager_v1 *manager, struct zwlr_foreign_toplevel_handle_v1 *toplevel) {
+    struct xdpw_screencast_context *ctx = data;
+
+	struct SToplevelEntry* entry = malloc(sizeof(struct SToplevelEntry));
+
+	entry->handle = toplevel;
+
+    wl_list_insert(&ctx->toplevel_resource_list, &entry->link);
+
+    zwlr_foreign_toplevel_handle_v1_add_listener(toplevel, &toplevelHandleListener, ctx);
+}
+
+void handleFinished(void *data, struct zwlr_foreign_toplevel_manager_v1 *zwlr_foreign_toplevel_manager_v1) {
+	; // noop
+}
+
+struct zwlr_foreign_toplevel_manager_v1_listener toplevelListener = {
+    .toplevel = handleToplevel,
+    .finished = handleFinished,
+};
+
+struct SToplevelEntry* toplevelEntryFromID(struct xdpw_screencast_context *ctx, uint32_t id) {
+    struct SToplevelEntry *current;
+    wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
+        if (((uint64_t)current->handle & 0xFFFFFFFF) == id) {
+            return current;
+        }
+    }
+	return NULL;
+}
+
+///
 
 void wlr_frame_free(struct xdpw_screencast_instance *cast) {
 	if (!cast->wlr_frame) {
@@ -423,8 +535,15 @@ void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
             cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output);
     } else {
 		// share window
-        cast->frame_callback_hyprland = hyprland_toplevel_export_manager_v1_capture_toplevel(
-			cast->ctx->hyprland_toplevel_manager, cast->with_cursor, cast->target.window_handle);
+		struct SToplevelEntry* entry = toplevelEntryFromID(cast->ctx, cast->target.window_handle);
+
+		if (!entry) {
+            logprint(DEBUG, "hyprland: error in getting entry");
+			return;
+        }
+
+        cast->frame_callback_hyprland = hyprland_toplevel_export_manager_v1_capture_toplevel_with_wlr_toplevel_handle(
+			cast->ctx->hyprland_toplevel_manager, cast->with_cursor, entry->handle);
 
         hyprland_toplevel_export_frame_v1_add_listener(cast->frame_callback_hyprland,
 			&hyprland_frame_listener, cast);
@@ -514,6 +633,65 @@ static void wlr_init_xdg_outputs(struct xdpw_screencast_context *ctx) {
 	}
 }
 
+// stolen from LLVM cuz it wouldnt include lol
+static inline int vasprintf(char **strp, const char *fmt, va_list ap) {
+    const size_t buff_size = 256;
+    if ((*strp = (char *)malloc(buff_size)) == NULL) {
+        return -1;
+    }
+
+    va_list ap_copy;
+    // va_copy may not be provided by the C library in C++ 03 mode.
+#if defined(_LIBCPP_CXX03_LANG) && __has_builtin(__builtin_va_copy)
+    __builtin_va_copy(ap_copy, ap);
+#else
+    va_copy(ap_copy, ap);
+#endif
+    int str_size = vsnprintf(*strp, buff_size, fmt, ap_copy);
+    va_end(ap_copy);
+
+    if ((size_t)str_size >= buff_size) {
+        if ((*strp = (char *)realloc(*strp, str_size + 1)) == NULL) {
+            return -1;
+        }
+        str_size = vsnprintf(*strp, str_size + 1, fmt, ap);
+    }
+    return str_size;
+}
+
+char *getFormat(const char *fmt, ...) {
+    char *outputStr = NULL;
+
+    va_list args;
+    va_start(args, fmt);
+    vasprintf(&outputStr, fmt, args);
+    va_end(args);
+
+    return outputStr;
+}
+
+char* buildWindowList(struct xdpw_screencast_context *ctx) {
+
+	char* rolling = calloc(1, 1);
+
+	struct SToplevelEntry* current;
+	wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
+		
+		char* oldRolling = rolling;
+
+		rolling = getFormat("%s%u[HC\011]%s[HT\011]%s[HE\011]", rolling, (uint32_t)(((uint64_t)current->handle) & 0xFFFFFFFF), current->clazz, current->name);
+
+		free(oldRolling);
+	}
+
+	for (size_t i = 0; i < strlen(rolling); ++i) {
+		if (rolling[i] == '\"')
+			rolling[i] = ' ';
+	}
+
+	return rolling;
+}
+
 struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
     char result[1024] = {0};
     FILE *fp;
@@ -523,13 +701,11 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 	const char *XCURSOR_SIZE = getenv("XCURSOR_SIZE");
     const char *HYPRLAND_INSTANCE_SIGNATURE = getenv("HYPRLAND_INSTANCE_SIGNATURE");
 
-    char cmd[256] = "WAYLAND_DISPLAY=";
-	strcat(cmd, WAYLAND_DISPLAY);
-	strcat(cmd, " XCURSOR_SIZE=");
-	strcat(cmd, XCURSOR_SIZE ? XCURSOR_SIZE : "24");
-	strcat(cmd, " HYPRLAND_INSTANCE_SIGNATURE=");
-	strcat(cmd, HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0");
-    strcat(cmd, " QT_QPA_PLATFORM=wayland hyprland-share-picker");
+	char* windowList = buildWindowList(ctx);
+
+    char *cmd = getFormat("WAYLAND_DISPLAY=%s XCURSOR_SIZE=%s HYPRLAND_INSTANCE_SIGNATURE=%s XDPH_WINDOW_SHARING_LIST=\"%s\" hyprland-share-picker", WAYLAND_DISPLAY, XCURSOR_SIZE ? XCURSOR_SIZE : "24", HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0", windowList);
+
+	free(windowList);
 
     logprint(DEBUG, "Screencast: Picker: Running command \"%s\"", cmd);
 
@@ -544,6 +720,8 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
     }
 
     pclose(fp);
+
+	free(cmd);
 
 	// great, let's parse it.
 
@@ -630,7 +808,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
         strncpy(display_name, result + 7, strlen(result) - 8);
         display_name[strlen(result) - 8] = 0;
 
-        res.window_handle = strtol(display_name, NULL, 16);
+        res.window_handle = strtol(display_name, NULL, 10);
 
 		free(display_name);
         return res;
@@ -880,6 +1058,17 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "hyprland: |-- registered to interface %s (Version %u)", interface, version);
 
         ctx->hyprland_toplevel_manager = wl_registry_bind(reg, id, &hyprland_toplevel_export_manager_v1_interface, version);
+    }
+
+	if (!strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name)) {
+		uint32_t version = ver;
+
+        logprint(DEBUG, "hyprland: |-- registered to interface %s (Version %u)", interface, version);
+
+        ctx->wlroots_toplevel_manager = wl_registry_bind(reg, id, &zwlr_foreign_toplevel_manager_v1_interface, version);
+		wl_list_init(&ctx->toplevel_resource_list);
+
+        zwlr_foreign_toplevel_manager_v1_add_listener(ctx->wlroots_toplevel_manager, &toplevelListener, ctx);
     }
 
     if (strcmp(interface, wl_shm_interface.name) == 0) {

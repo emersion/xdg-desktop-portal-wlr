@@ -16,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <array>
+#include <vector>
 
 std::string execAndGet(const char* cmd) {
     std::array<char, 128> buffer;
@@ -31,12 +32,58 @@ std::string execAndGet(const char* cmd) {
 }
 
 QApplication* pickerPtr = nullptr;
+MainPicker* mainPickerPtr = nullptr;
+
+struct SWindowEntry {
+    std::string name;
+    std::string clazz;
+    int id = 0;
+};
+
+std::vector<SWindowEntry> getWindows(const char* env) {
+    std::vector<SWindowEntry> result;
+
+    if (!env)
+        return result;
+
+    std::string rolling = env;
+
+    while (!rolling.empty()) {
+        // ID
+        const auto IDSEPPOS = rolling.find("[HC\011]");
+        const auto IDSTR = rolling.substr(0, IDSEPPOS);
+
+        // class
+        const auto CLASSSEPPOS = rolling.find("[HT\011]");
+        const auto CLASSSTR = rolling.substr(IDSEPPOS + 5, CLASSSEPPOS - IDSEPPOS - 5);
+
+        // title
+        const auto TITLESEPPOS = rolling.find("[HE\011]");
+        const auto TITLESTR = rolling.substr(CLASSSEPPOS + 5, TITLESEPPOS - 5 - CLASSSEPPOS);
+
+        try {
+            result.push_back({TITLESTR, CLASSSTR, std::stoi(IDSTR)});
+        } catch (...) {
+            std::cout << "err\n"; // silent err
+        }
+
+        rolling = rolling.substr(TITLESEPPOS + 5);
+    }
+
+    return result;
+}
 
 int main(int argc, char *argv[]) {
     qputenv("QT_LOGGING_RULES", "qml=false");
+
+    const char* WINDOWLISTSTR = getenv("XDPH_WINDOW_SHARING_LIST");
+
+    const auto WINDOWLIST = getWindows(WINDOWLISTSTR);
+
     QApplication picker(argc, argv);
     pickerPtr = &picker;
     MainPicker w;
+    mainPickerPtr = &w;
 
     // get the tabwidget
     const auto TABWIDGET = (QTabWidget*)w.children()[1]->children()[0];
@@ -82,29 +129,18 @@ int main(int argc, char *argv[]) {
 
     // loop over them
     int windowIterator = 0;
-    while (windowsList.find("Window ") != std::string::npos) {
-        auto windowPropLen = windowsList.find("Window ", windowsList.find("\n\n") + 2);
-        if (windowPropLen == std::string::npos)
-            windowPropLen = windowsList.length();
-        const std::string windowProp = windowsList.substr(0, windowPropLen);
-        windowsList = windowsList.substr(windowPropLen);
+    for (auto& window : WINDOWLIST) {
 
-        // get window name
-        auto windowName = windowProp.substr(windowProp.find(" -> ") + 4);
-        windowName = windowName.substr(0, windowName.find_first_of('\n') - 1);
-
-        auto windowHandle = windowProp.substr(7, windowProp.find(" -> ") - 7);
-
-        QString text = QString::fromStdString("Window " + windowHandle + ": " + windowName);
+        QString text = QString::fromStdString(window.clazz + ": " + window.name);
 
         QPushButton* button = new QPushButton(text, (QWidget*)WINDOWS_SCROLL_AREA_CONTENTS);
         button->move(9, 5 + (BUTTON_HEIGHT + BUTTON_PAD) * windowIterator);
         button->resize(BUTTON_WIDTH, BUTTON_HEIGHT);
-        QObject::connect(button, &QPushButton::clicked, [=] () {
-            std::string HANDLE = button->text().toStdString();
-            HANDLE = HANDLE.substr(7, HANDLE.find_first_of(':') - 7);
 
-            std::cout << "window:" << HANDLE << "\n";
+        mainPickerPtr->windowIDs[button] = window.id;
+
+        QObject::connect(button, &QPushButton::clicked, [=] () {
+            std::cout << "window:" << mainPickerPtr->windowIDs[button] << "\n";
             pickerPtr->quit();
             return 0;
         });
