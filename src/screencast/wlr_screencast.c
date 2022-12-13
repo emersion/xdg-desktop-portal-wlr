@@ -703,7 +703,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
 	char* windowList = buildWindowList(ctx);
 
-    char *cmd = getFormat("WAYLAND_DISPLAY=%s XCURSOR_SIZE=%s HYPRLAND_INSTANCE_SIGNATURE=%s XDPH_WINDOW_SHARING_LIST=\"%s\" hyprland-share-picker", WAYLAND_DISPLAY, XCURSOR_SIZE ? XCURSOR_SIZE : "24", HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0", windowList);
+    char *cmd = getFormat("WAYLAND_DISPLAY=%s QT_QPA_PLATFORM=\"wayland\" XCURSOR_SIZE=%s HYPRLAND_INSTANCE_SIGNATURE=%s XDPH_WINDOW_SHARING_LIST=\"%s\" hyprland-share-picker", WAYLAND_DISPLAY, XCURSOR_SIZE ? XCURSOR_SIZE : "24", HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0", windowList);
 
 	free(windowList);
 
