@@ -813,7 +813,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 		free(display_name);
         return res;
     } else {
-        logprint(DEBUG, "Screencast: Invalid result from hyprland-share-picker: ", result);
+        logprint(DEBUG, "Screencast: Invalid result from hyprland-share-picker: %s", result);
         return res;
     }
 
