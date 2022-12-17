@@ -64,7 +64,7 @@ std::vector<SWindowEntry> getWindows(const char* env) {
         try {
             result.push_back({TITLESTR, CLASSSTR, std::stoi(IDSTR)});
         } catch (...) {
-            std::cout << "err\n"; // silent err
+            // silent err
         }
 
         rolling = rolling.substr(TITLESEPPOS + 5);
