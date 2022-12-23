@@ -30,6 +30,7 @@
   in {
     overlays.default = _: prev: rec {
       xdg-desktop-portal-hyprland = prev.callPackage ./nix/default.nix {
+        stdenv = prev.gcc12Stdenv;
         inherit (inputs) hyprland-protocols;
         inherit hyprland-share-picker version;
       };
