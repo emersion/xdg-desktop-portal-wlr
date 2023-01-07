@@ -28,14 +28,7 @@ stdenv.mkDerivation {
   strictDeps = true;
   depsBuildBuild = [pkg-config];
   nativeBuildInputs = [meson ninja pkg-config wayland-scanner makeWrapper];
-  buildInputs = [inih libdrm mesa pipewire systemd wayland wayland-protocols];
-
-  preConfigure = ''
-    # for some reason rmdir doesn't work in a dirty tree
-    rmdir protocols/hyprland-protocols || true
-
-    ln -s ${hyprland-protocols.outPath}/ protocols/hyprland-protocols
-  '';
+  buildInputs = [hyprland-protocols inih libdrm mesa pipewire systemd wayland wayland-protocols];
 
   mesonFlags = [
     "-Dsd-bus-provider=libsystemd"

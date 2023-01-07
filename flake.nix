@@ -6,7 +6,7 @@
 
     hyprland-protocols = {
       url = "github:hyprwm/hyprland-protocols";
-      flake = false;
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 
@@ -31,7 +31,7 @@
     overlays.default = _: prev: rec {
       xdg-desktop-portal-hyprland = prev.callPackage ./nix/default.nix {
         stdenv = prev.gcc12Stdenv;
-        inherit (inputs) hyprland-protocols;
+        inherit (inputs.hyprland-protocols.packages.${prev.hostPlatform.system}) hyprland-protocols;
         inherit hyprland-share-picker version;
       };
 

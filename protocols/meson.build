@@ -1,4 +1,5 @@
 wl_protocol_dir = wayland_protos.get_variable('pkgdatadir')
+hl_protocol_dir = hyprland_protos.get_variable('pkgdatadir')
 
 wayland_scanner_dep = dependency('wayland-scanner', required: false, native: true)
 if wayland_scanner_dep.found()
@@ -13,9 +14,9 @@ endif
 client_protocols = [
 	wl_protocol_dir / 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
 	wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
+	hl_protocol_dir / 'protocols/hyprland-toplevel-export-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
 	'wlr-foreign-toplevel-management-unstable-v1.xml',
-	'hyprland-protocols/protocols/hyprland-toplevel-export-v1.xml'
 ]
 
 wl_proto_files = []

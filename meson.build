@@ -24,6 +24,7 @@ inc = include_directories('include')
 
 rt = cc.find_library('rt')
 pipewire = dependency('libpipewire-0.3', version: '>= 0.3.41')
+hyprland_protos = dependency('hyprland-protocols', version: '>=0.1', fallback: 'hyprland-protocols')
 wayland_client = dependency('wayland-client')
 wayland_protos = dependency('wayland-protocols', version: '>=1.24')
 iniparser = dependency('inih')
