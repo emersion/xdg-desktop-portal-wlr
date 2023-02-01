@@ -676,6 +676,9 @@ char *getFormat(const char *fmt, ...) {
 char *buildWindowList(struct xdpw_screencast_context *ctx) {
     char *rolling = calloc(1, 1);
 
+    if (!ctx->wlroots_toplevel_manager)
+        return rolling;
+
     struct SToplevelEntry *current;
     wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
         char *oldRolling = rolling;
