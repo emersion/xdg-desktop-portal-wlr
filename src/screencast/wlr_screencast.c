@@ -41,7 +41,7 @@ void handleTitle(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
         if (current->handle == handle) {
             strncpy(current->name, title, 255);
             for (int i = 0; i < 255; ++i)
-                if (current->name[i] == '\"' || current->name[i] == '\011' || current->name[i] == '\'')
+                if (current->name[i] == '\"' || current->name[i] == '>' || current->name[i] == '\'')
                     current->name[i] = ' ';
             current->name[255] = '\0';
             break;
@@ -57,7 +57,7 @@ void handleAppID(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
         if (current->handle == handle) {
             strncpy(current->clazz, app_id, 255);
             for (int i = 0; i < 255; ++i)
-                if (current->clazz[i] == '\"' || current->clazz[i] == '\011' || current->clazz[i] == '\'')
+                if (current->clazz[i] == '\"' || current->clazz[i] == '>' || current->clazz[i] == '\'')
                     current->clazz[i] = ' ';
             current->name[255] = '\0';
             break;
@@ -689,7 +689,7 @@ char *buildWindowList(struct xdpw_screencast_context *ctx) {
     wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
         char *oldRolling = rolling;
 
-        rolling = getFormat("%s%u[HC\011]%s[HT\011]%s[HE\011]", rolling, (uint32_t)(((uint64_t)current->handle) & 0xFFFFFFFF), current->clazz, current->name);
+        rolling = getFormat("%s%u[HC>]%s[HT>]%s[HE>]", rolling, (uint32_t)(((uint64_t)current->handle) & 0xFFFFFFFF), current->clazz, current->name);
 
         free(oldRolling);
     }

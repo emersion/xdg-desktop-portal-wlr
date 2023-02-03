@@ -1,22 +1,21 @@
-#include "mainpicker.h"
-
 #include <QApplication>
-#include <QScreen>
-#include <QWidget>
-#include <QTabWidget>
-#include <QPushButton>
-#include <QtWidgets>
-#include <QtDebug>
-#include <QObject>
 #include <QEvent>
-#include <string>
-#include <iostream>
+#include <QObject>
+#include <QPushButton>
+#include <QScreen>
+#include <QTabWidget>
+#include <QWidget>
+#include <QtDebug>
+#include <QtWidgets>
+#include <array>
 #include <cstdio>
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <array>
 #include <vector>
+
+#include "mainpicker.h"
 
 std::string execAndGet(const char* cmd) {
     std::array<char, 128> buffer;
@@ -50,15 +49,15 @@ std::vector<SWindowEntry> getWindows(const char* env) {
 
     while (!rolling.empty()) {
         // ID
-        const auto IDSEPPOS = rolling.find("[HC\011]");
+        const auto IDSEPPOS = rolling.find("[HC>]");
         const auto IDSTR = rolling.substr(0, IDSEPPOS);
 
         // class
-        const auto CLASSSEPPOS = rolling.find("[HT\011]");
+        const auto CLASSSEPPOS = rolling.find("[HT>]");
         const auto CLASSSTR = rolling.substr(IDSEPPOS + 5, CLASSSEPPOS - IDSEPPOS - 5);
 
         // title
-        const auto TITLESEPPOS = rolling.find("[HE\011]");
+        const auto TITLESEPPOS = rolling.find("[HE>]");
         const auto TITLESTR = rolling.substr(CLASSSEPPOS + 5, TITLESEPPOS - 5 - CLASSSEPPOS);
 
         try {
@@ -73,7 +72,7 @@ std::vector<SWindowEntry> getWindows(const char* env) {
     return result;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     qputenv("QT_LOGGING_RULES", "qml=false");
 
     const char* WINDOWLISTSTR = getenv("XDPH_WINDOW_SHARING_LIST");
@@ -95,20 +94,18 @@ int main(int argc, char *argv[]) {
     // add all screens
     const auto SCREENS = picker.screens();
 
-    constexpr int BUTTON_WIDTH  = 441;
+    constexpr int BUTTON_WIDTH = 441;
     constexpr int BUTTON_HEIGHT = 41;
-    constexpr int BUTTON_PAD    = 4;
+    constexpr int BUTTON_PAD = 4;
 
     for (int i = 0; i < SCREENS.size(); ++i) {
         const auto GEOMETRY = SCREENS[i]->geometry();
 
-        QString text = QString::fromStdString(std::string("Screen " + std::to_string(i) + " at " + std::to_string(GEOMETRY.x()) + ", "
-                            + std::to_string(GEOMETRY.y()) + " (" + std::to_string(GEOMETRY.width()) + "x"
-                            + std::to_string(GEOMETRY.height()) + ") (") + SCREENS[i]->name().toStdString() + ")");
+        QString text = QString::fromStdString(std::string("Screen " + std::to_string(i) + " at " + std::to_string(GEOMETRY.x()) + ", " + std::to_string(GEOMETRY.y()) + " (" + std::to_string(GEOMETRY.width()) + "x" + std::to_string(GEOMETRY.height()) + ") (") + SCREENS[i]->name().toStdString() + ")");
         QPushButton* button = new QPushButton(text, (QWidget*)SCREENS_SCROLL_AREA_CONTENTS);
         button->move(9, 5 + (BUTTON_HEIGHT + BUTTON_PAD) * i);
         button->resize(BUTTON_WIDTH, BUTTON_HEIGHT);
-        QObject::connect(button, &QPushButton::clicked, [=] () {
+        QObject::connect(button, &QPushButton::clicked, [=]() {
             std::string ID = button->text().toStdString();
             ID = ID.substr(ID.find_last_of('(') + 1);
             ID = ID.substr(0, ID.find_last_of(')'));
@@ -124,13 +121,9 @@ int main(int argc, char *argv[]) {
     // windows
     const auto WINDOWS_SCROLL_AREA_CONTENTS = (QWidget*)TAB1->findChild<QWidget*>("windows")->findChild<QScrollArea*>("scrollArea_2")->findChild<QWidget*>("scrollAreaWidgetContents_2");
 
-    // get all windows from hyprctl
-    std::string windowsList = execAndGet("hyprctl clients");
-
     // loop over them
     int windowIterator = 0;
     for (auto& window : WINDOWLIST) {
-
         QString text = QString::fromStdString(window.clazz + ": " + window.name);
 
         QPushButton* button = new QPushButton(text, (QWidget*)WINDOWS_SCROLL_AREA_CONTENTS);
@@ -139,7 +132,7 @@ int main(int argc, char *argv[]) {
 
         mainPickerPtr->windowIDs[button] = window.id;
 
-        QObject::connect(button, &QPushButton::clicked, [=] () {
+        QObject::connect(button, &QPushButton::clicked, [=]() {
             std::cout << "window:" << mainPickerPtr->windowIDs[button] << "\n";
             pickerPtr->quit();
             return 0;
@@ -158,7 +151,7 @@ int main(int argc, char *argv[]) {
     QPushButton* button = new QPushButton(text, (QWidget*)REGION_OBJECT);
     button->move(79, 80);
     button->resize(321, 41);
-    QObject::connect(button, &QPushButton::clicked, [=] () {
+    QObject::connect(button, &QPushButton::clicked, [=]() {
         auto REGION = execAndGet("slurp -f \"%o %x %y %w %h\"");
         REGION = REGION.substr(0, REGION.length() - 1);
 
