@@ -1070,7 +1070,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
         ctx->hyprland_toplevel_manager = wl_registry_bind(reg, id, &hyprland_toplevel_export_manager_v1_interface, version);
     }
 
-    if (!strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name) && ctx->toplevel_mgr_bind && !ctx->wlroots_toplevel_manager) {
+    if (!strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name) && !ctx->wlroots_toplevel_manager) {
         uint32_t version = ver;
 
         logprint(DEBUG, "hyprland: |-- registered to interface %s (Version %u)", interface, version);

@@ -127,7 +127,6 @@ struct xdpw_screencast_context {
     struct hyprland_toplevel_export_manager_v1 *hyprland_toplevel_manager;
     struct zwlr_foreign_toplevel_manager_v1 *wlroots_toplevel_manager;
     struct wl_list toplevel_resource_list;
-    int toplevel_mgr_bind;
 
     // gbm
     struct gbm_device *gbm;

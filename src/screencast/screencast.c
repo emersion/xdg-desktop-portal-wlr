@@ -170,7 +170,6 @@ static int start_screencast(struct xdpw_screencast_instance *cast) {
     // process at least one frame so that we know
     // some of the metadata required for the pipewire
     // remote state connected event
-    cast->ctx->toplevel_mgr_bind = 1;
     wl_display_dispatch(cast->ctx->state->wl_display);
     wl_display_roundtrip(cast->ctx->state->wl_display);
 
@@ -522,7 +521,6 @@ int xdpw_screencast_init(struct xdpw_state *state) {
     state->screencast = (struct xdpw_screencast_context){0};
     state->screencast.state = state;
     state->screencast.hyprland_toplevel_manager = NULL;
-    state->screencast.toplevel_mgr_bind = 0;
 
     int err;
     err = xdpw_pwr_context_create(state);
