@@ -40,6 +40,9 @@ void handleTitle(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
     wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
         if (current->handle == handle) {
             strncpy(current->name, title, 255);
+            for (int i = 0; i < 255; ++i)
+                if (current->name[i] == '\"' || current->name[i] == '\011' || current->name[i] == '\'')
+                    current->name[i] = ' ';
             current->name[255] = '\0';
             break;
         }
@@ -53,6 +56,9 @@ void handleAppID(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
     wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
         if (current->handle == handle) {
             strncpy(current->clazz, app_id, 255);
+            for (int i = 0; i < 255; ++i)
+                if (current->clazz[i] == '\"' || current->clazz[i] == '\011' || current->clazz[i] == '\'')
+                    current->clazz[i] = ' ';
             current->name[255] = '\0';
             break;
         }
