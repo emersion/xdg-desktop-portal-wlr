@@ -36,7 +36,7 @@ MainPicker* mainPickerPtr = nullptr;
 struct SWindowEntry {
     std::string name;
     std::string clazz;
-    long unsigned int id = 0;
+    unsigned long long id = 0;
 };
 
 std::vector<SWindowEntry> getWindows(const char* env) {
@@ -61,7 +61,7 @@ std::vector<SWindowEntry> getWindows(const char* env) {
         const auto TITLESTR = rolling.substr(CLASSSEPPOS + 5, TITLESEPPOS - 5 - CLASSSEPPOS);
 
         try {
-            result.push_back({TITLESTR, CLASSSTR, std::stoll(IDSTR)});
+            result.push_back({TITLESTR, CLASSSTR, std::stoull(IDSTR)});
         } catch (std::exception& e) {
             // silent err
         }
