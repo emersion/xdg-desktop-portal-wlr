@@ -9,6 +9,8 @@
   wayland-protocols,
   wayland-scanner,
   hyprland-share-picker,
+  grim,
+  slurp,
   hyprland-protocols,
   inih,
   libdrm,
@@ -35,7 +37,7 @@ stdenv.mkDerivation {
   ];
 
   postInstall = ''
-    wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [hyprland-share-picker]}
+    wrapProgram $out/libexec/xdg-desktop-portal-hyprland --prefix PATH ":" ${lib.makeBinPath [hyprland-share-picker grim slurp]}
   '';
 
   meta = with lib; {
