@@ -122,12 +122,12 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 		return false;
 	}
 	target->with_cursor = with_cursor;
-	target->output = xdpw_wlr_output_chooser(ctx);
-	if (!target->output) {
+	if (!xdpw_wlr_target_chooser(ctx, target)) {
 		logprint(ERROR, "wlroots: no output found");
 		free(target);
 		return false;
 	}
+	assert(target->output);
 
 	// Disable screencast sharing to avoid sharing between dmabuf and shm capable clients
 	/*
