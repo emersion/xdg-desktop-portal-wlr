@@ -492,7 +492,7 @@ static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output
 	return xdpw_wlr_output_first(output_list);
 }
 
-struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx) {
+static struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx) {
 	switch (ctx->state->config->screencast_conf.chooser_type) {
 	case XDPW_CHOOSER_DEFAULT:
 		return wlr_output_chooser_default(&ctx->output_list);
@@ -528,6 +528,11 @@ struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *
 	}
 end:
 	return NULL;
+}
+
+bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target) {
+	target->output = xdpw_wlr_output_chooser(ctx);
+	return target->output != NULL;
 }
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
