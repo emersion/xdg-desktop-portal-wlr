@@ -302,6 +302,36 @@ static const struct wl_output_listener wlr_output_listener = {
 	.description = wlr_output_handle_description,
 };
 
+static struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
+	struct xdpw_wlr_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, output_list, link) {
+		return output;
+	}
+	return NULL;
+}
+
+static struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
+		const char *name) {
+	struct xdpw_wlr_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, output_list, link) {
+		if (strcmp(output->name, name) == 0) {
+			return output;
+		}
+	}
+	return NULL;
+}
+
+static struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx,
+		struct wl_output *out, uint32_t id) {
+	struct xdpw_wlr_output *output, *tmp;
+	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
+		if ((output->output == out) || (output->id == id)) {
+			return output;
+		}
+	}
+	return NULL;
+}
+
 static pid_t spawn_chooser(char *cmd, int chooser_in[2], int chooser_out[2]) {
 	logprint(TRACE,
 			"exec chooser called: cmd %s, pipe chooser_in (%d,%d), pipe chooser_out (%d,%d)",
@@ -497,36 +527,6 @@ struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *
 		return output;
 	}
 end:
-	return NULL;
-}
-
-struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
-	struct xdpw_wlr_output *output, *tmp;
-	wl_list_for_each_safe(output, tmp, output_list, link) {
-		return output;
-	}
-	return NULL;
-}
-
-struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
-		const char *name) {
-	struct xdpw_wlr_output *output, *tmp;
-	wl_list_for_each_safe(output, tmp, output_list, link) {
-		if (strcmp(output->name, name) == 0) {
-			return output;
-		}
-	}
-	return NULL;
-}
-
-struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx,
-		struct wl_output *out, uint32_t id) {
-	struct xdpw_wlr_output *output, *tmp;
-	wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
-		if ((output->output == out) || (output->id == id)) {
-			return output;
-		}
-	}
 	return NULL;
 }
 
