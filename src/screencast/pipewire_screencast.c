@@ -74,6 +74,53 @@ static struct spa_pod *fixate_format(struct spa_pod_builder *b, enum spa_video_f
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
+static uint32_t calc_param_size(struct xdpw_screencast_instance *cast, bool fixate, uint32_t min_size) {
+	// Read from spa/pod/pod.h
+	uint32_t size_objects = sizeof(struct spa_pod_object);
+	uint32_t size_props = sizeof(struct spa_pod_prop);
+	uint32_t size_choices = 2*sizeof(uint64_t);
+	uint32_t size_values = 1*sizeof(uint64_t);
+
+	// counted from fixate_format and build_buffer
+	uint32_t n_objects = 0;
+	uint32_t n_props = 0;
+	uint32_t n_choices = 0;
+	uint32_t n_values = 0;
+
+	bool shm_has_alpha = xdpw_format_pw_strip_alpha(cast->screencopy_frame_info[WL_SHM].format) != SPA_VIDEO_FORMAT_UNKNOWN;
+
+	if (fixate) {
+		// this is the max space required for fixate_format
+		n_objects += 1;
+		n_props += 7;
+		n_choices += 2;
+		n_values += 11;
+	}
+
+	uint32_t modifier_count;
+	if (!cast->avoid_dmabufs &&
+			wlr_query_dmabuf_modifiers(cast->ctx, cast->screencopy_frame_info[DMABUF].format, 0, NULL, &modifier_count) && modifier_count > 0) {
+		// DMABUF
+		n_objects += 1;
+		n_props += 7;
+		n_choices += 2;
+		n_values += 8 + modifier_count + 1;
+		// SHM
+		n_objects += 1;
+		n_props += 6;
+		n_choices += shm_has_alpha ? 2 : 1;
+		n_values += shm_has_alpha ? 10 : 8;
+	} else {
+		// SHM
+		n_objects += 1;
+		n_props += 6;
+		n_choices += shm_has_alpha ? 2 : 1;
+		n_values += shm_has_alpha ? 10 : 8;
+	}
+
+	return SPA_MAX(size_objects * n_objects + size_props * n_props + size_choices * n_choices + size_values * n_values, min_size);
+}
+
 static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_format format,
 		uint32_t width, uint32_t height, uint32_t framerate,
 		uint64_t *modifiers, int modifier_count) {
@@ -152,14 +199,17 @@ static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_
 		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
 				cast->screencopy_frame_info[DMABUF].width, cast->screencopy_frame_info[DMABUF].height, cast->framerate,
 				modifiers, modifier_count);
+		assert(params[0] != NULL);
 		params[1] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
 				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
 				NULL, 0);
+		assert(params[1] != NULL);
 	} else {
 		param_count = 1;
 		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
 				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
 				NULL, 0);
+		assert(params[0] != NULL);
 	}
 	free(modifiers);
 	return param_count;
@@ -197,7 +247,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	logprint(TRACE, "pipewire: stream parameters changed");
 	struct xdpw_screencast_instance *cast = data;
 	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
+	uint8_t params_buffer[calc_param_size(cast, true, 1024)];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[3];
@@ -468,7 +518,7 @@ done:
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
 	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
+	uint8_t params_buffer[calc_param_size(cast, false, 0)];
 	struct spa_pod_builder b =
 		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
 	const struct spa_pod *params[2];
@@ -484,7 +534,7 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 
 	pw_loop_enter(state->pw_loop);
 
-	uint8_t buffer[1024];
+	uint8_t buffer[calc_param_size(cast, false, 0)];
 	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
 	const struct spa_pod *params[2];
 
