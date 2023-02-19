@@ -48,7 +48,7 @@ void exec_with_shell(char *command) {
 }
 
 void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
-		struct xdpw_screencast_instance *cast, struct xdpw_wlr_output *out, bool with_cursor) {
+		struct xdpw_screencast_instance *cast, struct xdpw_screencast_target *target) {
 
 	// only run exec_before if there's no other instance running that already ran it
 	if (wl_list_empty(&ctx->screencast_instances)) {
@@ -60,15 +60,14 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	}
 
 	cast->ctx = ctx;
-	cast->target_output = out;
+	cast->target = target;
 	if (ctx->state->config->screencast_conf.max_fps > 0) {
-		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)out->framerate ?
-			ctx->state->config->screencast_conf.max_fps : (uint32_t)out->framerate;
+		cast->max_framerate = ctx->state->config->screencast_conf.max_fps < (uint32_t)target->output->framerate ?
+			ctx->state->config->screencast_conf.max_fps : (uint32_t)target->output->framerate;
 	} else {
-		cast->max_framerate = (uint32_t)out->framerate;
+		cast->max_framerate = (uint32_t)target->output->framerate;
 	}
 	cast->framerate = cast->max_framerate;
-	cast->with_cursor = with_cursor;
 	cast->refcount = 1;
 	cast->node_id = SPA_ID_INVALID;
 	cast->avoid_dmabufs = false;
@@ -93,6 +92,7 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 		}
 	}
 
+	free(cast->target);
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
 	assert(wl_list_length(&cast->buffer_list) == 0);
@@ -108,7 +108,7 @@ void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast) {
 	}
 }
 
-bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
+bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, bool with_cursor) {
 
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
@@ -116,10 +116,16 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 			output->make, output->model, output->id, output->name);
 	}
 
-	struct xdpw_wlr_output *out;
-	out = xdpw_wlr_output_chooser(ctx);
-	if (!out) {
+	struct xdpw_screencast_target *target = calloc(1, sizeof(struct xdpw_screencast_target));
+	if (!target) {
+		logprint(ERROR, "wlroots: unable to allocate target");
+		return false;
+	}
+	target->with_cursor = with_cursor;
+	target->output = xdpw_wlr_output_chooser(ctx);
+	if (!target->output) {
 		logprint(ERROR, "wlroots: no output found");
+		free(target);
 		return false;
 	}
 
@@ -128,10 +134,10 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 	struct xdpw_screencast_instance *cast, *tmp_c;
 	wl_list_for_each_reverse_safe(cast, tmp_c, &ctx->screencast_instances, link) {
 		logprint(INFO, "xdpw: existing screencast instance: %d %s cursor",
-			cast->target_output->id,
-			cast->with_cursor ? "with" : "without");
+			cast->target->output->id,
+			cast->target->with_cursor ? "with" : "without");
 
-		if (cast->target_output->id == out->id && cast->with_cursor == with_cursor) {
+		if (cast->target->output->id == target->output->id && cast->target->with_cursor == target->with_cursor) {
 			if (cast->refcount == 0) {
 				logprint(DEBUG,
 					"xdpw: matching cast instance found, "
@@ -149,11 +155,10 @@ bool setup_outputs(struct xdpw_screencast_context *ctx, struct xdpw_session *ses
 
 	if (!sess->screencast_instance) {
 		sess->screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
-		xdpw_screencast_instance_init(ctx, sess->screencast_instance,
-			out, with_cursor);
+		xdpw_screencast_instance_init(ctx, sess->screencast_instance, target);
 	}
 	logprint(INFO, "wlroots: output: %s",
-		sess->screencast_instance->target_output->name);
+		sess->screencast_instance->target->output->name);
 
 	return true;
 
@@ -346,7 +351,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: select sources: found matching session %s", sess->session_handle);
-				output_selection_canceled = !setup_outputs(ctx, sess, cursor_embedded);
+				output_selection_canceled = !setup_target(ctx, sess, cursor_embedded);
 		}
 	}
 

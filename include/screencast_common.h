@@ -129,6 +129,11 @@ struct xdpw_screencast_context {
 	struct wl_list screencast_instances;
 };
 
+struct xdpw_screencast_target {
+	struct xdpw_wlr_output *output;
+	bool with_cursor;
+};
+
 struct xdpw_screencast_instance {
 	// list
 	struct wl_list link;
@@ -153,11 +158,10 @@ struct xdpw_screencast_instance {
 
 	// wlroots
 	struct zwlr_screencopy_frame_v1 *frame_callback;
-	struct xdpw_wlr_output *target_output;
+	struct xdpw_screencast_target *target;
 	uint32_t max_framerate;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
-	bool with_cursor;
 	int err;
 	bool quit;
 	bool teardown;

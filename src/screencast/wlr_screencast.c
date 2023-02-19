@@ -249,7 +249,7 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
 	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-		cast->ctx->screencopy_manager, cast->with_cursor, cast->target_output->output);
+		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
 
 	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
 		&wlr_frame_listener, cast);
@@ -765,7 +765,7 @@ static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "wlroots: output removed (%s)", output->name);
 		struct xdpw_screencast_instance *cast, *tmp;
 		wl_list_for_each_safe(cast, tmp, &ctx->screencast_instances, link) {
-			if (cast->target_output == output) {
+			if (cast->target->output == output) {
 				// screencopy might be in process for this instance
 				wlr_frame_free(cast);
 				// instance might be waiting for wakeup by the frame limiter
