@@ -6,6 +6,7 @@
 #include <spa/param/props.h>
 #include <spa/param/format-utils.h>
 #include <spa/param/video/format-utils.h>
+#include <spa/pod/dynamic.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <assert.h>
@@ -140,7 +141,7 @@ static bool build_modifierlist(struct xdpw_screencast_instance *cast,
 	return ret;
 }
 
-static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_instance *cast,
+static uint32_t build_formats(struct spa_pod_builder *b[static 2], struct xdpw_screencast_instance *cast,
 		const struct spa_pod *params[static 2]) {
 	uint32_t param_count;
 	uint32_t modifier_count;
@@ -149,17 +150,20 @@ static uint32_t build_formats(struct spa_pod_builder *b, struct xdpw_screencast_
 	if (!cast->avoid_dmabufs &&
 			build_modifierlist(cast, cast->screencopy_frame_info[DMABUF].format, &modifiers, &modifier_count) && modifier_count > 0) {
 		param_count = 2;
-		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
+		params[0] = build_format(b[0], xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
 				cast->screencopy_frame_info[DMABUF].width, cast->screencopy_frame_info[DMABUF].height, cast->framerate,
 				modifiers, modifier_count);
-		params[1] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
+		assert(params[0] != NULL);
+		params[1] = build_format(b[1], xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
 				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
 				NULL, 0);
+		assert(params[1] != NULL);
 	} else {
 		param_count = 1;
-		params[0] = build_format(b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
+		params[0] = build_format(b[0], xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
 				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
 				NULL, 0);
+		assert(params[0] != NULL);
 	}
 	free(modifiers);
 	return param_count;
@@ -197,9 +201,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	logprint(TRACE, "pipewire: stream parameters changed");
 	struct xdpw_screencast_instance *cast = data;
 	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
-	struct spa_pod_builder b =
-		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
+	uint8_t params_buffer[3][1024];
+	struct spa_pod_dynamic_builder b[3];
 	const struct spa_pod *params[3];
 	uint32_t blocks;
 	uint32_t data_type;
@@ -207,6 +210,10 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	if (!param || id != SPA_PARAM_Format) {
 		return;
 	}
+
+	spa_pod_dynamic_builder_init(&b[0], params_buffer[0], sizeof(params_buffer[0]), 2048);
+	spa_pod_dynamic_builder_init(&b[1], params_buffer[1], sizeof(params_buffer[1]), 2048);
+	spa_pod_dynamic_builder_init(&b[2], params_buffer[2], sizeof(params_buffer[2]), 2048);
 
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
@@ -225,6 +232,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			uint32_t flags = GBM_BO_USE_RENDERING;
 			uint64_t modifier;
 			uint32_t n_params;
+			struct spa_pod_builder *builder[2] = {&b[0].b, &b[1].b};
 
 			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
 				cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
@@ -261,18 +269,24 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			logprint(WARN, "pipewire: unable to allocate a dmabuf. Falling back to shm");
 			cast->avoid_dmabufs = true;
 
-			n_params = build_formats(&b, cast, &params[0]);
+			n_params = build_formats(builder, cast, &params[0]);
 			pw_stream_update_params(stream, params, n_params);
+			spa_pod_dynamic_builder_clean(&b[0]);
+			spa_pod_dynamic_builder_clean(&b[1]);
+			spa_pod_dynamic_builder_clean(&b[2]);
 			return;
 
 fixate_format:
-			params[0] = fixate_format(&b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format),
+			params[0] = fixate_format(&b[2].b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format),
 					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height, cast->framerate, &modifier);
 
-			n_params = build_formats(&b, cast, &params[1]);
+			n_params = build_formats(builder, cast, &params[1]);
 			n_params++;
 
 			pw_stream_update_params(stream, params, n_params);
+			spa_pod_dynamic_builder_clean(&b[0]);
+			spa_pod_dynamic_builder_clean(&b[1]);
+			spa_pod_dynamic_builder_clean(&b[2]);
 			return;
 		}
 
@@ -295,20 +309,23 @@ fixate_format:
 	logprint(DEBUG, "pipewire: size: (%u, %u)", cast->pwr_format.size.width, cast->pwr_format.size.height);
 	logprint(DEBUG, "pipewire: max_framerate: (%u / %u)", cast->pwr_format.max_framerate.num, cast->pwr_format.max_framerate.denom);
 
-	params[0] = build_buffer(&b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
+	params[0] = build_buffer(&b[0].b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
 			cast->screencopy_frame_info[cast->buffer_type].stride, data_type);
 
-	params[1] = spa_pod_builder_add_object(&b,
+	params[1] = spa_pod_builder_add_object(&b[1].b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_Header),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_header)));
 
-	params[2] = spa_pod_builder_add_object(&b,
+	params[2] = spa_pod_builder_add_object(&b[2].b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoTransform),
 		SPA_PARAM_META_size, SPA_POD_Int(sizeof(struct spa_meta_videotransform)));
 
 	pw_stream_update_params(stream, params, 3);
+	spa_pod_dynamic_builder_clean(&b[0]);
+	spa_pod_dynamic_builder_clean(&b[1]);
+	spa_pod_dynamic_builder_clean(&b[2]);
 }
 
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
@@ -468,14 +485,18 @@ done:
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
 	struct pw_stream *stream = cast->stream;
-	uint8_t params_buffer[1024];
-	struct spa_pod_builder b =
-		SPA_POD_BUILDER_INIT(params_buffer, sizeof(params_buffer));
+	uint8_t params_buffer[2][1024];
+	struct spa_pod_dynamic_builder b[2];
+	spa_pod_dynamic_builder_init(&b[0], params_buffer[0], sizeof(params_buffer[0]), 2048);
+	spa_pod_dynamic_builder_init(&b[1], params_buffer[1], sizeof(params_buffer[1]), 2048);
 	const struct spa_pod *params[2];
 
-	uint32_t n_params = build_formats(&b, cast, params);
+	struct spa_pod_builder *builder[2] = {&b[0].b, &b[1].b};
+	uint32_t n_params = build_formats(builder, cast, params);
 
 	pw_stream_update_params(stream, params, n_params);
+	spa_pod_dynamic_builder_clean(&b[0]);
+	spa_pod_dynamic_builder_clean(&b[1]);
 }
 
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
@@ -484,8 +505,10 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 
 	pw_loop_enter(state->pw_loop);
 
-	uint8_t buffer[1024];
-	struct spa_pod_builder b = SPA_POD_BUILDER_INIT(buffer, sizeof(buffer));
+	uint8_t buffer[2][1024];
+	struct spa_pod_dynamic_builder b[2];
+	spa_pod_dynamic_builder_init(&b[0], buffer[0], sizeof(buffer[0]), 2048);
+	spa_pod_dynamic_builder_init(&b[1], buffer[1], sizeof(buffer[1]), 2048);
 	const struct spa_pod *params[2];
 
 	char name[] = "xdpw-stream-XXXXXX";
@@ -501,7 +524,10 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	}
 	cast->pwr_stream_state = false;
 
-	uint32_t param_count = build_formats(&b, cast, params);
+	struct spa_pod_builder *builder[2] = {&b[0].b, &b[1].b};
+	uint32_t param_count = build_formats(builder, cast, params);
+	spa_pod_dynamic_builder_clean(&b[0]);
+	spa_pod_dynamic_builder_clean(&b[1]);
 
 	pw_stream_add_listener(cast->stream, &cast->stream_listener,
 		&pwr_stream_events, cast);
