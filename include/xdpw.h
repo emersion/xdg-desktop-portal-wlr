@@ -38,7 +38,7 @@ struct xdpw_session {
 	struct wl_list link;
 	sd_bus_slot *slot;
 	char *session_handle;
-	struct xdpw_screencast_instance *screencast_instance;
+	struct xdpw_screencast_session_data screencast_data;
 };
 
 typedef void (*xdpw_event_loop_timer_func_t)(void *data);
