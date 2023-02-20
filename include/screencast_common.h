@@ -171,6 +171,11 @@ struct xdpw_screencast_instance {
 	struct fps_limit_state fps_limit;
 };
 
+struct xdpw_screencast_session_data {
+	struct xdpw_screencast_instance *screencast_instance;
+	uint32_t cursor_mode;
+};
+
 struct xdpw_wlr_output {
 	struct wl_list link;
 	uint32_t id;

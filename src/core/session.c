@@ -61,7 +61,7 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 	if (!sess) {
 		return;
 	}
-	struct xdpw_screencast_instance *cast = sess->screencast_instance;
+	struct xdpw_screencast_instance *cast = sess->screencast_data.screencast_instance;
 	if (cast) {
 		assert(cast->refcount > 0);
 		--cast->refcount;
