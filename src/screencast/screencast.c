@@ -129,7 +129,21 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	if (!target_initialized) {
 		target_initialized = xdpw_wlr_target_chooser(ctx, target);
 		//TODO: Chooser option to confirm the persist mode
-		sess->screencast_data.persist_mode = PERSIST_NONE;
+		const char *env_persist_str = getenv("XDPW_PERSIST_MODE");
+		if (env_persist_str) {
+			if (strcmp(env_persist_str, "transient") == 0) {
+				sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_TRANSIENT
+					? PERSIST_TRANSIENT : sess->screencast_data.persist_mode;
+			} else if (strcmp(env_persist_str, "permanent") == 0) {
+				sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_PERMANENT
+					? PERSIST_PERMANENT : sess->screencast_data.persist_mode;
+			} else {
+				sess->screencast_data.persist_mode = PERSIST_NONE;
+			}
+
+		} else {
+			sess->screencast_data.persist_mode = PERSIST_NONE;
+		}
 	}
 	if (!target_initialized) {
 		logprint(ERROR, "wlroots: no output found");
