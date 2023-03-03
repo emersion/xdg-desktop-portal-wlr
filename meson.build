@@ -62,6 +62,8 @@ xdpw_files = files(
 	'src/screencast/wlr_screencopy.c',
 	'src/screencast/pipewire_screencast.c',
 	'src/screencast/fps_limit.c',
+	'src/remotedesktop/remotedesktop.c',
+	'src/remotedesktop/wlr_virtual_pointer.c',
 )
 
 executable(
