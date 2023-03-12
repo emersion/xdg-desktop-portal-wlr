@@ -90,6 +90,16 @@ static int method_remotedesktop_create_session(sd_bus_message *msg, void *data,
 	return 0;
 }
 
+static struct xdpw_session *get_session_from_handle(struct xdpw_state *state, char *session_handle) {
+	struct xdpw_session *sess;
+	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
+			return sess;
+		}
+	}
+	return NULL;
+}
+
 static int method_remotedesktop_select_devices(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	struct xdpw_state *state = data;
@@ -109,11 +119,7 @@ static int method_remotedesktop_select_devices(sd_bus_message *msg, void *data,
 	logprint(DEBUG, "remotedesktop: dbus: select devices: session_handle: %s", session_handle);
 	logprint(DEBUG, "remotedesktop: dbus: select devices: app_id: %s", app_id);
 
-	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
-		if (strcmp(sess->session_handle, session_handle) == 0) {
-			break;
-		}
-	}
+	sess = get_session_from_handle(state, session_handle);
 	if (!sess) {
 		logprint(WARN, "remotedesktop: dbus: select devices: session not found");
 		return -1;
@@ -181,11 +187,7 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 	logprint(DEBUG, "remotedesktop: dbus: start: session_handle: %s", session_handle);
 	logprint(DEBUG, "remotedesktop: dbus: start: app_id: %s", app_id);
 
-	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
-		if (strcmp(sess->session_handle, session_handle) == 0) {
-			break;
-		}
-	}
+	sess = get_session_from_handle(state, session_handle);
 	if (!sess) {
 		logprint(WARN, "remotedesktop: dbus: start: session not found");
 		return -1;
@@ -336,6 +338,63 @@ static int method_remotedesktop_notify_pointer_motion_absolute(
 
 static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 		void *data, sd_bus_error *ret_error) {
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	int32_t button;
+	uint32_t btn_state;
+
+	logprint(DEBUG, "remotedesktop: dbus: npm: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: dbus: npm: session_handle: %s", session_handle);
+
+	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
+		if (strcmp(sess->session_handle, session_handle) == 0) {
+			break;
+		}
+	}
+	if (!sess) {
+		logprint(WARN, "remotedesktop: dbus: npm: session not found");
+		return -1;
+	}
+	logprint(DEBUG, "remotedesktop: dbus: npm: session found");
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "i", &button);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "u", &btn_state);
+	if (ret < 0) {
+		return ret;
+	}
+	// wl_pointer.button_state and the button state enum defined in the RemoteDesktop protocol
+	// are identical, so this is not strictly necessary, just felt cleaner to me.
+	enum wl_pointer_button_state wl_btn_state;
+	switch (btn_state) {
+		case 0:
+			wl_btn_state = WL_POINTER_BUTTON_STATE_RELEASED;
+			break;
+		case 1:
+			wl_btn_state = WL_POINTER_BUTTON_STATE_PRESSED;
+			break;
+		default:
+			logprint(WARN, "remotedesktop: received invalid button state");
+			return -1;
+	};
+
+	zwlr_virtual_pointer_v1_button(sess->remotedesktop_data.virtual_pointer,
+			get_timestamp_ms(&sess->remotedesktop_data),
+			button, wl_btn_state);
 	return 0;
 }
 
