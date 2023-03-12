@@ -6,6 +6,7 @@
 
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 #include <wayland-client-protocol.h>
+#include <wayland-util.h>
 
 #define XDP_REMOTE_PROTO_VER 1
 
