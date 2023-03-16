@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
     button->resize(321, 41);
     QObject::connect(button, &QPushButton::clicked, [=]() {
         auto REGION = execAndGet("slurp -f \"%o %x %y %w %h\"");
-        REGION = REGION.substr(0, REGION.length() - 1);
+        REGION = REGION.substr(0, REGION.length());
 
         // now, get the screen
         QScreen* pScreen = nullptr;
