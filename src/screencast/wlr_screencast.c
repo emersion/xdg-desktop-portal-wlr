@@ -534,7 +534,7 @@ static const struct hyprland_toplevel_export_frame_v1_listener hyprland_frame_li
     .damage = hyprland_frame_damage};
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
-    if (cast->target.x != -1 && cast->target.y != -1 && cast->target.w != -1 && cast->target.h != -1 && cast->target.window_handle == -1) {
+    if (cast->target.x != -1 && cast->target.y != -1 && cast->target.w != -1 && cast->target.h != -1 && cast->target.window_handle <= 0) {
         // capture region
         cast->frame_callback = zwlr_screencopy_manager_v1_capture_output_region(
             cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output, cast->target.x,
