@@ -339,6 +339,7 @@ fixate_format:
 static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	struct xdpw_screencast_instance *cast = data;
 	struct spa_data *d;
+	enum spa_data_type t;
 
 	logprint(DEBUG, "pipewire: add buffer event handle");
 
@@ -347,17 +348,17 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	// Select buffer type from negotiation result
 	if ((d[0].type & (1u << SPA_DATA_MemFd)) > 0) {
 		assert(cast->buffer_type == WL_SHM);
-		d[0].type = SPA_DATA_MemFd;
+		t = SPA_DATA_MemFd;
 	} else if ((d[0].type & (1u << SPA_DATA_DmaBuf)) > 0) {
 		assert(cast->buffer_type == DMABUF);
-		d[0].type = SPA_DATA_DmaBuf;
+		t = SPA_DATA_DmaBuf;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
 		cast->err = 1;
 		return;
 	}
 
-	logprint(TRACE, "pipewire: selected buffertype %u", d[0].type);
+	logprint(TRACE, "pipewire: selected buffertype %u", t);
 
 	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, cast->buffer_type, &cast->screencopy_frame_info[cast->buffer_type]);
 	if (xdpw_buffer == NULL) {
@@ -370,6 +371,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 
 	assert(xdpw_buffer->plane_count >= 0 && buffer->buffer->n_datas == (uint32_t)xdpw_buffer->plane_count);
 	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
+		d[plane].type = t;
 		d[plane].maxsize = xdpw_buffer->size[plane];
 		d[plane].mapoffset = 0;
 		d[plane].chunk->size = xdpw_buffer->size[plane];
