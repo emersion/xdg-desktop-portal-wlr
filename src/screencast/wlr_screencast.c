@@ -41,8 +41,7 @@ void handleTitle(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
         if (current->handle == handle) {
             strncpy(current->name, title, 255);
             for (int i = 0; i < 255; ++i)
-                if (current->name[i] == '\"' || current->name[i] == '>' || current->name[i] == '\'')
-                    current->name[i] = ' ';
+                if (current->name[i] == '\"' || current->name[i] == '>' || current->name[i] == '\'') current->name[i] = ' ';
             current->name[255] = '\0';
             break;
         }
@@ -57,8 +56,7 @@ void handleAppID(void *data, struct zwlr_foreign_toplevel_handle_v1 *handle, con
         if (current->handle == handle) {
             strncpy(current->clazz, app_id, 255);
             for (int i = 0; i < 255; ++i)
-                if (current->clazz[i] == '\"' || current->clazz[i] == '>' || current->clazz[i] == '\'')
-                    current->clazz[i] = ' ';
+                if (current->clazz[i] == '\"' || current->clazz[i] == '>' || current->clazz[i] == '\'') current->clazz[i] = ' ';
             current->name[255] = '\0';
             break;
         }
@@ -187,8 +185,7 @@ void xdpw_wlr_frame_finish(struct xdpw_screencast_instance *cast) {
         xdpw_pwr_enqueue_buffer(cast);
         uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
         if (delay_ns > 0) {
-            xdpw_add_timer(cast->ctx->state, delay_ns,
-                           (xdpw_event_loop_timer_func_t)xdpw_wlr_frame_start, cast);
+            xdpw_add_timer(cast->ctx->state, delay_ns, (xdpw_event_loop_timer_func_t)xdpw_wlr_frame_start, cast);
             return;
         }
     }
@@ -211,11 +208,9 @@ void xdpw_wlr_frame_start(struct xdpw_screencast_instance *cast) {
     xdpw_wlr_register_cb(cast);
 }
 
-static void wlr_frame_buffer_done(void *data,
-                                  struct zwlr_screencopy_frame_v1 *frame);
+static void wlr_frame_buffer_done(void *data, struct zwlr_screencopy_frame_v1 *frame);
 
-static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
-                             uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
+static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame, uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -235,9 +230,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
     }
 }
 
-static void wlr_frame_linux_dmabuf(void *data,
-                                   struct zwlr_screencopy_frame_v1 *frame,
-                                   uint32_t format, uint32_t width, uint32_t height) {
+static void wlr_frame_linux_dmabuf(void *data, struct zwlr_screencopy_frame_v1 *frame, uint32_t format, uint32_t width, uint32_t height) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -250,8 +243,7 @@ static void wlr_frame_linux_dmabuf(void *data,
     cast->screencopy_frame_info[DMABUF].format = format;
 }
 
-static void wlr_frame_buffer_done(void *data,
-                                  struct zwlr_screencopy_frame_v1 *frame) {
+static void wlr_frame_buffer_done(void *data, struct zwlr_screencopy_frame_v1 *frame) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -266,7 +258,8 @@ static void wlr_frame_buffer_done(void *data,
 
     // Check if announced screencopy information is compatible with pipewire meta
     if ((cast->pwr_format.format != xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format) &&
-         cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format))) ||
+         cast->pwr_format.format !=
+             xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format))) ||
         cast->pwr_format.size.width != cast->screencopy_frame_info[cast->buffer_type].width ||
         cast->pwr_format.size.height != cast->screencopy_frame_info[cast->buffer_type].height) {
         logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
@@ -288,9 +281,8 @@ static void wlr_frame_buffer_done(void *data,
     assert(cast->current_frame.xdpw_buffer);
 
     // Check if dequeued buffer is compatible with announced buffer
-    if ((cast->buffer_type == WL_SHM &&
-         (cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
-          cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
+    if ((cast->buffer_type == WL_SHM && (cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
+                                         cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
         cast->current_frame.xdpw_buffer->width != cast->screencopy_frame_info[cast->buffer_type].width ||
         cast->current_frame.xdpw_buffer->height != cast->screencopy_frame_info[cast->buffer_type].height) {
         logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");
@@ -305,8 +297,7 @@ static void wlr_frame_buffer_done(void *data,
     fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 }
 
-static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
-                            uint32_t flags) {
+static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame, uint32_t flags) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -316,8 +307,7 @@ static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,
     cast->current_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
-static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
-                             uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame, uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -331,8 +321,7 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
     cast->current_frame.damage.height = height;
 }
 
-static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
-                            uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
+static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame, uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -349,8 +338,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
     xdpw_wlr_frame_finish(cast);
 }
 
-static void wlr_frame_failed(void *data,
-                             struct zwlr_screencopy_frame_v1 *frame) {
+static void wlr_frame_failed(void *data, struct zwlr_screencopy_frame_v1 *frame) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -373,11 +361,10 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
     .damage = wlr_frame_damage,
 };
 
-static void hyprland_frame_buffer_done(void *data,
-                                       struct hyprland_toplevel_export_frame_v1 *frame);
+static void hyprland_frame_buffer_done(void *data, struct hyprland_toplevel_export_frame_v1 *frame);
 
-static void hyprland_frame_buffer(void *data, struct hyprland_toplevel_export_frame_v1 *frame,
-                                  uint32_t format, uint32_t width, uint32_t height, uint32_t stride) {
+static void hyprland_frame_buffer(void *data, struct hyprland_toplevel_export_frame_v1 *frame, uint32_t format, uint32_t width, uint32_t height,
+                                  uint32_t stride) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -396,9 +383,8 @@ static void hyprland_frame_buffer(void *data, struct hyprland_toplevel_export_fr
     hyprland_frame_buffer_done(cast, frame);
 }
 
-static void hyprland_frame_linux_dmabuf(void *data,
-                                        struct hyprland_toplevel_export_frame_v1 *frame,
-                                        uint32_t format, uint32_t width, uint32_t height) {
+static void hyprland_frame_linux_dmabuf(void *data, struct hyprland_toplevel_export_frame_v1 *frame, uint32_t format, uint32_t width,
+                                        uint32_t height) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -411,8 +397,7 @@ static void hyprland_frame_linux_dmabuf(void *data,
     cast->screencopy_frame_info[DMABUF].format = format;
 }
 
-static void hyprland_frame_buffer_done(void *data,
-                                       struct hyprland_toplevel_export_frame_v1 *frame) {
+static void hyprland_frame_buffer_done(void *data, struct hyprland_toplevel_export_frame_v1 *frame) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -427,7 +412,8 @@ static void hyprland_frame_buffer_done(void *data,
 
     // Check if announced screencopy information is compatible with pipewire meta
     if ((cast->pwr_format.format != xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format) &&
-         cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format))) ||
+         cast->pwr_format.format !=
+             xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format))) ||
         cast->pwr_format.size.width != cast->screencopy_frame_info[cast->buffer_type].width ||
         cast->pwr_format.size.height != cast->screencopy_frame_info[cast->buffer_type].height) {
         logprint(DEBUG, "hyprland: pipewire and wlroots metadata are incompatible. Renegotiate stream");
@@ -449,9 +435,8 @@ static void hyprland_frame_buffer_done(void *data,
     assert(cast->current_frame.xdpw_buffer);
 
     // Check if dequeued buffer is compatible with announced buffer
-    if ((cast->buffer_type == WL_SHM &&
-         (cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
-          cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
+    if ((cast->buffer_type == WL_SHM && (cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
+                                         cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
         cast->current_frame.xdpw_buffer->width != cast->screencopy_frame_info[cast->buffer_type].width ||
         cast->current_frame.xdpw_buffer->height != cast->screencopy_frame_info[cast->buffer_type].height) {
         logprint(DEBUG, "hyprland: pipewire buffer has wrong dimensions");
@@ -466,8 +451,7 @@ static void hyprland_frame_buffer_done(void *data,
     fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 }
 
-static void hyprland_frame_flags(void *data, struct hyprland_toplevel_export_frame_v1 *frame,
-                                 uint32_t flags) {
+static void hyprland_frame_flags(void *data, struct hyprland_toplevel_export_frame_v1 *frame, uint32_t flags) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -477,8 +461,8 @@ static void hyprland_frame_flags(void *data, struct hyprland_toplevel_export_fra
     cast->current_frame.y_invert = flags & ZWLR_SCREENCOPY_FRAME_V1_FLAGS_Y_INVERT;
 }
 
-static void hyprland_frame_damage(void *data, struct hyprland_toplevel_export_frame_v1 *frame,
-                                  uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+static void hyprland_frame_damage(void *data, struct hyprland_toplevel_export_frame_v1 *frame, uint32_t x, uint32_t y, uint32_t width,
+                                  uint32_t height) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -492,8 +476,8 @@ static void hyprland_frame_damage(void *data, struct hyprland_toplevel_export_fr
     cast->current_frame.damage.height = height;
 }
 
-static void hyprland_frame_ready(void *data, struct hyprland_toplevel_export_frame_v1 *frame,
-                                 uint32_t tv_sec_hi, uint32_t tv_sec_lo, uint32_t tv_nsec) {
+static void hyprland_frame_ready(void *data, struct hyprland_toplevel_export_frame_v1 *frame, uint32_t tv_sec_hi, uint32_t tv_sec_lo,
+                                 uint32_t tv_nsec) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -510,8 +494,7 @@ static void hyprland_frame_ready(void *data, struct hyprland_toplevel_export_fra
     xdpw_wlr_frame_finish(cast);
 }
 
-static void hyprland_frame_failed(void *data,
-                                  struct hyprland_toplevel_export_frame_v1 *frame) {
+static void hyprland_frame_failed(void *data, struct hyprland_toplevel_export_frame_v1 *frame) {
     struct xdpw_screencast_instance *cast = data;
     if (!frame) {
         return;
@@ -524,24 +507,23 @@ static void hyprland_frame_failed(void *data,
     xdpw_wlr_frame_finish(cast);
 }
 
-static const struct hyprland_toplevel_export_frame_v1_listener hyprland_frame_listener = {
-    .buffer = hyprland_frame_buffer,
-    .buffer_done = hyprland_frame_buffer_done,
-    .linux_dmabuf = hyprland_frame_linux_dmabuf,
-    .flags = hyprland_frame_flags,
-    .ready = hyprland_frame_ready,
-    .failed = hyprland_frame_failed,
-    .damage = hyprland_frame_damage};
+static const struct hyprland_toplevel_export_frame_v1_listener hyprland_frame_listener = {.buffer = hyprland_frame_buffer,
+                                                                                          .buffer_done = hyprland_frame_buffer_done,
+                                                                                          .linux_dmabuf = hyprland_frame_linux_dmabuf,
+                                                                                          .flags = hyprland_frame_flags,
+                                                                                          .ready = hyprland_frame_ready,
+                                                                                          .failed = hyprland_frame_failed,
+                                                                                          .damage = hyprland_frame_damage};
 
 void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
     if (cast->target.x != -1 && cast->target.y != -1 && cast->target.w != -1 && cast->target.h != -1 && cast->target.window_handle <= 0) {
         // capture region
-        cast->frame_callback = zwlr_screencopy_manager_v1_capture_output_region(
-            cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output, cast->target.x,
-            cast->target.y, cast->target.w, cast->target.h);
+        cast->frame_callback =
+            zwlr_screencopy_manager_v1_capture_output_region(cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output,
+                                                             cast->target.x, cast->target.y, cast->target.w, cast->target.h);
     } else if (cast->target.window_handle == -1) {
-        cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
-            cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output);
+        cast->frame_callback =
+            zwlr_screencopy_manager_v1_capture_output(cast->ctx->screencopy_manager, cast->with_cursor, cast->target.output->output);
     } else {
         // share window
         struct SToplevelEntry *entry = toplevelEntryFromID(cast->ctx, cast->target.window_handle);
@@ -554,41 +536,34 @@ void xdpw_wlr_register_cb(struct xdpw_screencast_instance *cast) {
         cast->frame_callback_hyprland = hyprland_toplevel_export_manager_v1_capture_toplevel_with_wlr_toplevel_handle(
             cast->ctx->hyprland_toplevel_manager, cast->with_cursor, entry->handle);
 
-        hyprland_toplevel_export_frame_v1_add_listener(cast->frame_callback_hyprland,
-                                                       &hyprland_frame_listener, cast);
+        hyprland_toplevel_export_frame_v1_add_listener(cast->frame_callback_hyprland, &hyprland_frame_listener, cast);
 
         logprint(TRACE, "hyprland: callbacks registered");
         return;
     }
 
-    zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
-                                          &wlr_frame_listener, cast);
+    zwlr_screencopy_frame_v1_add_listener(cast->frame_callback, &wlr_frame_listener, cast);
     logprint(TRACE, "wlroots: callbacks registered");
 }
 
-static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
-                                       int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
+static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output, int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
                                        int32_t subpixel, const char *make, const char *model, int32_t transform) {
     struct xdpw_wlr_output *output = data;
     output->make = strdup(make);
     output->model = strdup(model);
 }
 
-static void wlr_output_handle_mode(void *data, struct wl_output *wl_output,
-                                   uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
+static void wlr_output_handle_mode(void *data, struct wl_output *wl_output, uint32_t flags, int32_t width, int32_t height, int32_t refresh) {
     if (flags & WL_OUTPUT_MODE_CURRENT) {
         struct xdpw_wlr_output *output = data;
         output->framerate = (float)refresh / 1000;
     }
 }
 
-static void wlr_output_handle_done(void *data, struct wl_output *wl_output) {
-    /* Nothing to do */
+static void wlr_output_handle_done(void *data, struct wl_output *wl_output) { /* Nothing to do */
 }
 
-static void wlr_output_handle_scale(void *data, struct wl_output *wl_output,
-                                    int32_t factor) {
-    /* Nothing to do */
+static void wlr_output_handle_scale(void *data, struct wl_output *wl_output, int32_t factor) { /* Nothing to do */
 }
 
 static const struct wl_output_listener wlr_output_listener = {
@@ -598,8 +573,7 @@ static const struct wl_output_listener wlr_output_listener = {
     .scale = wlr_output_handle_scale,
 };
 
-static void wlr_xdg_output_name(void *data, struct zxdg_output_v1 *xdg_output,
-                                const char *name) {
+static void wlr_xdg_output_name(void *data, struct zxdg_output_v1 *xdg_output, const char *name) {
     struct xdpw_wlr_output *output = data;
 
     output->name = strdup(name);
@@ -617,18 +591,13 @@ static const struct zxdg_output_v1_listener wlr_xdg_output_listener = {
     .name = wlr_xdg_output_name,
 };
 
-static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output,
-                                        struct zxdg_output_v1 *xdg_output) {
+static void wlr_add_xdg_output_listener(struct xdpw_wlr_output *output, struct zxdg_output_v1 *xdg_output) {
     output->xdg_output = xdg_output;
-    zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener,
-                                output);
+    zxdg_output_v1_add_listener(output->xdg_output, &wlr_xdg_output_listener, output);
 }
 
-static void wlr_init_xdg_output(struct xdpw_screencast_context *ctx,
-                                struct xdpw_wlr_output *output) {
-    struct zxdg_output_v1 *xdg_output =
-        zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager,
-                                              output->output);
+static void wlr_init_xdg_output(struct xdpw_screencast_context *ctx, struct xdpw_wlr_output *output) {
+    struct zxdg_output_v1 *xdg_output = zxdg_output_manager_v1_get_xdg_output(ctx->xdg_output_manager, output->output);
     wlr_add_xdg_output_listener(output, xdg_output);
 }
 
@@ -682,8 +651,7 @@ char *getFormat(const char *fmt, ...) {
 char *buildWindowList(struct xdpw_screencast_context *ctx) {
     char *rolling = calloc(1, 1);
 
-    if (!ctx->wlroots_toplevel_manager)
-        return rolling;
+    if (!ctx->wlroots_toplevel_manager) return rolling;
 
     struct SToplevelEntry *current;
     wl_list_for_each(current, &ctx->toplevel_resource_list, link) {
@@ -695,8 +663,7 @@ char *buildWindowList(struct xdpw_screencast_context *ctx) {
     }
 
     for (size_t i = 0; i < strlen(rolling); ++i) {
-        if (rolling[i] == '\"')
-            rolling[i] = ' ';
+        if (rolling[i] == '\"') rolling[i] = ' ';
     }
 
     return rolling;
@@ -713,7 +680,10 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
     char *windowList = buildWindowList(ctx);
 
-    char *cmd = getFormat("WAYLAND_DISPLAY=%s QT_QPA_PLATFORM=\"wayland\" XCURSOR_SIZE=%s HYPRLAND_INSTANCE_SIGNATURE=%s XDPH_WINDOW_SHARING_LIST=\"%s\" hyprland-share-picker", WAYLAND_DISPLAY, XCURSOR_SIZE ? XCURSOR_SIZE : "24", HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0", windowList);
+    char *cmd = getFormat(
+        "WAYLAND_DISPLAY=%s QT_QPA_PLATFORM=\"wayland\" XCURSOR_SIZE=%s HYPRLAND_INSTANCE_SIGNATURE=%s XDPH_WINDOW_SHARING_LIST=\"%s\" "
+        "hyprland-share-picker",
+        WAYLAND_DISPLAY, XCURSOR_SIZE ? XCURSOR_SIZE : "24", HYPRLAND_INSTANCE_SIGNATURE ? HYPRLAND_INSTANCE_SIGNATURE : "0", windowList);
 
     free(windowList);
 
@@ -756,8 +726,7 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
         free(display_name);
 
-        if (!found)
-            return res;
+        if (!found) return res;
 
         res.output = out;
         return res;
@@ -832,14 +801,11 @@ struct xdpw_share xdpw_wlr_chooser(struct xdpw_screencast_context *ctx) {
 
 struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
     struct xdpw_wlr_output *output, *tmp;
-    wl_list_for_each_safe(output, tmp, output_list, link) {
-        return output;
-    }
+    wl_list_for_each_safe(output, tmp, output_list, link) { return output; }
     return NULL;
 }
 
-struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list,
-                                                     const char *name) {
+struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list, const char *name) {
     struct xdpw_wlr_output *output, *tmp;
     wl_list_for_each_safe(output, tmp, output_list, link) {
         if (strcmp(output->name, name) == 0) {
@@ -849,8 +815,7 @@ struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list
     return NULL;
 }
 
-struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx,
-                                             struct wl_output *out, uint32_t id) {
+struct xdpw_wlr_output *xdpw_wlr_output_find(struct xdpw_screencast_context *ctx, struct wl_output *out, uint32_t id) {
     struct xdpw_wlr_output *output, *tmp;
     wl_list_for_each_safe(output, tmp, &ctx->output_list, link) {
         if ((output->output == out) || (output->id == id)) {
@@ -870,8 +835,7 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
     free(out);
 }
 
-static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx,
-                                         uint32_t format, uint64_t modifier) {
+static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx, uint32_t format, uint64_t modifier) {
     struct xdpw_format_modifier_pair *fm_pair;
     wl_array_for_each(fm_pair, &ctx->format_modifier_pairs) {
         if (fm_pair->fourcc == format && fm_pair->modifier == modifier) {
@@ -886,9 +850,8 @@ static void wlr_format_modifier_pair_add(struct xdpw_screencast_context *ctx,
     logprint(TRACE, "wlroots: format %u (%lu)", fm_pair->fourcc, fm_pair->modifier);
 }
 
-static void linux_dmabuf_handle_modifier(void *data,
-                                         struct zwp_linux_dmabuf_v1 *zwp_linux_dmabuf_v1,
-                                         uint32_t format, uint32_t modifier_hi, uint32_t modifier_lo) {
+static void linux_dmabuf_handle_modifier(void *data, struct zwp_linux_dmabuf_v1 *zwp_linux_dmabuf_v1, uint32_t format, uint32_t modifier_hi,
+                                         uint32_t modifier_lo) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(TRACE, "wlroots: linux_dmabuf_handle_modifier called");
@@ -902,8 +865,8 @@ static const struct zwp_linux_dmabuf_v1_listener linux_dmabuf_listener = {
     .modifier = linux_dmabuf_handle_modifier,
 };
 
-static void linux_dmabuf_feedback_handle_main_device(void *data,
-                                                     struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *device_arr) {
+static void linux_dmabuf_feedback_handle_main_device(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1,
+                                                     struct wl_array *device_arr) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_handle_main_device called");
@@ -923,8 +886,7 @@ static void linux_dmabuf_feedback_handle_main_device(void *data,
     ctx->gbm = xdpw_gbm_device_create(drmDev);
 }
 
-static void linux_dmabuf_feedback_format_table(void *data,
-                                               struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, int fd, uint32_t size) {
+static void linux_dmabuf_feedback_format_table(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, int fd, uint32_t size) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_format_table called");
@@ -941,8 +903,7 @@ static void linux_dmabuf_feedback_format_table(void *data,
     ctx->feedback_data.format_table_size = size;
 }
 
-static void linux_dmabuf_feedback_handle_done(void *data,
-                                              struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
+static void linux_dmabuf_feedback_handle_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_handle_done called");
@@ -954,8 +915,8 @@ static void linux_dmabuf_feedback_handle_done(void *data,
     ctx->feedback_data.format_table_size = 0;
 }
 
-static void linux_dmabuf_feedback_tranche_target_devices(void *data,
-                                                         struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *device_arr) {
+static void linux_dmabuf_feedback_tranche_target_devices(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1,
+                                                         struct wl_array *device_arr) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_target_devices called");
@@ -979,13 +940,12 @@ static void linux_dmabuf_feedback_tranche_target_devices(void *data,
     }
 }
 
-static void linux_dmabuf_feedback_tranche_flags(void *data,
-                                                struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, uint32_t flags) {
+static void linux_dmabuf_feedback_tranche_flags(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, uint32_t flags) {
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_flags called");
 }
 
-static void linux_dmabuf_feedback_tranche_formats(void *data,
-                                                  struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1, struct wl_array *indices) {
+static void linux_dmabuf_feedback_tranche_formats(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1,
+                                                  struct wl_array *indices) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_formats called");
@@ -1012,8 +972,7 @@ static void linux_dmabuf_feedback_tranche_formats(void *data,
     }
 }
 
-static void linux_dmabuf_feedback_tranche_done(void *data,
-                                               struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
+static void linux_dmabuf_feedback_tranche_done(void *data, struct zwp_linux_dmabuf_feedback_v1 *zwp_linux_dmabuf_feedback_v1) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: linux_dmabuf_feedback_tranche_done called");
@@ -1031,8 +990,7 @@ static const struct zwp_linux_dmabuf_feedback_v1_listener linux_dmabuf_listener_
     .tranche_done = linux_dmabuf_feedback_tranche_done,
 };
 
-static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
-                                    uint32_t id, const char *interface, uint32_t ver) {
+static void wlr_registry_handle_add(void *data, struct wl_registry *reg, uint32_t id, const char *interface, uint32_t ver) {
     struct xdpw_screencast_context *ctx = data;
 
     logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)", interface, ver);
@@ -1058,8 +1016,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
             version = SC_MANAGER_VERSION_MIN;
         }
         logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
-        ctx->screencopy_manager = wl_registry_bind(
-            reg, id, &zwlr_screencopy_manager_v1_interface, version);
+        ctx->screencopy_manager = wl_registry_bind(reg, id, &zwlr_screencopy_manager_v1_interface, version);
     }
 
     if (!strcmp(interface, hyprland_toplevel_export_manager_v1_interface.name) && !ctx->hyprland_toplevel_manager) {
@@ -1088,8 +1045,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 
     if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0) {
         logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, XDG_OUTPUT_MANAGER_VERSION);
-        ctx->xdg_output_manager =
-            wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
+        ctx->xdg_output_manager = wl_registry_bind(reg, id, &zxdg_output_manager_v1_interface, XDG_OUTPUT_MANAGER_VERSION);
     }
     if (strcmp(interface, zwp_linux_dmabuf_v1_interface.name) == 0) {
         uint32_t version = ver;
@@ -1111,8 +1067,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
     }
 }
 
-static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
-                                       uint32_t id) {
+static void wlr_registry_handle_remove(void *data, struct wl_registry *reg, uint32_t id) {
     struct xdpw_screencast_context *ctx = data;
     struct xdpw_wlr_output *output = xdpw_wlr_output_find(ctx, NULL, id);
     if (output) {
@@ -1164,8 +1119,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
     // make sure our wlroots supports xdg_output_manager
     if (!ctx->xdg_output_manager) {
-        logprint(ERROR, "Compositor doesn't support %s!",
-                 zxdg_output_manager_v1_interface.name);
+        logprint(ERROR, "Compositor doesn't support %s!", zxdg_output_manager_v1_interface.name);
         return -1;
     }
 
@@ -1183,8 +1137,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
     // make sure our wlroots supports screencopy protocol
     if (!ctx->screencopy_manager) {
-        logprint(ERROR, "Compositor doesn't support %s!",
-                 zwlr_screencopy_manager_v1_interface.name);
+        logprint(ERROR, "Compositor doesn't support %s!", zwlr_screencopy_manager_v1_interface.name);
         return -1;
     }
 
@@ -1210,9 +1163,7 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
     }
 
     struct xdpw_screencast_instance *cast, *tmp_c;
-    wl_list_for_each_safe(cast, tmp_c, &ctx->screencast_instances, link) {
-        cast->quit = true;
-    }
+    wl_list_for_each_safe(cast, tmp_c, &ctx->screencast_instances, link) { cast->quit = true; }
 
     if (ctx->screencopy_manager) {
         zwlr_screencopy_manager_v1_destroy(ctx->screencopy_manager);

@@ -17,6 +17,7 @@ client_protocols = [
 	hl_protocol_dir / 'protocols/hyprland-toplevel-export-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
 	'wlr-foreign-toplevel-management-unstable-v1.xml',
+	'hyprland-global-shortcuts-v1.xml',
 ]
 
 wl_proto_files = []
