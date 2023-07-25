@@ -594,6 +594,21 @@ void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
 	cast->stream = NULL;
 }
 
+static void on_core_error(void *data, uint32_t id, int seq, int res, const char* message) {
+	// If our pipewire connection drops then we won't be able to actually
+	// do a screencast.  Exit the process so someone restarts us and the
+	// new xdpw can reconnect to pipewire.
+	logprint(ERROR, "pipewire: fatal error event from core");
+	exit(1);
+}
+
+static const struct pw_core_events core_events = {
+	PW_VERSION_CORE_EVENTS,
+	.error = on_core_error,
+};
+
+static struct spa_hook core_listener;
+
 int xdpw_pwr_context_create(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
@@ -613,6 +628,11 @@ int xdpw_pwr_context_create(struct xdpw_state *state) {
 			logprint(ERROR, "pipewire: couldn't connect to context");
 			return -1;
 		}
+
+		// Setup a core listener to detect errors / disconnects
+		// (i.e. in case the pipewire daemon is restarted).
+		spa_zero(core_listener);
+		pw_core_add_listener(ctx->core, &core_listener, &core_events, state);
 	}
 	return 0;
 }
