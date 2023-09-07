@@ -175,10 +175,7 @@ int main(int argc, char *argv[]) {
 	wl_list_init(&state.timers);
 
 	struct pollfd pollfds[] = {
-		[EVENT_LOOP_DBUS] = {
-			.fd = sd_bus_get_fd(state.bus),
-			.events = POLLIN,
-		},
+		[EVENT_LOOP_DBUS] = {0}, // Filled in later
 		[EVENT_LOOP_WAYLAND] = {
 			.fd = wl_display_get_fd(state.wl_display),
 			.events = POLLIN,
@@ -196,7 +193,30 @@ int main(int argc, char *argv[]) {
 	state.timer_poll_fd = pollfds[EVENT_LOOP_TIMER].fd;
 
 	while (1) {
-		ret = poll(pollfds, sizeof(pollfds) / sizeof(pollfds[0]), -1);
+		// sd-bus requires that we update FD/events/timeout every time we poll
+		pollfds[EVENT_LOOP_DBUS].fd = sd_bus_get_fd(state.bus);
+		if (pollfds[EVENT_LOOP_DBUS].fd < 0) {
+			logprint(ERROR, "sd_bus_get_fd failed: %s",
+				strerror(-pollfds[EVENT_LOOP_DBUS].fd));
+			goto error;
+		}
+		pollfds[EVENT_LOOP_DBUS].events = sd_bus_get_events(state.bus);
+		if (pollfds[EVENT_LOOP_DBUS].events < 0) {
+			logprint(ERROR, "sd_bus_get_events failed: %s",
+				strerror(-pollfds[EVENT_LOOP_DBUS].events));
+			goto error;
+		}
+		uint64_t usec_timeout = 0;
+		ret = sd_bus_get_timeout(state.bus, &usec_timeout);
+		if (ret < 0) {
+			logprint(ERROR, "sd_bus_get_timeout failed: %s", strerror(-ret));
+			goto error;
+		}
+		// Convert timestamp from usec to msec.  Value of -1 indicates no
+		// timeout, i.e. poll forever.
+		int msec_timeout = usec_timeout == UINT64_MAX ? -1 : (int)((usec_timeout + 999) / 1000);
+
+		ret = poll(pollfds, sizeof(pollfds) / sizeof(pollfds[0]), msec_timeout);
 		if (ret < 0) {
 			logprint(ERROR, "poll failed: %s", strerror(errno));
 			goto error;
@@ -215,7 +235,9 @@ int main(int argc, char *argv[]) {
 			break;
 		}
 
-		if (pollfds[EVENT_LOOP_DBUS].revents & POLLIN) {
+		// sd-bus sets events=0 if it already has messages to process
+		if (pollfds[EVENT_LOOP_DBUS].revents ||
+				pollfds[EVENT_LOOP_DBUS].events == 0) {
 			logprint(TRACE, "event-loop: got dbus event");
 			do {
 				ret = sd_bus_process(state.bus, NULL);
