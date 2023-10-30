@@ -2,7 +2,14 @@
 
 [![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master?)
 
-[xdg-desktop-portal] backend for wlroots
+[xdg-desktop-portal] backend for wlroots.
+
+Currently it only implements the following portals only and is meant to offload the missing portals to other implementations depending on the user preferences.
+
+- org.freedesktop.impl.portal.Screenshot
+- org.freedesktop.impl.portal.ScreenCast
+
+Other portals that can be used include `gtk` for many implementations, `gnome-keyring` for the Secret portal.
 
 ## Building
 
@@ -34,6 +41,17 @@ can be added to your config file:
 
 When correctly installed, xdg-desktop-portal should automatically invoke
 xdg-desktop-portal-wlr when needed.
+
+[Recent changes](https://www.bassi.io/articles/2023/05/29/configuring-portals/) to xdg-desktop-portal is requiring desktop environments to set up a `*-portals.conf` configuration that specify which portals should be used for a given `XDG_CURRENT_DESKTOP` value. If this file does not exists in `/usr/share/xdg-desktop-portal/`, you should create it under `~/.config/xdg-desktop-portal/` with content like this:
+
+```ini
+[preferred]
+default=gtk
+org.freedesktop.impl.portal.Screenshot=wlr
+org.freedesktop.impl.portal.ScreenCast=wlr
+```
+
+(you can specify the default portal to use for any implementation not explicitly defined, and you can add any portal you need for other specific interfaces like gnome-keyring for the Secret portal).
 
 ### Configuration
 
