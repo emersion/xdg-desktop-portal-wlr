@@ -585,12 +585,67 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		return ret;
 	}
-	ret = sd_bus_message_append(reply, "{sv}",
-		"streams", "a(ua{sv})", 1,
-		cast->node_id, 3,
-		"position", "(ii)", 0, 0,
-		"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height,
-		"source_type", "u", MONITOR);
+	ret = sd_bus_message_open_container(reply, 'e', "sv");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "s", "streams");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'v', "a(ua{sv})");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'a', "(ua{sv})");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'r', "ua{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "u", cast->node_id);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'a', "{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	if (cast->target->output->xdg_output) {
+		ret = sd_bus_message_append(reply, "{sv}",
+			"position", "(ii)", cast->target->output->x, cast->target->output->y);
+		if (ret < 0) {
+			return ret;
+		}
+		ret = sd_bus_message_append(reply, "{sv}",
+			"size", "(ii)", cast->target->output->width, cast->target->output->height);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+	ret = sd_bus_message_append(reply, "{sv}", "source_type", "u", MONITOR);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
 	if (ret < 0) {
 		return ret;
 	}
