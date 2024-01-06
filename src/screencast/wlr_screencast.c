@@ -2,6 +2,7 @@
 
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "wlr-screencopy-unstable-v1-client-protocol.h"
+#include "xdg-output-unstable-v1-client-protocol.h"
 #include <fcntl.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -306,6 +307,42 @@ static const struct wl_output_listener wlr_output_listener = {
 	.description = wlr_output_handle_description,
 };
 
+static void xdg_output_handle_logical_position(void *data, struct zxdg_output_v1 *xdg_output_v1,
+		int32_t x, int32_t y) {
+	struct xdpw_wlr_output *output = data;
+	output->x = x;
+	output->y = y;
+}
+
+static void xdg_output_handle_logical_size(void *data, struct zxdg_output_v1 *xdg_output_v1,
+		int32_t width, int32_t height) {
+	struct xdpw_wlr_output *output = data;
+	output->width = width;
+	output->height = height;
+}
+
+static void xdg_output_handle_done(void *data, struct zxdg_output_v1 *xdg_output_v1) {
+	/* Nothing to do */
+}
+
+static void xdg_output_handle_name(void *data, struct zxdg_output_v1 *xdg_output_v1,
+		const char *name) {
+	/* Nothing to do */
+}
+
+static void xdg_output_handle_description(void *data, struct zxdg_output_v1 *xdg_output_v1,
+		const char *description) {
+	/* Nothing to do */
+}
+
+static const struct zxdg_output_v1_listener xdg_output_listener = {
+	.logical_position = xdg_output_handle_logical_position,
+	.logical_size = xdg_output_handle_logical_size,
+	.done = xdg_output_handle_done,
+	.name = xdg_output_handle_name,
+	.description = xdg_output_handle_description,
+};
+
 static struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list) {
 	struct xdpw_wlr_output *output, *tmp;
 	wl_list_for_each_safe(output, tmp, output_list, link) {
@@ -555,6 +592,9 @@ static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out->name);
 	free(out->make);
 	free(out->model);
+	if (out->xdg_output) {
+		zxdg_output_v1_destroy(out->xdg_output);
+	}
 	wl_output_destroy(out->output);
 	wl_list_remove(&out->link);
 	free(out);
@@ -737,6 +777,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, WL_OUTPUT_VERSION);
 		output->output = wl_registry_bind(reg, id, &wl_output_interface, WL_OUTPUT_VERSION);
 
+		if (ctx->xdg_output_manager) {
+			output->xdg_output = zxdg_output_manager_v1_get_xdg_output(
+				ctx->xdg_output_manager, output->output);
+			zxdg_output_v1_add_listener(output->xdg_output, &xdg_output_listener, output);
+		}
+
 		wl_output_add_listener(output->output, &wlr_output_listener, output);
 		wl_list_insert(&ctx->output_list, &output->link);
 	}
@@ -775,6 +821,17 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		} else {
 			zwp_linux_dmabuf_v1_add_listener(ctx->linux_dmabuf, &linux_dmabuf_listener, ctx);
 		}
+	}
+
+	if (strcmp(interface, zxdg_output_manager_v1_interface.name) == 0
+			&& ver >= XDG_OUTPUT_VERSION_MIN) {
+		uint32_t version = ver;
+		if (XDG_OUTPUT_VERSION < ver) {
+			version = XDG_OUTPUT_VERSION;
+		}
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, version);
+		ctx->xdg_output_manager = wl_registry_bind(
+			reg, id, &zxdg_output_manager_v1_interface, version);
 	}
 }
 
@@ -856,6 +913,19 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 		}
 	}
 
+	if (ctx->xdg_output_manager) {
+		struct xdpw_wlr_output *output;
+		wl_list_for_each(output, &ctx->output_list, link) {
+			if (!output->xdg_output) {
+				output->xdg_output = zxdg_output_manager_v1_get_xdg_output(
+					ctx->xdg_output_manager, output->output);
+				zxdg_output_v1_add_listener(output->xdg_output, &xdg_output_listener, output);
+			}
+		}
+		wl_display_roundtrip(state->wl_display);
+		logprint(DEBUG, "wayland: xdg_output listeners run");
+	}
+
 	return 0;
 }
 
@@ -865,6 +935,9 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	struct xdpw_wlr_output *output, *tmp_o;
 	wl_list_for_each_safe(output, tmp_o, &ctx->output_list, link) {
 		wl_list_remove(&output->link);
+		if (output->xdg_output) {
+			zxdg_output_v1_destroy(output->xdg_output);
+		}
 		wl_output_destroy(output->output);
 	}
 
@@ -889,6 +962,9 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	}
 	if (ctx->linux_dmabuf) {
 		zwp_linux_dmabuf_v1_destroy(ctx->linux_dmabuf);
+	}
+	if (ctx->xdg_output_manager) {
+		zxdg_output_manager_v1_destroy(ctx->xdg_output_manager);
 	}
 	if (ctx->registry) {
 		wl_registry_destroy(ctx->registry);

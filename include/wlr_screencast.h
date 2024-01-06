@@ -13,6 +13,9 @@
 #define LINUX_DMABUF_VERSION 4
 #define LINUX_DMABUF_VERSION_MIN 3
 
+#define XDG_OUTPUT_VERSION 3
+#define XDG_OUTPUT_VERSION_MIN 1
+
 struct xdpw_state;
 
 int xdpw_wlr_screencopy_init(struct xdpw_state *state);

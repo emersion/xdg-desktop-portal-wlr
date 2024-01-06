@@ -127,6 +127,7 @@ struct xdpw_screencast_context {
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
+	struct zxdg_output_manager_v1 *xdg_output_manager;
 	struct xdpw_dmabuf_feedback_data feedback_data;
 	struct wl_array format_modifier_pairs;
 
@@ -194,9 +195,12 @@ struct xdpw_wlr_output {
 	struct wl_list link;
 	uint32_t id;
 	struct wl_output *output;
+	struct zxdg_output_v1 *xdg_output;
 	char *make;
 	char *model;
 	char *name;
+	int x;
+	int y;
 	int width;
 	int height;
 	float framerate;
