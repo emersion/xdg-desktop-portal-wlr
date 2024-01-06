@@ -590,7 +590,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		cast->node_id, 3,
 		"position", "(ii)", 0, 0,
 		"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height,
-		"source_type", "u", 1 << MONITOR);
+		"source_type", "u", MONITOR);
 	if (ret < 0) {
 		return ret;
 	}
