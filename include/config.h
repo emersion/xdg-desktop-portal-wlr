@@ -14,8 +14,15 @@ struct config_screencast {
 	bool force_mod_linear;
 };
 
+struct config_remotedesktop {
+	bool allow_keyboard;
+	bool allow_pointer;
+	bool allow_touchscreen;
+};
+
 struct xdpw_config {
 	struct config_screencast screencast_conf;
+	struct config_remotedesktop remotedesktop_conf;
 };
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config);

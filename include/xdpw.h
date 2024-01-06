@@ -12,6 +12,7 @@
 
 #include "screencast_common.h"
 #include "screenshot_common.h"
+#include "remotedesktop_common.h"
 #include "config.h"
 
 struct xdpw_state {
@@ -24,6 +25,9 @@ struct xdpw_state {
 	uint32_t screencast_cursor_modes; // bitfield of enum cursor_modes
 	uint32_t screencast_version;
 	uint32_t screenshot_version;
+	struct xdpw_remotedesktop_context remotedesktop;
+	uint32_t remotedesktop_version;
+	uint32_t remotedesktop_available_device_types;
 	struct xdpw_config *config;
 	int timer_poll_fd;
 	struct wl_list timers;
@@ -39,6 +43,7 @@ struct xdpw_session {
 	sd_bus_slot *slot;
 	char *session_handle;
 	struct xdpw_screencast_session_data screencast_data;
+	struct xdpw_remotedesktop_session_data remotedesktop_data;
 };
 
 typedef void (*xdpw_event_loop_timer_func_t)(void *data);
@@ -59,6 +64,7 @@ enum {
 
 int xdpw_screenshot_init(struct xdpw_state *state);
 int xdpw_screencast_init(struct xdpw_state *state);
+int xdpw_remotedesktop_init(struct xdpw_state *state);
 
 struct xdpw_request *xdpw_request_create(sd_bus *bus, const char *object_path);
 void xdpw_request_destroy(struct xdpw_request *req);
