@@ -3,7 +3,7 @@ project(
 	'c',
 	version: '0.7.1',
 	license: 'MIT',
-	meson_version: '>=0.59.0',
+	meson_version: '>=0.60.0',
 	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
 )
 
@@ -37,24 +37,7 @@ endif
 
 if get_option('sd-bus-provider') == 'auto'
 	assert(get_option('auto_features').auto(), 'sd-bus-provider must not be set to auto since auto_features != auto')
-	sdbus = dependency('libsystemd',
-		required: false,
-		not_found_message: 'libsystemd not found, trying libelogind',
-	)
-	if not sdbus.found()
-		sdbus = dependency('libelogind',
-			required: false,
-			not_found_message: 'libelogind not found, trying basu',
-		)
-	endif
-	if not sdbus.found()
-		sdbus = dependency('basu',
-			required: false,
-		)
-	endif
-	if not sdbus.found()
-		error('Neither libsystemd, nor libelogind, nor basu was found')
-	endif
+	sdbus = dependency(['libsystemd', 'libelogind', 'basu'])
 else
 	sdbus = dependency(get_option('sd-bus-provider'))
 endif
