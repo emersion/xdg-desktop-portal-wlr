@@ -18,7 +18,7 @@ add_project_arguments(cc.get_supported_arguments([
 
 prefix = get_option('prefix')
 sysconfdir = get_option('sysconfdir')
-add_project_arguments('-DSYSCONFDIR="@0@"'.format(join_paths(prefix, sysconfdir)), language : 'c')
+add_project_arguments('-DSYSCONFDIR="@0@"'.format(prefix / sysconfdir), language : 'c')
 
 inc = include_directories('include')
 
@@ -97,12 +97,10 @@ executable(
 )
 
 conf_data = configuration_data()
-conf_data.set('libexecdir',
-	join_paths(get_option('prefix'), get_option('libexecdir')))
+conf_data.set('libexecdir', get_option('prefix') / get_option('libexecdir'))
 conf_data.set('systemd_service', '')
 
 systemd = dependency('systemd', required: get_option('systemd'))
-
 if systemd.found()
 	systemd_service_file = 'xdg-desktop-portal-wlr.service'
 	user_unit_dir = systemd.get_variable(pkgconfig: 'systemduserunitdir',
@@ -121,12 +119,12 @@ configure_file(
 	configuration: conf_data,
 	input: 'org.freedesktop.impl.portal.desktop.wlr.service.in',
 	output: '@BASENAME@',
-	install_dir: join_paths(get_option('datadir'), 'dbus-1', 'services'),
+	install_dir: get_option('datadir') / 'dbus-1' / 'services',
 )
 
 install_data(
 	'wlr.portal',
-	install_dir: join_paths(get_option('datadir'), 'xdg-desktop-portal', 'portals'),
+	install_dir: get_option('datadir') / 'xdg-desktop-portal' / 'portals',
 )
 
 scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7', native: true)
@@ -145,7 +143,7 @@ if scdoc.found()
 				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_variable(pkgconfig: 'scdoc'), output)
 			],
 			install: true,
-			install_dir: join_paths(get_option('mandir'), 'man' + section),
+			install_dir: get_option('mandir') / ('man' + section),
 		)
 	endforeach
 endif
