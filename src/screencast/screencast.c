@@ -624,12 +624,6 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		if (ret < 0) {
 			return ret;
 		}
-	} else {
-		ret = sd_bus_message_append(reply, "{sv}",
-			"size", "(ii)", cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height);
-		if (ret < 0) {
-			return ret;
-		}
 	}
 	ret = sd_bus_message_append(reply, "{sv}", "source_type", "u", MONITOR);
 	if (ret < 0) {
