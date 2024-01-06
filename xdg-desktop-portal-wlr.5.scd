@@ -40,8 +40,7 @@ These options need to be placed under the **[screencast]** section.
 	Select which output will be screencast.
 
 	This option is used with **chooser_type** = none. The list of available outputs
-	can be obtained via **wayland-info**(1) (under the _zxdg_output_manager_v1_
-	section).
+	can be obtained via **wayland-info**(1) (under the _wl_output_ section).
 
 **max_fps** = _limit_
 	Limit the number of frames per second to the provided rate.
