@@ -3,7 +3,7 @@ project(
 	'c',
 	version: '0.7.1',
 	license: 'MIT',
-	meson_version: '>=0.58.0',
+	meson_version: '>=0.59.0',
 	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
 )
 
@@ -129,6 +129,8 @@ install_data(
 
 scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7', native: true)
 if scdoc.found()
+	scdoc_prog = find_program(scdoc.get_variable(pkgconfig: 'scdoc'), native: true)
+
 	man_pages = ['xdg-desktop-portal-wlr.5.scd']
 	foreach src : man_pages
 		topic = src.split('.')[0]
@@ -139,9 +141,9 @@ if scdoc.found()
 			output,
 			input: files(src),
 			output: output,
-			command: [
-				'sh', '-c', '@0@ < @INPUT@ > @1@'.format(scdoc.get_variable(pkgconfig: 'scdoc'), output)
-			],
+			command: scdoc_prog,
+			feed: true,
+			capture: true,
 			install: true,
 			install_dir: get_option('mandir') / ('man' + section),
 		)
