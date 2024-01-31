@@ -12,6 +12,8 @@ struct config_screencast {
 	char *chooser_cmd;
 	enum xdpw_chooser_types chooser_type;
 	bool force_mod_linear;
+	enum xdpw_cropmode cropmode;
+	struct xdpw_frame_crop region;
 };
 
 struct xdpw_config {

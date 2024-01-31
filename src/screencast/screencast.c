@@ -73,6 +73,16 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	cast->avoid_dmabufs = false;
 	cast->teardown = false;
 	wl_list_init(&cast->buffer_list);
+	if (ctx->state->config->screencast_conf.chooser_type == XDPW_CHOOSER_NONE &&
+			ctx->state->config->screencast_conf.cropmode != XDPW_CROP_NONE &&
+			ctx->state->config->screencast_conf.region.width != 0 &&
+			ctx->state->config->screencast_conf.region.height != 0) {
+		cast->cropmode = ctx->state->config->screencast_conf.cropmode;
+		cast->current_frame.crop.x = ctx->state->config->screencast_conf.region.x;
+		cast->current_frame.crop.y = ctx->state->config->screencast_conf.region.y;
+		cast->current_frame.crop.width = ctx->state->config->screencast_conf.region.width;
+		cast->current_frame.crop.height = ctx->state->config->screencast_conf.region.height;
+	}
 	logprint(INFO, "xdpw: screencast instance %p has %d references", cast, cast->refcount);
 	wl_list_insert(&ctx->screencast_instances, &cast->link);
 	logprint(INFO, "xdpw: %d active screencast instances",
