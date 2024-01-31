@@ -263,12 +263,6 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	struct xdpw_request *req =
-		xdpw_request_create(sd_bus_message_get_bus(msg), request_handle);
-	if (req == NULL) {
-		return -ENOMEM;
-	}
-
 	struct xdpw_session *sess =
 		xdpw_session_create(state, sd_bus_message_get_bus(msg), strdup(session_handle));
 	if (sess == NULL) {

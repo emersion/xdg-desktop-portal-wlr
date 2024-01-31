@@ -109,13 +109,6 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	// TODO: cleanup this
-	struct xdpw_request *req =
-		xdpw_request_create(sd_bus_message_get_bus(msg), handle);
-	if (req == NULL) {
-		return -ENOMEM;
-	}
-
 	// TODO: choose a better path
 	const char path[] = "/tmp/out.png";
 	if (interactive && !exec_screenshooter_interactive(path)) {
@@ -245,12 +238,6 @@ static int method_pick_color(sd_bus_message *msg, void *data,
 	ret = sd_bus_message_read(msg, "oss", &handle, &app_id, &parent_window);
 	if (ret < 0) {
 		return ret;
-	}
-
-	struct xdpw_request *req =
-		xdpw_request_create(sd_bus_message_get_bus(msg), handle);
-	if (req == NULL) {
-		return -ENOMEM;
 	}
 
 	struct xdpw_ppm_pixel pixel = {0};
