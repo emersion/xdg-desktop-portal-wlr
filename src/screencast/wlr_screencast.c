@@ -148,6 +148,9 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
+	cast->current_frame.transformation = cast->target->output->transformation;
+	logprint(TRACE, "wlroots: transformation %u", cast->current_frame.transformation);
+
 	cast->current_frame.damage_count = 0;
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.xdpw_buffer->buffer);
 	logprint(TRACE, "wlroots: frame copied");
