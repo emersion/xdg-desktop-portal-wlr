@@ -67,6 +67,7 @@ struct xdpw_frame {
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
+	uint32_t transformation;
 	struct xdpw_frame_damage damage[4];
 	uint32_t damage_count;
 	struct xdpw_buffer *xdpw_buffer;
