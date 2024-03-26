@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
-#include <drm_fourcc.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <spa/utils/result.h>
@@ -188,19 +187,10 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 }
 
 static int start_screencast(struct xdpw_screencast_instance *cast) {
-	xdpw_wlr_register_cb(cast);
-
-	// process at least one frame so that we know
-	// some of the metadata required for the pipewire
-	// remote state connected event
-	wl_display_dispatch(cast->ctx->state->wl_display);
-	wl_display_roundtrip(cast->ctx->state->wl_display);
-
-	if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
-			(cast->ctx->state->screencast_version >= 3 &&
-			 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
-		logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
-		return -1;
+	int ret;
+	ret = xdpw_wlr_session_init(cast);
+	if (ret < 0) {
+		return ret;
 	}
 
 	xdpw_pwr_stream_create(cast);

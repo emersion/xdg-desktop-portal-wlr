@@ -550,11 +550,11 @@ static void pwr_handle_stream_on_process(void *data) {
 		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 		if (delay_ns > 0) {
 			xdpw_add_timer(cast->ctx->state, delay_ns,
-				(xdpw_event_loop_timer_func_t) xdpw_wlr_frame_start, cast);
+				(xdpw_event_loop_timer_func_t) xdpw_wlr_frame_capture, cast);
 			return;
 		}
 	}
-	xdpw_wlr_frame_start(cast);
+	xdpw_wlr_frame_capture(cast);
 }
 
 static const struct pw_stream_events pwr_stream_events = {
