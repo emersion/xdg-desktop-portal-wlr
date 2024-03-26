@@ -57,6 +57,7 @@ xdpw_files = files(
 	'src/screencast/screencast.c',
 	'src/screencast/screencast_common.c',
 	'src/screencast/wlr_screencast.c',
+	'src/screencast/wlr_screencopy.c',
 	'src/screencast/pipewire_screencast.c',
 	'src/screencast/fps_limit.c',
 )
