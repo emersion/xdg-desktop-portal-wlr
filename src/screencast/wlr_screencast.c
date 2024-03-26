@@ -25,11 +25,11 @@
 #include "fps_limit.h"
 
 static void wlr_frame_free(struct xdpw_screencast_instance *cast) {
-	if (!cast->wlr_frame) {
+	if (!cast->wlr_session.wlr_frame) {
 		return;
 	}
-	zwlr_screencopy_frame_v1_destroy(cast->wlr_frame);
-	cast->wlr_frame = NULL;
+	zwlr_screencopy_frame_v1_destroy(cast->wlr_session.wlr_frame);
+	cast->wlr_session.wlr_frame = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
 }
 
@@ -75,7 +75,7 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	}
 
 	logprint(TRACE, "wlroots: buffer event handler");
-	cast->wlr_frame = frame;
+	cast->wlr_session.wlr_frame = frame;
 
 	cast->screencopy_frame_info[WL_SHM].width = width;
 	cast->screencopy_frame_info[WL_SHM].height = height;
@@ -230,10 +230,10 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 };
 
 static void wlr_register_cb(struct xdpw_screencast_instance *cast) {
-	cast->frame_callback = zwlr_screencopy_manager_v1_capture_output(
+	cast->wlr_session.frame_callback = zwlr_screencopy_manager_v1_capture_output(
 		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
 
-	zwlr_screencopy_frame_v1_add_listener(cast->frame_callback,
+	zwlr_screencopy_frame_v1_add_listener(cast->wlr_session.frame_callback,
 		&wlr_frame_listener, cast);
 	logprint(TRACE, "wlroots: callbacks registered");
 }
