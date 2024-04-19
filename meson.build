@@ -133,3 +133,9 @@ if scdoc.found()
 		)
 	endforeach
 endif
+
+summary({
+	'sd-bus provider': sdbus.name(),
+	'systemd service': systemd.found(),
+	'Man pages': scdoc.found(),
+}, bool_yn: true)
