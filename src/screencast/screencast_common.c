@@ -22,48 +22,22 @@ void randname(char *buf) {
 	}
 }
 
-static char *gbm_find_render_node(drmDevice *device) {
-	drmDevice *devices[64];
-	char *render_node = NULL;
-
-	int n = drmGetDevices2(0, devices, sizeof(devices) / sizeof(devices[0]));
-	for (int i = 0; i < n; ++i) {
-		drmDevice *dev = devices[i];
-		if (device && !drmDevicesEqual(device, dev)) {
-				continue;
-		}
-		if (!(dev->available_nodes & (1 << DRM_NODE_RENDER)))
-			continue;
-
-		render_node = strdup(dev->nodes[DRM_NODE_RENDER]);
-		break;
-	}
-
-	drmFreeDevices(devices, n);
-	return render_node;
-}
-
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
-	struct gbm_device *gbm;
-	char *render_node = NULL;
-
-	render_node = gbm_find_render_node(device);
-	if (render_node == NULL) {
-		logprint(ERROR, "xdpw: Could not find render node");
+	if (!(device->available_nodes & (1 << DRM_NODE_RENDER))) {
+		logprint(ERROR, "xdpw: DRM device has no render node");
 		return NULL;
 	}
+
+	const char *render_node = device->nodes[DRM_NODE_RENDER];
 	logprint(INFO, "xdpw: Using render node %s", render_node);
 
 	int fd = open(render_node, O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
 		logprint(ERROR, "xdpw: Could not open render node %s", render_node);
-		free(render_node);
 		return NULL;
 	}
 
-	free(render_node);
-	gbm = gbm_create_device(fd);
-	return gbm;
+	return gbm_create_device(fd);
 }
 
 static int anonymous_shm_open(void) {
