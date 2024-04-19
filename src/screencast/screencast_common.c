@@ -264,28 +264,8 @@ enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format) {
 		return WL_SHM_FORMAT_ARGB8888;
 	case DRM_FORMAT_XRGB8888:
 		return WL_SHM_FORMAT_XRGB8888;
-	case DRM_FORMAT_RGBA8888:
-	case DRM_FORMAT_RGBX8888:
-	case DRM_FORMAT_ABGR8888:
-	case DRM_FORMAT_XBGR8888:
-	case DRM_FORMAT_BGRA8888:
-	case DRM_FORMAT_BGRX8888:
-	case DRM_FORMAT_NV12:
-	case DRM_FORMAT_XRGB2101010:
-	case DRM_FORMAT_XBGR2101010:
-	case DRM_FORMAT_RGBX1010102:
-	case DRM_FORMAT_BGRX1010102:
-	case DRM_FORMAT_ARGB2101010:
-	case DRM_FORMAT_ABGR2101010:
-	case DRM_FORMAT_RGBA1010102:
-	case DRM_FORMAT_BGRA1010102:
-	case DRM_FORMAT_BGR888:
-	case DRM_FORMAT_RGB888:
-		return (enum wl_shm_format)format;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported drm "
-			"format 0x%08x", format);
-		abort();
+		return (enum wl_shm_format)format;
 	}
 }
 
@@ -295,28 +275,8 @@ uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format) {
 		return DRM_FORMAT_ARGB8888;
 	case WL_SHM_FORMAT_XRGB8888:
 		return DRM_FORMAT_XRGB8888;
-	case WL_SHM_FORMAT_RGBA8888:
-	case WL_SHM_FORMAT_RGBX8888:
-	case WL_SHM_FORMAT_ABGR8888:
-	case WL_SHM_FORMAT_XBGR8888:
-	case WL_SHM_FORMAT_BGRA8888:
-	case WL_SHM_FORMAT_BGRX8888:
-	case WL_SHM_FORMAT_NV12:
-	case WL_SHM_FORMAT_XRGB2101010:
-	case WL_SHM_FORMAT_XBGR2101010:
-	case WL_SHM_FORMAT_RGBX1010102:
-	case WL_SHM_FORMAT_BGRX1010102:
-	case WL_SHM_FORMAT_ARGB2101010:
-	case WL_SHM_FORMAT_ABGR2101010:
-	case WL_SHM_FORMAT_RGBA1010102:
-	case WL_SHM_FORMAT_BGRA1010102:
-	case WL_SHM_FORMAT_BGR888:
-	case WL_SHM_FORMAT_RGB888:
-		return (uint32_t)format;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: unsupported wl_shm "
-			"format 0x%08x", format);
-		abort();
+		return (uint32_t)format;
 	}
 }
 
