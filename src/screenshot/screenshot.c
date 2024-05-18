@@ -265,21 +265,22 @@ static int method_pick_color(sd_bus_message *msg, void *data,
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
 	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1, "color", "(ddd)", red, green, blue);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
 	ret = sd_bus_send(NULL, reply, NULL);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
+unref_reply:
 	sd_bus_message_unref(reply);
-	return 0;
+	return ret;
 }
 
 static const sd_bus_vtable screenshot_vtable[] = {
