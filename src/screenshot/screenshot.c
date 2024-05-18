@@ -118,16 +118,13 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 
 	// TODO: choose a better path
 	const char path[] = "/tmp/out.png";
+	const char uri[] = "file:///tmp/out.png";
 	if (interactive && !exec_screenshooter_interactive(path)) {
 		return -1;
 	}
 	if (!interactive && !exec_screenshooter(path)) {
 		return -1;
 	}
-
-	const char uri_prefix[] = "file://";
-	char uri[strlen(path) + strlen(uri_prefix) + 1];
-	snprintf(uri, sizeof(uri), "%s%s", uri_prefix, path);
 
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
