@@ -132,21 +132,22 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 	sd_bus_message *reply = NULL;
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
 	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 1, "uri", "s", uri);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
 	ret = sd_bus_send(NULL, reply, NULL);
 	if (ret < 0) {
-		return ret;
+		goto unref_reply;
 	}
 
+unref_reply:
 	sd_bus_message_unref(reply);
-	return 0;
+	return ret;
 }
 
 static bool spawn_chooser(int chooser_out[2]) {
