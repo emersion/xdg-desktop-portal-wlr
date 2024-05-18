@@ -120,10 +120,12 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 	const char path[] = "/tmp/out.png";
 	const char uri[] = "file:///tmp/out.png";
 	if (interactive && !exec_screenshooter_interactive(path)) {
-		return -1;
+		ret = -1;
+		goto destroy_request;
 	}
 	if (!interactive && !exec_screenshooter(path)) {
-		return -1;
+		ret = -1;
+		goto destroy_request;
 	}
 
 	sd_bus_message *reply = NULL;
@@ -144,6 +146,8 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 
 unref_reply:
 	sd_bus_message_unref(reply);
+destroy_request:
+	xdpw_request_destroy(req);
 	return ret;
 }
 
