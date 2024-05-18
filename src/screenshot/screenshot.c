@@ -160,7 +160,7 @@ static bool spawn_chooser(int chooser_out[2]) {
 		dup2(chooser_out[1], STDOUT_FILENO);
 		close(chooser_out[1]);
 
-		execl("/bin/sh", "/bin/sh", "-c", "grim -g \"$(slurp -p)\" -t ppm -", NULL);
+		execl("/bin/sh", "/bin/sh", "-c", "grim -s 1 -g \"$(slurp -p)\" -t ppm -", NULL);
 
 		perror("execl");
 		_exit(127);
