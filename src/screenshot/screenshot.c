@@ -255,7 +255,8 @@ static int method_pick_color(sd_bus_message *msg, void *data,
 
 	struct xdpw_ppm_pixel pixel = {0};
 	if (!exec_color_picker(&pixel)) {
-		return -1;
+		ret = -1;
+		goto destroy_request;
 	}
 
 	double red = pixel.red / (pixel.max_color_value * 1.0);
@@ -280,6 +281,8 @@ static int method_pick_color(sd_bus_message *msg, void *data,
 
 unref_reply:
 	sd_bus_message_unref(reply);
+destroy_request:
+	xdpw_request_destroy(req);
 	return ret;
 }
 
