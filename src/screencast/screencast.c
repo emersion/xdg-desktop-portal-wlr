@@ -341,7 +341,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		} else if (strcmp(key, "types") == 0) {
 			uint32_t mask;
 			sd_bus_message_read(msg, "v", "u", &mask);
-			if (mask & (1<<WINDOW)) {
+			if (!(mask & MONITOR)) {
 				logprint(INFO, "dbus: non-monitor cast requested, not replying");
 				return -1;
 			}
