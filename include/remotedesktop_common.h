@@ -28,8 +28,8 @@ struct xdpw_remotedesktop_session_data {
 };
 
 enum device_types {
-  KEYBOARD = 1,
-  POINTER = 2,
+	KEYBOARD = 1,
+	POINTER = 2,
 	TOUCHSCREEN = 4,
 };
 
