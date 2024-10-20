@@ -216,6 +216,24 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 	remote = &sess->remotedesktop_data;
 	remote->virtual_pointer = zwlr_virtual_pointer_manager_v1_create_virtual_pointer(
 		state->remotedesktop.virtual_pointer_manager, NULL);
+
+	// TODO: make this user configureable
+	struct xkb_rule_names rule_names = {
+		.rules = "evdev",
+		.layout = "us",
+		.model = "pc105",
+		.variant = "",
+		.options = "",
+	};
+	logprint(DEBUG, "Creating virtual keyboard with manager 0x%x",
+			state->remotedesktop.virtual_keyboard_manager);
+	remote->keyboard.virtual_keyboard = zwp_virtual_keyboard_manager_v1_create_virtual_keyboard(
+			state->remotedesktop.virtual_keyboard_manager, state->remotedesktop.seat);
+	ret = keyboard_init(&remote->keyboard, &rule_names);
+	if (ret < 0) {
+		return ret;
+	}
+
 	clock_gettime(CLOCK_REALTIME, &remote->t_start);
 
 	ret = sd_bus_message_read(msg, "s", &parent_window);
@@ -639,11 +657,85 @@ static int method_remotedesktop_notify_pointer_axis_discrete(
 
 static int method_remotedesktop_notify_keyboard_keycode(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	int32_t keycode;
+	uint32_t keystate;
+
+	logprint(DEBUG, "remotedesktop: npb: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: npb: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npb: session not found");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "i", &keycode);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "u", &keystate);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: received code %x, state %u", keycode, keystate);
+	// The remotedesktop keycodes are evdev keycodes. They are converted to xkb keycodes by a
+	// fixed offset of 8.
+	keyboard_feed_code(&sess->remotedesktop_data.keyboard, keycode + 8, keystate == 1);
 	return 0;
 }
 
 static int method_remotedesktop_notify_keyboard_keysym(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	int32_t keysym;
+	uint32_t keystate;
+
+	logprint(DEBUG, "remotedesktop: npb: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: npb: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npb: session not found");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "i", &keysym);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "u", &keystate);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: received symbol %x, state %u", keysym, keystate);
+	keyboard_feed(&sess->remotedesktop_data.keyboard, (xkb_keysym_t)keysym, keystate == 1);
 	return 0;
 }
 
