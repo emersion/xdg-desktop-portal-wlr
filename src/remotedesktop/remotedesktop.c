@@ -3,7 +3,9 @@
 #include <spa/utils/result.h>
 #include <time.h>
 
+#include "remotedesktop_common.h"
 #include "screencast.h"
+#include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 #include "wlr_virtual_pointer.h"
 #include "xdpw.h"
 
@@ -143,6 +145,12 @@ static int method_remotedesktop_select_devices(sd_bus_message *msg, void *data,
 				return ret;
 			}
 			logprint(DEBUG, "remotedesktop: select devices: option types: %x", types);
+			if ((types & ~(KEYBOARD | POINTER)) != 0) {
+				logprint(DEBUG, "remotedesktop: unsupported device selected, "
+						"only keyboard and pointer are supported so far.");
+				types &= KEYBOARD | POINTER;
+			}
+			sess->remotedesktop_data.devices = types;
 		} else {
 			logprint(WARN, "remotedesktop: select devices: unknown option: %s", key);
 			sd_bus_message_skip(msg, "v");
@@ -403,6 +411,11 @@ static int method_remotedesktop_notify_pointer_motion(sd_bus_message *msg,
 	}
 	logprint(DEBUG, "remotedesktop: npm: session found");
 
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npm: called, but pointer not selected!");
+		return -1;
+	}
+
 	ret = sd_bus_message_skip(msg, "a{sv}");
 	if (ret < 0) {
 		return ret;
@@ -450,6 +463,11 @@ static int method_remotedesktop_notify_pointer_motion_absolute(
 		return -1;
 	}
 	logprint(DEBUG, "remotedesktop: npma: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npma: called, but pointer not selected!");
+		return -1;
+	}
 
 	ret = sd_bus_message_skip(msg, "a{sv}");
 	if (ret < 0) {
@@ -502,6 +520,11 @@ static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 	}
 	logprint(DEBUG, "remotedesktop: npb: session found");
 
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npb: called, but pointer not selected!");
+		return -1;
+	}
+
 	ret = sd_bus_message_skip(msg, "a{sv}");
 	if (ret < 0) {
 		return ret;
@@ -548,6 +571,11 @@ static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 		return -1;
 	}
 	logprint(DEBUG, "remotedesktop: npa: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npa: called, but pointer not selected!");
+		return -1;
+	}
 
 	ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
 	if (ret < 0) {
@@ -636,6 +664,11 @@ static int method_remotedesktop_notify_pointer_axis_discrete(
 	}
 	logprint(DEBUG, "remotedesktop: npad: session found");
 
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npad: called, but pointer not selected!");
+		return -1;
+	}
+
 	ret = sd_bus_message_skip(msg, "a{sv}");
 	if (ret < 0) {
 		return ret;
@@ -676,6 +709,11 @@ static int method_remotedesktop_notify_keyboard_keycode(
 	sess = get_session_from_handle(state, session_handle);
 	if (!sess) {
 		logprint(WARN, "remotedesktop: npb: session not found");
+		return -1;
+	}
+
+	if (!(sess->remotedesktop_data.devices & KEYBOARD)) {
+		logprint(DEBUG, "remotedesktop: npb: called, but keyboard not selected!");
 		return -1;
 	}
 
@@ -722,6 +760,11 @@ static int method_remotedesktop_notify_keyboard_keysym(
 		return -1;
 	}
 
+	if (!(sess->remotedesktop_data.devices & KEYBOARD)) {
+		logprint(DEBUG, "remotedesktop: npb: called, but keyboard not selected!");
+		return -1;
+	}
+
 	ret = sd_bus_message_skip(msg, "a{sv}");
 	if (ret < 0) {
 		return ret;
@@ -741,17 +784,21 @@ static int method_remotedesktop_notify_keyboard_keysym(
 
 static int method_remotedesktop_notify_touch_down(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
-	return 0;
+
+	logprint(DEBUG, "remotedesktop: npt: called, but not supported!");
+	return -1;
 }
 
 static int method_remotedesktop_notify_touch_motion(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
-	return 0;
+	logprint(DEBUG, "remotedesktop: npt: called, but not supported!");
+	return -1;
 }
 
 static int method_remotedesktop_notify_touch_up(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
-	return 0;
+	logprint(DEBUG, "remotedesktop: npt: called, but not supported!");
+	return -1;
 }
 
 static const sd_bus_vtable remotedesktop_vtable[] = {
