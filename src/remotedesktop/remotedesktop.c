@@ -3,6 +3,7 @@
 #include <spa/utils/result.h>
 #include <time.h>
 
+#include "config.h"
 #include "remotedesktop_common.h"
 #include "screencast.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
@@ -145,10 +146,13 @@ static int method_remotedesktop_select_devices(sd_bus_message *msg, void *data,
 				return ret;
 			}
 			logprint(DEBUG, "remotedesktop: select devices: option types: %x", types);
-			if ((types & ~(KEYBOARD | POINTER)) != 0) {
-				logprint(DEBUG, "remotedesktop: unsupported device selected, "
-						"only keyboard and pointer are supported so far.");
-				types &= KEYBOARD | POINTER;
+			uint32_t allowed_types =
+				(state->config->remotedesktop_conf.allow_keyboard ? KEYBOARD : 0) |
+				(state->config->remotedesktop_conf.allow_pointer ? POINTER : 0);
+			if ((types & ~allowed_types) != 0) {
+				logprint(DEBUG, "remotedesktop: tried to select not allowed device, "
+						"selected types: 0x%x, allowed types: 0x%x.", types, allowed_types);
+				types &= allowed_types;
 			}
 			sess->remotedesktop_data.devices = types;
 		} else {
