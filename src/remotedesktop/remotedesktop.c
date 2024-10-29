@@ -432,6 +432,7 @@ static int method_remotedesktop_notify_pointer_motion(sd_bus_message *msg,
 	zwlr_virtual_pointer_v1_motion(sess->remotedesktop_data.virtual_pointer,
 		get_timestamp_ms(&sess->remotedesktop_data),
 		wl_fixed_from_double(dx), wl_fixed_from_double(dy));
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
 
 	return 0;
 }
@@ -487,6 +488,7 @@ static int method_remotedesktop_notify_pointer_motion_absolute(
 		get_timestamp_ms(&sess->remotedesktop_data),
 		wl_fixed_from_double(x), wl_fixed_from_double(y),
 		output->width, output->height);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
 
 	return 0;
 }
@@ -541,6 +543,7 @@ static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 	zwlr_virtual_pointer_v1_button(sess->remotedesktop_data.virtual_pointer,
 		get_timestamp_ms(&sess->remotedesktop_data),
 		button, btn_state);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
 	return 0;
 }
 
@@ -632,6 +635,7 @@ static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 			get_timestamp_ms(&sess->remotedesktop_data),
 			WL_POINTER_AXIS_HORIZONTAL_SCROLL);
 	}
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
 	return 0;
 }
 
@@ -685,6 +689,7 @@ static int method_remotedesktop_notify_pointer_axis_discrete(
 	zwlr_virtual_pointer_v1_axis_discrete(sess->remotedesktop_data.virtual_pointer,
 			get_timestamp_ms(&sess->remotedesktop_data),
 			axis, wl_fixed_from_double(0.1), steps);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
 	return 0;
 }
 
