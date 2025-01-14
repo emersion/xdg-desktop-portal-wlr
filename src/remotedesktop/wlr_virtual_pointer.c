@@ -43,9 +43,15 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 	}
 }
 
+
+static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
+		uint32_t id) {
+	// TODO: handle seat removal?
+}
+
 static const struct wl_registry_listener wlr_registry_listener = {
 	.global = wlr_registry_handle_add,
-	.global_remove = NULL,
+	.global_remove = wlr_registry_handle_remove,
 };
 
 int xdpw_wlr_virtual_pointer_init(struct xdpw_state *state) {
