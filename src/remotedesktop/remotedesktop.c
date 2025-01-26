@@ -396,13 +396,13 @@ static int method_remotedesktop_notify_pointer_motion(sd_bus_message *msg,
 	struct xdpw_session *sess;
 	double dx = 0, dy = 0;
 
-	logprint(DEBUG, "remotedesktop: npm: method invoked");
+	logprint(TRACE, "remotedesktop: npm: method invoked");
 
 	ret = sd_bus_message_read(msg, "o", &session_handle);
 	if (ret < 0) {
 		return ret;
 	}
-	logprint(DEBUG, "remotedesktop: npm: session_handle: %s", session_handle);
+	logprint(TRACE, "remotedesktop: npm: session_handle: %s", session_handle);
 
 	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
@@ -413,10 +413,10 @@ static int method_remotedesktop_notify_pointer_motion(sd_bus_message *msg,
 		logprint(WARN, "remotedesktop: npm: session not found");
 		return -1;
 	}
-	logprint(DEBUG, "remotedesktop: npm: session found");
+	logprint(TRACE, "remotedesktop: npm: session found");
 
 	if (!(sess->remotedesktop_data.devices & POINTER)) {
-		logprint(DEBUG, "remotedesktop: npm: called, but pointer not selected!");
+		logprint(ERROR, "remotedesktop: npm: called, but pointer not selected!");
 		return -1;
 	}
 
@@ -450,13 +450,13 @@ static int method_remotedesktop_notify_pointer_motion_absolute(
 	struct xdpw_session *sess;
 	double x = 0, y = 0;
 
-	logprint(DEBUG, "remotedesktop: npma: method invoked");
+	logprint(TRACE, "remotedesktop: npma: method invoked");
 
 	ret = sd_bus_message_read(msg, "o", &session_handle);
 	if (ret < 0) {
 		return ret;
 	}
-	logprint(DEBUG, "remotedesktop: npma: session_handle: %s", session_handle);
+	logprint(TRACE, "remotedesktop: npma: session_handle: %s", session_handle);
 
 	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
@@ -467,10 +467,10 @@ static int method_remotedesktop_notify_pointer_motion_absolute(
 		logprint(WARN, "remotedesktop: npma: session not found");
 		return -1;
 	}
-	logprint(DEBUG, "remotedesktop: npma: session found");
+	logprint(TRACE, "remotedesktop: npma: session found");
 
 	if (!(sess->remotedesktop_data.devices & POINTER)) {
-		logprint(DEBUG, "remotedesktop: npma: called, but pointer not selected!");
+		logprint(ERROR, "remotedesktop: npma: called, but pointer not selected!");
 		return -1;
 	}
 
@@ -527,7 +527,7 @@ static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 	logprint(DEBUG, "remotedesktop: npb: session found");
 
 	if (!(sess->remotedesktop_data.devices & POINTER)) {
-		logprint(DEBUG, "remotedesktop: npb: called, but pointer not selected!");
+		logprint(ERROR, "remotedesktop: npb: called, but pointer not selected!");
 		return -1;
 	}
 
