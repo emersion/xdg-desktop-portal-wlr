@@ -544,6 +544,17 @@ static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 		return ret;
 	}
 
+	if (btn_state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		if (sess->remotedesktop_data.pressed_buttons & 1<<button) {
+			logprint(WARN, "remotedesktop: npb: pointer already pressed, releasing first");
+			zwlr_virtual_pointer_v1_button(sess->remotedesktop_data.virtual_pointer,
+					get_timestamp_ms(&sess->remotedesktop_data),
+					button, WL_POINTER_BUTTON_STATE_RELEASED);
+		}
+		sess->remotedesktop_data.pressed_buttons |= 1<<button;
+	} else {
+		sess->remotedesktop_data.pressed_buttons &= ~(1<<button);
+	}
 	zwlr_virtual_pointer_v1_button(sess->remotedesktop_data.virtual_pointer,
 		get_timestamp_ms(&sess->remotedesktop_data),
 		button, btn_state);

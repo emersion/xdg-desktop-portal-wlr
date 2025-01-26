@@ -32,6 +32,7 @@ struct xdpw_remotedesktop_session_data {
 	struct keyboard keyboard;
 	struct timespec t_start;
 	uint32_t devices;
+	uint32_t pressed_buttons;
 };
 
 enum device_types {
