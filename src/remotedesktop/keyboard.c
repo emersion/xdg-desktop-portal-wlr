@@ -159,7 +159,7 @@ void keyboard_dump_lookup_table(const struct keyboard* self)
 
 static uint32_t get_time_ms() {
 	struct timespec t;
-	clock_gettime(CLOCK_MONOTONIC_RAW, &t);
+	clock_gettime(CLOCK_MONOTONIC, &t);
 	return t.tv_sec * 1e3 + t.tv_nsec * 1e-6;
 }
 
