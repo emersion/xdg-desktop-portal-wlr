@@ -6,8 +6,8 @@
 #include "config.h"
 #include "remotedesktop_common.h"
 #include "screencast.h"
+#include "virtual_input.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
-#include "wlr_virtual_pointer.h"
 #include "xdpw.h"
 
 static const char object_path[] = "/org/freedesktop/portal/desktop";
@@ -865,7 +865,7 @@ int xdpw_remotedesktop_init(struct xdpw_state *state) {
 	state->remotedesktop.state = state;
 
 	int err;
-	err = xdpw_wlr_virtual_pointer_init(state);
+	err = xdpw_virtual_input_init(state);
 	if (err) {
 		goto fail_virtual_pointer;
 	}
@@ -874,7 +874,7 @@ int xdpw_remotedesktop_init(struct xdpw_state *state) {
 		interface_name, remotedesktop_vtable, state);
 
 fail_virtual_pointer:
-	xdpw_wlr_virtual_pointer_finish(&state->remotedesktop);
+	xdpw_virtual_input_finish(&state->remotedesktop);
 
 	return err;
 }

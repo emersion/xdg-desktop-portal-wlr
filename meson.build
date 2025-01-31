@@ -67,7 +67,7 @@ xdpw_files = files(
 	'src/remotedesktop/remotedesktop.c',
 	'src/remotedesktop/keyboard.c',
 	'src/remotedesktop/shm.c',
-	'src/remotedesktop/wlr_virtual_pointer.c',
+	'src/remotedesktop/virtual_input.c',
 )
 
 executable(

@@ -1,5 +1,5 @@
-#ifndef WLR_VIRTUAL_POINTER_H
-#define WLR_VIRTUAL_POINTER_H
+#ifndef VIRTUAL_INPUT_H
+#define VIRTUAL_INPUT_H
 
 #define VIRTUAL_POINTER_VERSION 2
 #define VIRTUAL_POINTER_VERSION_MIN 1
@@ -11,8 +11,8 @@
 
 struct xdpw_state;
 
-int xdpw_wlr_virtual_pointer_init(struct xdpw_state *state);
+int xdpw_virtual_input_init(struct xdpw_state *state);
 
-void xdpw_wlr_virtual_pointer_finish(struct xdpw_remotedesktop_context *ctx);
+void xdpw_virtual_input_finish(struct xdpw_remotedesktop_context *ctx);
 
 #endif

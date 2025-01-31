@@ -1,9 +1,8 @@
-#include "wlr_virtual_pointer.h"
+#include "virtual_input.h"
 
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 
-#include "remotedesktop.h"
 #include "xdpw.h"
 #include "logger.h"
 
@@ -54,7 +53,7 @@ static const struct wl_registry_listener wlr_registry_listener = {
 	.global_remove = wlr_registry_handle_remove,
 };
 
-int xdpw_wlr_virtual_pointer_init(struct xdpw_state *state) {
+int xdpw_virtual_input_init(struct xdpw_state *state) {
 	struct xdpw_remotedesktop_context *ctx = &state->remotedesktop;
 
 	// retrieve registry
@@ -73,10 +72,17 @@ int xdpw_wlr_virtual_pointer_init(struct xdpw_state *state) {
 		return -1;
 	}
 
+	// make sure our wlroots supports virtual-keyboard protocol
+	if (!ctx->virtual_keyboard_manager) {
+		logprint(ERROR, "Compositor doesn't support %s!",
+			zwp_virtual_keyboard_manager_v1_interface.name);
+		return -1;
+	}
+
 	return 0;
 }
 
-void xdpw_wlr_virtual_pointer_finish(struct xdpw_remotedesktop_context *ctx) {
+void xdpw_virtual_input_finish(struct xdpw_remotedesktop_context *ctx) {
 	if (ctx->virtual_pointer_manager) {
 		zwlr_virtual_pointer_manager_v1_destroy(ctx->virtual_pointer_manager);
 	}
