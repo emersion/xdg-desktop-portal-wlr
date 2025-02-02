@@ -878,3 +878,16 @@ fail_virtual_pointer:
 
 	return err;
 }
+
+void xdpw_remotedesktop_destroy(struct xdpw_remotedesktop_session_data *data) {
+	logprint(DEBUG, "remotedesktop: destroy called.");
+	if (data->virtual_pointer) {
+		zwlr_virtual_pointer_v1_destroy(data->virtual_pointer);
+		data->virtual_pointer = NULL;
+	}
+	if (data->keyboard.virtual_keyboard) {
+		zwp_virtual_keyboard_v1_destroy(data->keyboard.virtual_keyboard);
+		data->keyboard.virtual_keyboard = NULL;
+		keyboard_destroy(&data->keyboard);
+	}
+}
