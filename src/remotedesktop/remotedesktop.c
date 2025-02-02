@@ -635,22 +635,21 @@ static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 		return ret;
 	}
 
-	zwlr_virtual_pointer_v1_axis(sess->remotedesktop_data.virtual_pointer,
-		get_timestamp_ms(&sess->remotedesktop_data),
-		WL_POINTER_AXIS_VERTICAL_SCROLL, wl_fixed_from_double(dy * 10));
-	zwlr_virtual_pointer_v1_axis(sess->remotedesktop_data.virtual_pointer,
-		get_timestamp_ms(&sess->remotedesktop_data),
-		WL_POINTER_AXIS_HORIZONTAL_SCROLL, wl_fixed_from_double(dx * 10));
+	struct zwlr_virtual_pointer_v1 *pointer = sess->remotedesktop_data.virtual_pointer;
+	uint32_t t = get_timestamp_ms(&sess->remotedesktop_data);
+
+	zwlr_virtual_pointer_v1_axis_source(pointer, WL_POINTER_AXIS_SOURCE_CONTINUOUS);
+	zwlr_virtual_pointer_v1_axis(pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL,
+			wl_fixed_from_double(dy));
+	zwlr_virtual_pointer_v1_axis(pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL,
+			wl_fixed_from_double(dx));
 
 	if (finish) {
-		zwlr_virtual_pointer_v1_axis_stop(sess->remotedesktop_data.virtual_pointer,
-			get_timestamp_ms(&sess->remotedesktop_data),
-			WL_POINTER_AXIS_VERTICAL_SCROLL);
-		zwlr_virtual_pointer_v1_axis_stop(sess->remotedesktop_data.virtual_pointer,
-			get_timestamp_ms(&sess->remotedesktop_data),
-			WL_POINTER_AXIS_HORIZONTAL_SCROLL);
+		zwlr_virtual_pointer_v1_axis_stop(pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL);
+		zwlr_virtual_pointer_v1_axis_stop(pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL);
 	}
-	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
+
+	zwlr_virtual_pointer_v1_frame(pointer);
 	return 0;
 }
 
