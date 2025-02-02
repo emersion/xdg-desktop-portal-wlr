@@ -571,13 +571,13 @@ static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 	struct xdpw_session *sess;
 	double dx = 0, dy = 0;
 
-	logprint(DEBUG, "remotedesktop: npa: method invoked");
+	logprint(TRACE, "remotedesktop: npa: method invoked");
 
 	ret = sd_bus_message_read(msg, "o", &session_handle);
 	if (ret < 0) {
 		return ret;
 	}
-	logprint(DEBUG, "remotedesktop: npa: session_handle: %s", session_handle);
+	logprint(TRACE, "remotedesktop: npa: session_handle: %s", session_handle);
 
 	wl_list_for_each_reverse(sess, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
@@ -588,7 +588,7 @@ static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 		logprint(WARN, "remotedesktop: npa: session not found");
 		return -1;
 	}
-	logprint(DEBUG, "remotedesktop: npa: session found");
+	logprint(TRACE, "remotedesktop: npa: session found");
 
 	if (!(sess->remotedesktop_data.devices & POINTER)) {
 		logprint(DEBUG, "remotedesktop: npa: called, but pointer not selected!");
