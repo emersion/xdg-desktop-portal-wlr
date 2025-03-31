@@ -16,6 +16,8 @@
 #include "xdpw.h"
 #include "logger.h"
 
+#define DAMAGE_REGION_COUNT 16
+
 static struct spa_pod *build_buffer(struct spa_pod_builder *b, uint32_t blocks, uint32_t size,
 		uint32_t stride, uint32_t datatype) {
 	assert(blocks > 0);
@@ -188,6 +190,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		logprint(WARN, "pipewire: no buffer to queue");
 		goto done;
 	}
+	struct xdpw_buffer *xdpw_buf = cast->current_frame.xdpw_buffer;
 	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
@@ -220,25 +223,32 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	if ((damage = spa_buffer_find_meta(spa_buf, SPA_META_VideoDamage))) {
 		struct spa_region *d_region = spa_meta_first(damage);
 		uint32_t damage_counter = 0;
-		do {
-			if (damage_counter >= cast->current_frame.damage_count) {
-				*d_region = SPA_REGION(0, 0, 0, 0);
-				logprint(TRACE, "pipewire: end damage %u %u,%u (%ux%u)", damage_counter,
-						d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+		struct xdpw_frame_damage *fdamage;
+		bool stopped_for_spa = false;
+		wl_array_for_each(fdamage, &xdpw_buf->damage) {
+			if (!spa_meta_check(d_region + 1, damage)) {
+				stopped_for_spa = true;
+				break;
 			}
-			struct xdpw_frame_damage *fdamage = &cast->current_frame.damage[damage_counter];
+			d_region++;
+
 			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
 			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
 					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
-		} while (spa_meta_check(d_region + 1, damage) && d_region++);
+			damage_counter++;
+		}
 
-		if (damage_counter < cast->current_frame.damage_count) {
-			struct xdpw_frame_damage fdamage =
+		if (stopped_for_spa) {
+			struct xdpw_frame_damage new_fdamage =
 				{d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height};
-			for (; damage_counter < cast->current_frame.damage_count; damage_counter++) {
-				fdamage = merge_damage(&fdamage, &cast->current_frame.damage[damage_counter]);
+
+			wl_array_for_each(fdamage, &xdpw_buf->damage) {
+				if (damage_counter-- > 0) {
+					continue;
+				}
+				new_fdamage = merge_damage(&new_fdamage, fdamage);
 			}
-			*d_region = SPA_REGION(fdamage.x, fdamage.y, fdamage.width, fdamage.height);
+			*d_region = SPA_REGION(new_fdamage.x, new_fdamage.y, new_fdamage.width, new_fdamage.height);
 			logprint(TRACE, "pipewire: collected damage %u %u,%u (%ux%u)", damage_counter,
 					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
 		}
@@ -446,9 +456,9 @@ fixate_format:
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
 		SPA_PARAM_META_type, SPA_POD_Id(SPA_META_VideoDamage),
 		SPA_PARAM_META_size, SPA_POD_CHOICE_RANGE_Int(
-			sizeof(struct spa_meta_region) * 4,
+			sizeof(struct spa_meta_region) * DAMAGE_REGION_COUNT,
 			sizeof(struct spa_meta_region) * 1,
-			sizeof(struct spa_meta_region) * 4));
+			sizeof(struct spa_meta_region) * DAMAGE_REGION_COUNT));
 
 	pw_stream_update_params(stream, params, 4);
 	spa_pod_dynamic_builder_clean(&b[0]);
