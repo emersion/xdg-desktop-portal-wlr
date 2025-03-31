@@ -77,12 +77,18 @@ static struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *c
 }
 
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
-		enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info) {
+		enum buffer_type buffer_type) {
 	struct xdpw_buffer *buffer = calloc(1, sizeof(struct xdpw_buffer));
+
+	struct xdpw_screencopy_frame_info *frame_info = &cast->screencopy_frame_info[buffer_type];
+
+	uint32_t format = xdpw_format_drm_fourcc_from_pw_format(cast->pwr_format.format);
+	assert(format != DRM_FORMAT_INVALID);
+
 	buffer->width = frame_info->width;
 	buffer->height = frame_info->height;
-	buffer->format = frame_info->format;
 	buffer->buffer_type = buffer_type;
+	buffer->format = format;
 	wl_array_init(&buffer->damage);
 
 	switch (buffer_type) {
@@ -105,7 +111,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			return NULL;
 		}
 
-		buffer->buffer = import_wl_shm_buffer(cast, buffer->fd[0], xdpw_format_wl_shm_from_drm_fourcc(frame_info->format),
+		buffer->buffer = import_wl_shm_buffer(cast, buffer->fd[0], xdpw_format_wl_shm_from_drm_fourcc(format),
 			frame_info->width, frame_info->height, frame_info->stride);
 		if (buffer->buffer == NULL) {
 			logprint(ERROR, "xdpw: unable to create wl_buffer");
@@ -119,19 +125,19 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
 			uint64_t *modifiers = (uint64_t*)&cast->pwr_format.modifier;
 			buffer->bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm, frame_info->width, frame_info->height,
-				frame_info->format, modifiers, 1, flags);
+				format, modifiers, 1, flags);
 		} else {
 			if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
 				flags |= GBM_BO_USE_LINEAR;
 			}
 			buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
-				frame_info->format, flags);
+				format, flags);
 		}
 
 		// Fallback for linear buffers via the implicit api
 		if (buffer->bo == NULL && cast->pwr_format.modifier == DRM_FORMAT_MOD_LINEAR) {
 			buffer->bo = gbm_bo_create(cast->ctx->gbm, frame_info->width, frame_info->height,
-					frame_info->format, flags | GBM_BO_USE_LINEAR);
+					format, flags | GBM_BO_USE_LINEAR);
 		}
 
 		if (buffer->bo == NULL) {
@@ -297,9 +303,52 @@ enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format) {
 	case DRM_FORMAT_RGB888:
 		return SPA_VIDEO_FORMAT_BGR;
 	default:
-		logprint(ERROR, "xdg-desktop-portal-wlr: failed to convert drm "
-			"format 0x%08x to spa_video_format", format);
-		abort();
+		return SPA_VIDEO_FORMAT_UNKNOWN;
+	}
+}
+
+uint32_t xdpw_format_drm_fourcc_from_pw_format(enum spa_video_format format) {
+	switch (format) {
+	case SPA_VIDEO_FORMAT_BGRA:
+		return DRM_FORMAT_ARGB8888;
+	case SPA_VIDEO_FORMAT_BGRx:
+		return DRM_FORMAT_XRGB8888;
+	case SPA_VIDEO_FORMAT_ABGR:
+		return DRM_FORMAT_RGBA8888;
+	case SPA_VIDEO_FORMAT_xBGR:
+		return DRM_FORMAT_RGBX8888;
+	case SPA_VIDEO_FORMAT_RGBA:
+		return DRM_FORMAT_ABGR8888;
+	case SPA_VIDEO_FORMAT_RGBx:
+		return DRM_FORMAT_XBGR8888;
+	case SPA_VIDEO_FORMAT_ARGB:
+		return DRM_FORMAT_BGRA8888;
+	case SPA_VIDEO_FORMAT_xRGB:
+		return DRM_FORMAT_BGRX8888;
+	case SPA_VIDEO_FORMAT_NV12:
+		return DRM_FORMAT_NV12;
+	case SPA_VIDEO_FORMAT_xRGB_210LE:
+		return DRM_FORMAT_XRGB2101010;
+	case SPA_VIDEO_FORMAT_xBGR_210LE:
+		return DRM_FORMAT_XBGR2101010;
+	case SPA_VIDEO_FORMAT_RGBx_102LE:
+		return DRM_FORMAT_RGBX1010102;
+	case SPA_VIDEO_FORMAT_BGRx_102LE:
+		return DRM_FORMAT_BGRX1010102;
+	case SPA_VIDEO_FORMAT_ARGB_210LE:
+		return DRM_FORMAT_ARGB2101010;
+	case SPA_VIDEO_FORMAT_ABGR_210LE:
+		return DRM_FORMAT_ABGR2101010;
+	case SPA_VIDEO_FORMAT_RGBA_102LE:
+		return DRM_FORMAT_RGBA1010102;
+	case SPA_VIDEO_FORMAT_BGRA_102LE:
+		return DRM_FORMAT_BGRA1010102;
+	case SPA_VIDEO_FORMAT_RGB:
+		return DRM_FORMAT_BGR888;
+	case SPA_VIDEO_FORMAT_BGR:
+		return DRM_FORMAT_RGB888;
+	default:
+		return DRM_FORMAT_INVALID;
 	}
 }
 
