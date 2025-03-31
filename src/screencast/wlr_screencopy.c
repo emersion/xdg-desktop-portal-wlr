@@ -151,7 +151,9 @@ static void wlr_frame_buffer_done(void *data,
 	cast->current_frame.transformation = cast->target->output->transformation;
 	logprint(TRACE, "wlroots: transformation %u", cast->current_frame.transformation);
 
-	cast->current_frame.damage_count = 0;
+	struct xdpw_buffer *buffer = cast->current_frame.xdpw_buffer;
+	buffer->damage.size = 0;
+
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.xdpw_buffer->buffer);
 	logprint(TRACE, "wlroots: frame copied");
 
@@ -178,13 +180,10 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	logprint(TRACE, "wlroots: damage event handler");
 
-	logprint(TRACE, "wlroots: damage %"PRIu32": %"PRIu32",%"PRIu32"x%"PRIu32",%"PRIu32, cast->current_frame.damage_count, x, y, width, height);
-	struct xdpw_frame_damage damage = {x, y, width, height};
-	if (cast->current_frame.damage_count < 4) {
-		cast->current_frame.damage[cast->current_frame.damage_count++] = damage;
-	} else {
-		cast->current_frame.damage[3] = merge_damage(&cast->current_frame.damage[3], &damage);
-	}
+	struct xdpw_buffer *buffer = cast->current_frame.xdpw_buffer;
+	logprint(TRACE, "wlroots: damage %"PRIu32": %"PRIu32",%"PRIu32"x%"PRIu32",%"PRIu32, buffer->damage.size, x, y, width, height);
+	struct xdpw_frame_damage *damage = wl_array_add(&buffer->damage, sizeof(*damage));
+	*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
 }
 
 static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,

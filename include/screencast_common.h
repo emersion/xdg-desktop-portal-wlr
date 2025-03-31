@@ -68,8 +68,6 @@ struct xdpw_frame {
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
 	uint32_t transformation;
-	struct xdpw_frame_damage damage[4];
-	uint32_t damage_count;
 	struct xdpw_buffer *xdpw_buffer;
 	struct pw_buffer *pw_buffer;
 };
@@ -95,6 +93,8 @@ struct xdpw_buffer {
 	uint32_t size[GBM_MAX_PLANES];
 	uint32_t stride[GBM_MAX_PLANES];
 	uint32_t offset[GBM_MAX_PLANES];
+
+	struct wl_array damage;
 
 	struct gbm_bo *bo;
 
