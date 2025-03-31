@@ -106,6 +106,8 @@ struct xdpw_screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
+	struct ext_output_image_capture_source_manager_v1 *ext_output_image_capture_source_manager;
+	struct ext_image_copy_capture_manager_v1 *ext_image_copy_capture_manager;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
@@ -152,6 +154,11 @@ struct xdpw_buffer_constraints {
 	struct gbm_device *gbm;
 };
 
+struct xdpw_screencast_ext_session {
+	struct ext_image_copy_capture_session_v1 *capture_session;
+	struct ext_image_copy_capture_frame_v1 *frame;
+};
+
 struct xdpw_screencast_wlr_session {
 	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
@@ -181,6 +188,7 @@ struct xdpw_screencast_instance {
 	// wlroots
 	union {
 		struct xdpw_screencast_wlr_session wlr_session;
+		struct xdpw_screencast_ext_session ext_session;
 	};
 
 	struct xdpw_buffer_constraints current_constraints;
@@ -234,6 +242,8 @@ uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
 uint32_t xdpw_format_drm_fourcc_from_pw_format(enum spa_video_format format);
 enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
+
+int xdpw_bpp_from_drm_fourcc(uint32_t format);
 
 enum xdpw_chooser_types get_chooser_type(const char *chooser_type);
 const char *chooser_type_str(enum xdpw_chooser_types chooser_type);
