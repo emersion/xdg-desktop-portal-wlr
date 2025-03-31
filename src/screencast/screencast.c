@@ -58,6 +58,9 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 		}
 	}
 
+	xdpw_buffer_constraints_init(&cast->current_constraints);
+	xdpw_buffer_constraints_init(&cast->pending_constraints);
+
 	cast->ctx = ctx;
 	cast->target = target;
 	if (ctx->state->config->screencast_conf.max_fps > 0) {
@@ -95,6 +98,9 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
 	assert(wl_list_length(&cast->buffer_list) == 0);
+
+	xdpw_buffer_constraints_finish(&cast->current_constraints);
+	xdpw_buffer_constraints_finish(&cast->pending_constraints);
 	free(cast);
 }
 
