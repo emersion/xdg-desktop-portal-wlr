@@ -221,12 +221,13 @@ struct xdpw_wlr_output {
 void randname(char *buf);
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
-	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
+	enum buffer_type buffer_type);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
 bool wlr_query_dmabuf_modifiers(struct xdpw_screencast_context *ctx, uint32_t drm_format,
 		uint32_t num_modifiers, uint64_t *modifiers, uint32_t *max_modifiers);
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
 uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
+uint32_t xdpw_format_drm_fourcc_from_pw_format(enum spa_video_format format);
 enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
 

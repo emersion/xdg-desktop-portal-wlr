@@ -174,6 +174,22 @@ static void build_formats(struct spa_pod_builder *builder, struct xdpw_screencas
 	free(modifiers);
 }
 
+static uint32_t spa_video_format_to_fourcc(struct xdpw_screencast_instance *cast, enum spa_video_format format) {
+	if (!cast->avoid_dmabufs) {
+		struct xdpw_format_modifier_pair *fm_pair;
+		wl_array_for_each(fm_pair, &cast->ctx->format_modifier_pairs) {
+			enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(fm_pair->fourcc);
+			if (pw_format == SPA_VIDEO_FORMAT_UNKNOWN) {
+				continue;
+			}
+			if (pw_format == format) {
+				return fm_pair->fourcc;
+			}
+		}
+	}
+	return DRM_FORMAT_INVALID;
+}
+
 void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: dequeueing buffer");
 
@@ -354,7 +370,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
 		cast->buffer_type = DMABUF;
 		data_type = 1<<SPA_DATA_DmaBuf;
-		assert(cast->pwr_format.format == xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format));
+		uint32_t fourcc = spa_video_format_to_fourcc(cast, cast->pwr_format.format);
+		assert(fourcc != DRM_FORMAT_INVALID);
 		if ((prop_modifier->flags & SPA_POD_PROP_FLAG_DONT_FIXATE) > 0) {
 			const struct spa_pod *pod_modifier = &prop_modifier->value;
 
@@ -366,7 +383,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 
 			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
 				cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
-				cast->screencopy_frame_info[cast->buffer_type].format, modifiers, n_modifiers, flags);
+				fourcc, modifiers, n_modifiers, flags);
 			if (bo) {
 				modifier = gbm_bo_get_modifier(bo);
 				gbm_bo_destroy(bo);
@@ -388,7 +405,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 				}
 				bo = gbm_bo_create(cast->ctx->gbm,
 					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
-					cast->screencopy_frame_info[cast->buffer_type].format, flags);
+					fourcc, flags);
 				if (bo) {
 					modifier = gbm_bo_get_modifier(bo);
 					gbm_bo_destroy(bo);
@@ -408,7 +425,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 
 fixate_format:
 
-			add_pod(&params, fixate_format(&builder.b, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format),
+			add_pod(&params, fixate_format(&builder.b, cast->pwr_format.format,
 					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height, cast->framerate, &modifier));
 
 			build_formats(&builder.b, cast, &params);
@@ -423,7 +440,7 @@ fixate_format:
 			blocks = 1;
 		} else {
 			blocks = gbm_device_get_format_modifier_plane_count(cast->ctx->gbm,
-				cast->screencopy_frame_info[DMABUF].format, cast->pwr_format.modifier);
+				fourcc, cast->pwr_format.modifier);
 		}
 	} else {
 		cast->buffer_type = WL_SHM;
@@ -488,7 +505,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 
 	logprint(TRACE, "pipewire: selected buffertype %u", t);
 
-	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, cast->buffer_type, &cast->screencopy_frame_info[cast->buffer_type]);
+	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, cast->buffer_type);
 	if (xdpw_buffer == NULL) {
 		logprint(ERROR, "pipewire: failed to create xdpw buffer");
 		cast->err = 1;
