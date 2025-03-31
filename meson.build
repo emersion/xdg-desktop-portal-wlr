@@ -58,6 +58,7 @@ xdpw_files = files(
 	'src/screenshot/screenshot.c',
 	'src/screencast/screencast.c',
 	'src/screencast/screencast_common.c',
+	'src/screencast/ext_image_copy.c',
 	'src/screencast/wlr_screencast.c',
 	'src/screencast/wlr_screencopy.c',
 	'src/screencast/pipewire_screencast.c',
