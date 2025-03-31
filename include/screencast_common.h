@@ -91,10 +91,10 @@ struct xdpw_buffer {
 	uint32_t format;
 	int plane_count;
 
-	int fd[4];
-	uint32_t size[4];
-	uint32_t stride[4];
-	uint32_t offset[4];
+	int fd[GBM_MAX_PLANES];
+	uint32_t size[GBM_MAX_PLANES];
+	uint32_t stride[GBM_MAX_PLANES];
+	uint32_t offset[GBM_MAX_PLANES];
 
 	struct gbm_bo *bo;
 
