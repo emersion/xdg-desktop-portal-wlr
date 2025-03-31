@@ -77,11 +77,17 @@ static void wlr_frame_buffer(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	logprint(TRACE, "wlroots: buffer event handler");
 	cast->wlr_session.wlr_frame = frame;
 
-	cast->screencopy_frame_info[WL_SHM].width = width;
-	cast->screencopy_frame_info[WL_SHM].height = height;
-	cast->screencopy_frame_info[WL_SHM].stride = stride;
-	cast->screencopy_frame_info[WL_SHM].size = stride * height;
-	cast->screencopy_frame_info[WL_SHM].format = xdpw_format_drm_fourcc_from_wl_shm(format);
+	struct xdpw_shm_format *fmt = wl_array_add(&cast->pending_constraints.shm_formats, sizeof(*fmt));
+	if (fmt == NULL) {
+		logprint(WARN, "ext: allocation for shm format failed");
+		return;
+	}
+	fmt->fourcc = xdpw_format_drm_fourcc_from_wl_shm(format);
+	fmt->stride = stride;
+
+	cast->pending_constraints.width = width;
+	cast->pending_constraints.height = height;
+	cast->pending_constraints.dirty = true;
 
 	if (zwlr_screencopy_manager_v1_get_version(cast->ctx->screencopy_manager) < 3) {
 		wlr_frame_buffer_done(cast, frame);
@@ -98,15 +104,37 @@ static void wlr_frame_linux_dmabuf(void *data,
 
 	logprint(TRACE, "wlroots: linux_dmabuf event handler");
 
-	cast->screencopy_frame_info[DMABUF].width = width;
-	cast->screencopy_frame_info[DMABUF].height = height;
-	cast->screencopy_frame_info[DMABUF].format = format;
+
+	struct xdpw_format_modifier_pair *fm_pair;
+	wl_array_for_each(fm_pair, &cast->ctx->format_modifier_pairs) {
+		if (fm_pair->fourcc != format) {
+			continue;
+		}
+
+		struct xdpw_format_modifier_pair *new =
+			wl_array_add(&cast->pending_constraints.dmabuf_format_modifier_pairs, sizeof(*new));
+		assert(new != NULL);
+		new->fourcc = fm_pair->fourcc;
+		new->modifier = fm_pair->modifier;
+	}
+
+	cast->pending_constraints.width = width;
+	cast->pending_constraints.height = height;
+	cast->pending_constraints.dirty = true;
+
 }
 
 static void wlr_frame_buffer_done(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
 	struct xdpw_screencast_instance *cast = data;
 	if (!frame) {
+		return;
+	}
+
+	if (xdpw_buffer_constraints_move(&cast->current_constraints, &cast->pending_constraints)) {
+		logprint(DEBUG, "wlroots: buffer constraints changed");
+		cast->frame_state = XDPW_FRAME_STATE_RENEG;
+		wlr_frame_finish(cast);
 		return;
 	}
 
@@ -117,33 +145,8 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
-	// Check if announced screencopy information is compatible with pipewire meta
-	if ((cast->pwr_format.format != xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format) &&
-			cast->pwr_format.format != xdpw_format_pw_strip_alpha(xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[cast->buffer_type].format))) ||
-			cast->pwr_format.size.width != cast->screencopy_frame_info[cast->buffer_type].width ||
-			cast->pwr_format.size.height != cast->screencopy_frame_info[cast->buffer_type].height) {
-		logprint(DEBUG, "wlroots: pipewire and wlroots metadata are incompatible. Renegotiate stream");
-		cast->frame_state = XDPW_FRAME_STATE_RENEG;
-		wlr_frame_finish(cast);
-		return;
-	}
-
 	if (!cast->current_frame.xdpw_buffer) {
 		logprint(WARN, "wlroots: no current buffer");
-		wlr_frame_finish(cast);
-		return;
-	}
-
-	assert(cast->current_frame.xdpw_buffer);
-
-	// Check if dequeued buffer is compatible with announced buffer
-	if (( cast->buffer_type == WL_SHM &&
-				(cast->current_frame.xdpw_buffer->size[0] != cast->screencopy_frame_info[cast->buffer_type].size ||
-				cast->current_frame.xdpw_buffer->stride[0] != cast->screencopy_frame_info[cast->buffer_type].stride)) ||
-			cast->current_frame.xdpw_buffer->width != cast->screencopy_frame_info[cast->buffer_type].width ||
-			cast->current_frame.xdpw_buffer->height != cast->screencopy_frame_info[cast->buffer_type].height) {
-		logprint(DEBUG, "wlroots: pipewire buffer has wrong dimensions");
-		cast->frame_state = XDPW_FRAME_STATE_FAILED;
 		wlr_frame_finish(cast);
 		return;
 	}
@@ -265,13 +268,6 @@ int xdpw_wlr_sc_session_init(struct xdpw_screencast_instance *cast) {
 	// remote state connected event
 	wl_display_dispatch(cast->ctx->state->wl_display);
 	wl_display_roundtrip(cast->ctx->state->wl_display);
-
-	if (cast->screencopy_frame_info[WL_SHM].format == DRM_FORMAT_INVALID ||
-			(cast->ctx->state->screencast_version >= 3 &&
-			 cast->screencopy_frame_info[DMABUF].format == DRM_FORMAT_INVALID)) {
-		logprint(INFO, "wlroots: unable to receive a valid format from wlr_screencopy");
-		return -1;
-	}
 
 	return 0;
 }

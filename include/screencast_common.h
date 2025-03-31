@@ -72,14 +72,6 @@ struct xdpw_frame {
 	struct pw_buffer *pw_buffer;
 };
 
-struct xdpw_screencopy_frame_info {
-	uint32_t width;
-	uint32_t height;
-	uint32_t size;
-	uint32_t stride;
-	uint32_t format;
-};
-
 struct xdpw_buffer {
 	struct wl_list link;
 	enum buffer_type buffer_type;
@@ -101,10 +93,6 @@ struct xdpw_buffer {
 	struct wl_buffer *buffer;
 };
 
-struct xdpw_format_modifier_pair {
-	uint32_t fourcc;
-	uint64_t modifier;
-};
 
 struct xdpw_dmabuf_feedback_data {
 	void *format_table_data;
@@ -153,6 +141,24 @@ struct xdpw_screencast_restore_data {
 	const char *output_name;
 };
 
+struct xdpw_format_modifier_pair {
+	uint32_t fourcc;
+	uint64_t modifier;
+};
+
+struct xdpw_shm_format {
+	uint32_t fourcc;
+	uint32_t stride;
+};
+
+struct xdpw_buffer_constraints {
+	struct wl_array dmabuf_format_modifier_pairs;
+	struct wl_array shm_formats;
+	uint32_t width, height;
+	bool dirty;
+	struct gbm_device *gbm;
+};
+
 struct xdpw_screencast_wlr_session {
 	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
@@ -184,9 +190,12 @@ struct xdpw_screencast_instance {
 	union {
 		struct xdpw_screencast_wlr_session wlr_session;
 	};
+
+	struct xdpw_buffer_constraints current_constraints;
+	struct xdpw_buffer_constraints pending_constraints;
+
 	struct xdpw_screencast_target *target;
 	uint32_t max_framerate;
-	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
 	int err;
 	bool quit;
 	bool teardown;
@@ -223,8 +232,14 @@ struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
-bool wlr_query_dmabuf_modifiers(struct xdpw_screencast_context *ctx, uint32_t drm_format,
-		uint32_t num_modifiers, uint64_t *modifiers, uint32_t *max_modifiers);
+
+void xdpw_buffer_constraints_init(struct xdpw_buffer_constraints *constraints);
+void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints);
+bool xdpw_buffer_constraints_move(struct xdpw_buffer_constraints *dst, struct xdpw_buffer_constraints *src);
+uint32_t xdpw_count_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format);
+void xdpw_query_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format,
+		uint64_t *modifiers, uint32_t num_modifiers);
+
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
 uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
 uint32_t xdpw_format_drm_fourcc_from_pw_format(enum spa_video_format format);
