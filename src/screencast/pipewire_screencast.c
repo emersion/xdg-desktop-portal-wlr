@@ -127,7 +127,7 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 
 static bool build_modifierlist(struct xdpw_screencast_instance *cast,
 		uint32_t drm_format, uint64_t **modifiers, uint32_t *modifier_count) {
-	if (!wlr_query_dmabuf_modifiers(cast->ctx, drm_format, 0, NULL, modifier_count)) {
+	if (!xdpw_query_dmabuf_modifiers(cast, drm_format, 0, NULL, modifier_count)) {
 		*modifiers = NULL;
 		*modifier_count = 0;
 		return false;
@@ -138,7 +138,7 @@ static bool build_modifierlist(struct xdpw_screencast_instance *cast,
 		return true;
 	}
 	*modifiers = calloc(*modifier_count, sizeof(uint64_t));
-	bool ret = wlr_query_dmabuf_modifiers(cast->ctx, drm_format, *modifier_count, *modifiers, modifier_count);
+	bool ret = xdpw_query_dmabuf_modifiers(cast, drm_format, *modifier_count, *modifiers, modifier_count);
 	logprint(INFO, "wlroots: num_modififiers %d", *modifier_count);
 	return ret;
 }
@@ -154,40 +154,55 @@ static void add_pod(struct wl_array *params, const struct spa_pod *pod) {
 
 static void build_formats(struct spa_pod_builder *builder, struct xdpw_screencast_instance *cast,
 		struct wl_array *params) {
-	uint32_t modifier_count;
-	uint64_t *modifiers = NULL;
-
-	if (!cast->avoid_dmabufs &&
-			build_modifierlist(cast, cast->screencopy_frame_info[DMABUF].format, &modifiers, &modifier_count) && modifier_count > 0) {
-		add_pod(params, build_format(builder, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[DMABUF].format),
-				cast->screencopy_frame_info[DMABUF].width, cast->screencopy_frame_info[DMABUF].height, cast->framerate,
-				modifiers, modifier_count));
-
-		add_pod(params, build_format(builder, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
-				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
-				NULL, 0));
-	} else {
-		add_pod(params, build_format(builder, xdpw_format_pw_from_drm_fourcc(cast->screencopy_frame_info[WL_SHM].format),
-				cast->screencopy_frame_info[WL_SHM].width, cast->screencopy_frame_info[WL_SHM].height, cast->framerate,
-				NULL, 0));
-	}
-	free(modifiers);
-}
-
-static uint32_t spa_video_format_to_fourcc(struct xdpw_screencast_instance *cast, enum spa_video_format format) {
 	if (!cast->avoid_dmabufs) {
+		uint32_t last_format = DRM_FORMAT_INVALID;
 		struct xdpw_format_modifier_pair *fm_pair;
-		wl_array_for_each(fm_pair, &cast->ctx->format_modifier_pairs) {
+		wl_array_for_each(fm_pair, &cast->current_constraints.dmabuf_format_modifier_pairs) {
+			if (last_format == fm_pair->fourcc) {
+				continue;
+			}
 			enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(fm_pair->fourcc);
 			if (pw_format == SPA_VIDEO_FORMAT_UNKNOWN) {
 				continue;
 			}
-			if (pw_format == format) {
-				return fm_pair->fourcc;
+			last_format = fm_pair->fourcc;
+
+			uint32_t modifier_count;
+			uint64_t *modifiers = NULL;
+			build_modifierlist(cast, fm_pair->fourcc, &modifiers, &modifier_count);
+			if (modifier_count > 0) {
+				add_pod(params, build_format(builder, pw_format,
+						cast->current_constraints.width, cast->current_constraints.height,
+						cast->framerate, modifiers, modifier_count));
+			}
+			free(modifiers);
+		}
+	}
+
+	uint32_t *format;
+	wl_array_for_each(format, &cast->current_constraints.shm_formats) {
+		enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(*format);
+		if (pw_format != SPA_VIDEO_FORMAT_UNKNOWN) {
+			add_pod(params, build_format(builder, pw_format,
+						cast->current_constraints.width, cast->current_constraints.height,
+						cast->framerate, NULL, 0));
+		}
+	}
+}
+
+static bool has_drm_fourcc(struct xdpw_screencast_instance *cast, uint32_t format) {
+	if (format == DRM_FORMAT_INVALID) {
+		return false;
+	}
+	if (!cast->avoid_dmabufs) {
+		struct xdpw_format_modifier_pair *fm_pair;
+		wl_array_for_each(fm_pair, &cast->current_constraints.dmabuf_format_modifier_pairs) {
+			if (fm_pair->fourcc == format) {
+				return true;
 			}
 		}
 	}
-	return DRM_FORMAT_INVALID;
+	return false;
 }
 
 void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
@@ -200,6 +215,13 @@ void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	}
 
 	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
+	if (cast->current_frame.xdpw_buffer->constraint_id != cast->current_constraints.constraint_id) {
+		logprint(DEBUG, "pipewire: buffer does not match current constraints");
+		pwr_update_stream_param(cast);
+		pw_stream_queue_buffer(cast->stream, cast->current_frame.pw_buffer);
+		cast->current_frame.pw_buffer = NULL;
+		cast->current_frame.xdpw_buffer = NULL;
+	}
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
@@ -307,6 +329,9 @@ done:
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
 	struct pw_stream *stream = cast->stream;
+	if (stream == NULL) {
+		return;
+	}
 	uint8_t params_buffer[2048];
 	struct spa_pod_dynamic_builder builder;
 	spa_pod_dynamic_builder_init(&builder, params_buffer, sizeof(params_buffer[0]), 2048);
@@ -366,12 +391,14 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
+	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
+
 	const struct spa_pod_prop *prop_modifier;
 	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
 		cast->buffer_type = DMABUF;
 		data_type = 1<<SPA_DATA_DmaBuf;
-		uint32_t fourcc = spa_video_format_to_fourcc(cast, cast->pwr_format.format);
-		assert(fourcc != DRM_FORMAT_INVALID);
+		uint32_t fourcc = xdpw_format_drm_fourcc_from_pw_format(cast->pwr_format.format);
+		assert(has_drm_fourcc(cast, fourcc));
 		if ((prop_modifier->flags & SPA_POD_PROP_FLAG_DONT_FIXATE) > 0) {
 			const struct spa_pod *pod_modifier = &prop_modifier->value;
 
@@ -381,8 +408,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			uint32_t flags = GBM_BO_USE_RENDERING;
 			uint64_t modifier;
 
-			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
-				cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
+			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(gbm,
+				cast->current_constraints.width, cast->current_constraints.height,
 				fourcc, modifiers, n_modifiers, flags);
 			if (bo) {
 				modifier = gbm_bo_get_modifier(bo);
@@ -403,9 +430,8 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 				default:
 					continue;
 				}
-				bo = gbm_bo_create(cast->ctx->gbm,
-					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height,
-					fourcc, flags);
+				bo = gbm_bo_create(gbm, cast->current_constraints.width,
+						cast->current_constraints.height, fourcc, flags);
 				if (bo) {
 					modifier = gbm_bo_get_modifier(bo);
 					gbm_bo_destroy(bo);
@@ -426,7 +452,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 fixate_format:
 
 			add_pod(&params, fixate_format(&builder.b, cast->pwr_format.format,
-					cast->screencopy_frame_info[cast->buffer_type].width, cast->screencopy_frame_info[cast->buffer_type].height, cast->framerate, &modifier));
+						cast->current_constraints.width, cast->current_constraints.height, cast->framerate, &modifier));
 
 			build_formats(&builder.b, cast, &params);
 
@@ -439,7 +465,7 @@ fixate_format:
 		if (cast->pwr_format.modifier == DRM_FORMAT_MOD_INVALID) {
 			blocks = 1;
 		} else {
-			blocks = gbm_device_get_format_modifier_plane_count(cast->ctx->gbm,
+			blocks = gbm_device_get_format_modifier_plane_count(gbm,
 				fourcc, cast->pwr_format.modifier);
 		}
 	} else {
@@ -455,8 +481,7 @@ fixate_format:
 	logprint(DEBUG, "pipewire: size: (%u, %u)", cast->pwr_format.size.width, cast->pwr_format.size.height);
 	logprint(DEBUG, "pipewire: max_framerate: (%u / %u)", cast->pwr_format.max_framerate.num, cast->pwr_format.max_framerate.denom);
 
-	add_pod(&params, build_buffer(&builder.b, blocks, cast->screencopy_frame_info[cast->buffer_type].size,
-			cast->screencopy_frame_info[cast->buffer_type].stride, data_type));
+	add_pod(&params, build_buffer(&builder.b, blocks, 0, 0, data_type));
 
 	add_pod(&params, spa_pod_builder_add_object(&builder.b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
