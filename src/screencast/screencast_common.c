@@ -83,6 +83,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	buffer->height = frame_info->height;
 	buffer->format = frame_info->format;
 	buffer->buffer_type = buffer_type;
+	wl_array_init(&buffer->damage);
 
 	switch (buffer_type) {
 	case WL_SHM:
@@ -197,6 +198,7 @@ void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	for (int plane = 0; plane < buffer->plane_count; plane++) {
 		close(buffer->fd[plane]);
 	}
+	wl_array_release(&buffer->damage);
 	wl_list_remove(&buffer->link);
 	free(buffer);
 }
