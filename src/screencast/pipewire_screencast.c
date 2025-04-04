@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <libdrm/drm_fourcc.h>
 
+#include "screencast.h"
 #include "wlr_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
@@ -200,7 +201,7 @@ static bool has_drm_fourcc(struct xdpw_screencast_instance *cast, uint32_t forma
 	return false;
 }
 
-void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
+static void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: dequeueing buffer");
 
 	assert(!cast->current_frame.pw_buffer);
@@ -210,6 +211,7 @@ void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	}
 
 	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
+	cast->current_frame.completed = false;
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
@@ -224,12 +226,12 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
 
-	bool buffer_corrupt = cast->frame_state != XDPW_FRAME_STATE_SUCCESS;
+	bool buffer_corrupt = !cast->current_frame.completed;
 
 	if (cast->current_frame.y_invert) {
 		//TODO: Flip buffer or set stride negative
-		buffer_corrupt = true;
-		cast->err = 1;
+		xdpw_screencast_instance_destroy(cast);
+		return;
 	}
 
 	logprint(TRACE, "********************");
@@ -512,7 +514,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 		t = SPA_DATA_DmaBuf;
 	} else {
 		logprint(ERROR, "pipewire: unsupported buffer type");
-		cast->err = 1;
+		xdpw_screencast_instance_destroy(cast);
 		return;
 	}
 
@@ -521,7 +523,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	struct xdpw_buffer *xdpw_buffer = xdpw_buffer_create(cast, cast->buffer_type);
 	if (xdpw_buffer == NULL) {
 		logprint(ERROR, "pipewire: failed to create xdpw buffer");
-		cast->err = 1;
+		xdpw_screencast_instance_destroy(cast);
 		return;
 	}
 	wl_list_insert(&cast->buffer_list, &xdpw_buffer->link);
@@ -553,6 +555,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 
 	struct xdpw_buffer *xdpw_buffer = buffer->user_data;
 	if (xdpw_buffer) {
+		wl_list_remove(&xdpw_buffer->link);
 		xdpw_buffer_destroy(xdpw_buffer);
 	}
 	if (cast->current_frame.pw_buffer == buffer) {

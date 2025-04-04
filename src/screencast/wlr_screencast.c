@@ -626,16 +626,7 @@ static void wlr_registry_handle_remove(void *data, struct wl_registry *reg,
 		wl_list_for_each_safe(cast, tmp, &ctx->screencast_instances, link) {
 			if (cast->target->output == output) {
 				// screencopy might be in process for this instance
-				xdpw_wlr_session_close(cast);
-				// instance might be waiting for wakeup by the frame limiter
-				struct xdpw_timer *timer, *ttmp;
-				wl_list_for_each_safe(timer, ttmp, &cast->ctx->state->timers, link) {
-					if (timer->user_data == cast) {
-						xdpw_destroy_timer(timer);
-					}
-				}
-				cast->teardown = true;
-				xdpw_screencast_instance_teardown(cast);
+				xdpw_screencast_instance_destroy(cast);
 			}
 		}
 		wlr_remove_output(output);
@@ -724,7 +715,7 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 
 	struct xdpw_screencast_instance *cast, *tmp_c;
 	wl_list_for_each_safe(cast, tmp_c, &ctx->screencast_instances, link) {
-		cast->quit = true;
+		xdpw_screencast_instance_destroy(cast);
 	}
 
 	if (ctx->screencopy_manager) {

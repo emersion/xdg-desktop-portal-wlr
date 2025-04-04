@@ -24,44 +24,13 @@
 #include "logger.h"
 #include "fps_limit.h"
 
-static void wlr_frame_free(struct xdpw_screencast_instance *cast) {
+static void wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 	if (!cast->wlr_session.wlr_frame) {
 		return;
 	}
 	zwlr_screencopy_frame_v1_destroy(cast->wlr_session.wlr_frame);
 	cast->wlr_session.wlr_frame = NULL;
 	logprint(TRACE, "wlroots: frame destroyed");
-}
-
-static void wlr_frame_finish(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "wlroots: finish screencopy");
-
-	wlr_frame_free(cast);
-
-	if (cast->quit || cast->err) {
-		// TODO: revisit the exit condition (remove quit?)
-		// and clean up sessions that still exist if err
-		// is the cause of the instance_destroy call
-		xdpw_screencast_instance_destroy(cast);
-		return;
-	}
-
-	if (!cast->pwr_stream_state) {
-		cast->frame_state = XDPW_FRAME_STATE_NONE;
-		return;
-	}
-
-	if (cast->frame_state == XDPW_FRAME_STATE_RENEG) {
-		pwr_update_stream_param(cast);
-	}
-
-	if (cast->frame_state == XDPW_FRAME_STATE_FAILED) {
-		xdpw_pwr_enqueue_buffer(cast);
-	}
-
-	if (cast->frame_state == XDPW_FRAME_STATE_SUCCESS) {
-		xdpw_pwr_enqueue_buffer(cast);
-	}
 }
 
 static void wlr_frame_buffer_done(void *data,
@@ -133,7 +102,8 @@ static void wlr_frame_buffer_done(void *data,
 
 	if (xdpw_buffer_constraints_move(&cast->current_constraints, &cast->pending_constraints)) {
 		logprint(DEBUG, "wlroots: buffer constraints changed");
-		cast->frame_state = XDPW_FRAME_STATE_RENEG;
+		pwr_update_stream_param(cast);
+		xdpw_pwr_enqueue_buffer(cast);
 		wlr_frame_finish(cast);
 		return;
 	}
@@ -147,6 +117,7 @@ static void wlr_frame_buffer_done(void *data,
 
 	if (!cast->current_frame.xdpw_buffer) {
 		logprint(WARN, "wlroots: no current buffer");
+		xdpw_pwr_enqueue_buffer(cast);
 		wlr_frame_finish(cast);
 		return;
 	}
@@ -200,10 +171,10 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 
 	cast->current_frame.tv_sec = ((((uint64_t)tv_sec_hi) << 32) | tv_sec_lo);
 	cast->current_frame.tv_nsec = tv_nsec;
+	cast->current_frame.completed = true;
 	logprint(TRACE, "wlroots: timestamp %"PRIu64":%"PRIu32, cast->current_frame.tv_sec, cast->current_frame.tv_nsec);
 
-	cast->frame_state = XDPW_FRAME_STATE_SUCCESS;
-
+	xdpw_pwr_enqueue_buffer(cast);
 	wlr_frame_finish(cast);
 }
 
@@ -216,8 +187,7 @@ static void wlr_frame_failed(void *data,
 
 	logprint(TRACE, "wlroots: failed event handler");
 
-	cast->frame_state = XDPW_FRAME_STATE_FAILED;
-
+	xdpw_pwr_enqueue_buffer(cast);
 	wlr_frame_finish(cast);
 }
 
@@ -242,22 +212,15 @@ static void wlr_register_cb(struct xdpw_screencast_instance *cast) {
 
 void xdpw_wlr_sc_frame_capture(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "wlroots: start screencopy");
-	if (cast->quit || cast->err) {
-		xdpw_screencast_instance_destroy(cast);
-		return;
-	}
-
 	if (cast->initialized && !cast->pwr_stream_state) {
-		cast->frame_state = XDPW_FRAME_STATE_NONE;
 		return;
 	}
 
-	cast->frame_state = XDPW_FRAME_STATE_STARTED;
 	wlr_register_cb(cast);
 }
 
 void xdpw_wlr_sc_session_close(struct xdpw_screencast_instance *cast) {
-	wlr_frame_free(cast);
+	wlr_frame_finish(cast);
 }
 
 int xdpw_wlr_sc_session_init(struct xdpw_screencast_instance *cast) {
