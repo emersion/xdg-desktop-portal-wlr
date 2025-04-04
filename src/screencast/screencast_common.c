@@ -103,7 +103,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		}
 		if (!found) {
 			logprint(ERROR, "xdpw: unable to find format: %d", format);
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 
 		}
@@ -115,14 +115,13 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		buffer->fd[0] = anonymous_shm_open();
 		if (buffer->fd[0] == -1) {
 			logprint(ERROR, "xdpw: unable to create anonymous filedescriptor");
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 
 		if (ftruncate(buffer->fd[0], buffer->size[0]) < 0) {
 			logprint(ERROR, "xdpw: unable to truncate filedescriptor");
-			close(buffer->fd[0]);
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 
@@ -156,7 +155,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 
 		if (buffer->bo == NULL) {
 			logprint(ERROR, "xdpw: failed to create gbm_bo");
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 		buffer->plane_count = gbm_bo_get_plane_count(buffer->bo);
@@ -165,8 +164,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		params = zwp_linux_dmabuf_v1_create_params(cast->ctx->linux_dmabuf);
 		if (!params) {
 			logprint(ERROR, "xdpw: failed to create linux_buffer_params");
-			gbm_bo_destroy(buffer->bo);
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 
@@ -180,11 +178,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			if (buffer->fd[plane] < 0) {
 				logprint(ERROR, "xdpw: failed to get file descriptor");
 				zwp_linux_buffer_params_v1_destroy(params);
-				gbm_bo_destroy(buffer->bo);
-				for (int plane_tmp = 0; plane_tmp < plane; plane_tmp++) {
-					close(buffer->fd[plane_tmp]);
-				}
-				free(buffer);
+				xdpw_buffer_destroy(buffer);
 				return NULL;
 			}
 
@@ -198,11 +192,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 
 		if (!buffer->buffer) {
 			logprint(ERROR, "xdpw: failed to create buffer");
-			gbm_bo_destroy(buffer->bo);
-			for (int plane = 0; plane < buffer->plane_count; plane++) {
-				close(buffer->fd[plane]);
-			}
-			free(buffer);
+			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 	}
@@ -211,15 +201,16 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 }
 
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
-	wl_buffer_destroy(buffer->buffer);
-	if (buffer->buffer_type == DMABUF) {
+	if (buffer->buffer) {
+		wl_buffer_destroy(buffer->buffer);
+	}
+	if (buffer->bo) {
 		gbm_bo_destroy(buffer->bo);
 	}
 	for (int plane = 0; plane < buffer->plane_count; plane++) {
 		close(buffer->fd[plane]);
 	}
 	wl_array_release(&buffer->damage);
-	wl_list_remove(&buffer->link);
 	free(buffer);
 }
 

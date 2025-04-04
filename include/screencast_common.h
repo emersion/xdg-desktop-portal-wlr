@@ -43,14 +43,6 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_DMENU,
 };
 
-enum xdpw_frame_state {
-  XDPW_FRAME_STATE_NONE,
-  XDPW_FRAME_STATE_STARTED,
-  XDPW_FRAME_STATE_RENEG,
-  XDPW_FRAME_STATE_FAILED,
-  XDPW_FRAME_STATE_SUCCESS,
-};
-
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
@@ -64,6 +56,7 @@ struct xdpw_frame_damage {
 };
 
 struct xdpw_frame {
+	bool completed;
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
@@ -173,7 +166,6 @@ struct xdpw_screencast_instance {
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
 	struct xdpw_frame current_frame;
-	enum xdpw_frame_state frame_state;
 	struct wl_list buffer_list;
 	bool avoid_dmabufs;
 
@@ -196,9 +188,6 @@ struct xdpw_screencast_instance {
 
 	struct xdpw_screencast_target *target;
 	uint32_t max_framerate;
-	int err;
-	bool quit;
-	bool teardown;
 	enum buffer_type buffer_type;
 
 	// fps limit
