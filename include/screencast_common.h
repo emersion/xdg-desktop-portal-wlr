@@ -41,6 +41,7 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_NONE,
   XDPW_CHOOSER_SIMPLE,
   XDPW_CHOOSER_DMENU,
+  XDPW_CHOOSER_JSON,
 };
 
 enum xdpw_frame_state {
