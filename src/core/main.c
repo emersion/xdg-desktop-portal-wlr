@@ -120,6 +120,8 @@ int main(int argc, char *argv[]) {
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 		.screencast_version = XDP_CAST_PROTO_VER,
 		.screenshot_version = XDP_SHOT_PROTO_VER,
+		.remotedesktop_available_device_types = POINTER,
+		.remotedesktop_version = XDP_REMOTE_PROTO_VER,
 		.config = &config,
 	};
 
@@ -134,6 +136,12 @@ int main(int argc, char *argv[]) {
 	ret = xdpw_screencast_init(&state);
 	if (ret < 0) {
 		logprint(ERROR, "xdpw: failed to initialize screencast");
+		goto error;
+	}
+
+	ret = xdpw_remotedesktop_init(&state);
+	if (ret < 0) {
+		logprint(ERROR, "xdpw: failed to initialize remotedesktop");
 		goto error;
 	}
 

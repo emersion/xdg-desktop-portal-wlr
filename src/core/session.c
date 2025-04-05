@@ -5,6 +5,7 @@
 #include <assert.h>
 #include "xdpw.h"
 #include "screencast.h"
+#include "remotedesktop.h"
 #include "logger.h"
 
 static const char interface_name[] = "org.freedesktop.impl.portal.Session";
@@ -80,6 +81,8 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 			}
 		}
 	}
+
+	xdpw_remotedesktop_destroy(&sess->remotedesktop_data);
 
 	sd_bus_slot_unref(sess->slot);
 	wl_list_remove(&sess->link);

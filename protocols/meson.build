@@ -9,7 +9,9 @@ wayland_scanner = find_program(
 client_protocols = [
 	wl_protocol_dir / 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
 	wl_protocol_dir / 'unstable/xdg-output/xdg-output-unstable-v1.xml',
+	'virtual-keyboard-unstable-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
+	'wlr-virtual-pointer-unstable-v1.xml',
 ]
 
 wl_proto_files = []
