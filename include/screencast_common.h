@@ -43,14 +43,6 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_DMENU,
 };
 
-enum xdpw_frame_state {
-  XDPW_FRAME_STATE_NONE,
-  XDPW_FRAME_STATE_STARTED,
-  XDPW_FRAME_STATE_RENEG,
-  XDPW_FRAME_STATE_FAILED,
-  XDPW_FRAME_STATE_SUCCESS,
-};
-
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
 	char *cmd;
@@ -64,47 +56,38 @@ struct xdpw_frame_damage {
 };
 
 struct xdpw_frame {
+	bool completed;
 	bool y_invert;
 	uint64_t tv_sec;
 	uint32_t tv_nsec;
 	uint32_t transformation;
-	struct xdpw_frame_damage damage[4];
-	uint32_t damage_count;
 	struct xdpw_buffer *xdpw_buffer;
 	struct pw_buffer *pw_buffer;
-};
-
-struct xdpw_screencopy_frame_info {
-	uint32_t width;
-	uint32_t height;
-	uint32_t size;
-	uint32_t stride;
-	uint32_t format;
 };
 
 struct xdpw_buffer {
 	struct wl_list link;
 	enum buffer_type buffer_type;
 
+	uint32_t constraint_id;
+
 	uint32_t width;
 	uint32_t height;
 	uint32_t format;
 	int plane_count;
 
-	int fd[4];
-	uint32_t size[4];
-	uint32_t stride[4];
-	uint32_t offset[4];
+	int fd[GBM_MAX_PLANES];
+	uint32_t size[GBM_MAX_PLANES];
+	uint32_t stride[GBM_MAX_PLANES];
+	uint32_t offset[GBM_MAX_PLANES];
+
+	struct wl_array damage;
 
 	struct gbm_bo *bo;
 
 	struct wl_buffer *buffer;
 };
 
-struct xdpw_format_modifier_pair {
-	uint32_t fourcc;
-	uint64_t modifier;
-};
 
 struct xdpw_dmabuf_feedback_data {
 	void *format_table_data;
@@ -125,6 +108,8 @@ struct xdpw_screencast_context {
 	struct wl_list output_list;
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
+	struct ext_output_image_capture_source_manager_v1 *ext_output_image_capture_source_manager;
+	struct ext_image_copy_capture_manager_v1 *ext_image_copy_capture_manager;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
@@ -153,6 +138,37 @@ struct xdpw_screencast_restore_data {
 	const char *output_name;
 };
 
+struct xdpw_format_modifier_pair {
+	uint32_t fourcc;
+	uint64_t modifier;
+};
+
+struct xdpw_shm_format {
+	uint32_t fourcc;
+	uint32_t stride;
+};
+
+enum xdpw_buffer_constraints_dirty_field {
+	XDPW_BUFFER_CONSTRAINTS_DMABUF_FORMATS = 1 << 0,
+	XDPW_BUFFER_CONSTRAINTS_SHM_FORMATS = 1 << 1,
+	XDPW_BUFFER_CONSTRAINTS_DIMENSIONS = 1 << 2,
+	XDPW_BUFFER_CONSTRAINTS_DEVICE = 1 << 3,
+};
+
+struct xdpw_buffer_constraints {
+	struct wl_array dmabuf_format_modifier_pairs;
+	struct wl_array shm_formats;
+	uint32_t width, height;
+	uint32_t constraint_id;
+	uint32_t dirty;
+	struct gbm_device *gbm;
+};
+
+struct xdpw_screencast_ext_session {
+	struct ext_image_copy_capture_session_v1 *capture_session;
+	struct ext_image_copy_capture_frame_v1 *frame;
+};
+
 struct xdpw_screencast_wlr_session {
 	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
@@ -167,7 +183,6 @@ struct xdpw_screencast_instance {
 	struct xdpw_screencast_context *ctx;
 	bool initialized;
 	struct xdpw_frame current_frame;
-	enum xdpw_frame_state frame_state;
 	struct wl_list buffer_list;
 	bool avoid_dmabufs;
 
@@ -183,13 +198,14 @@ struct xdpw_screencast_instance {
 	// wlroots
 	union {
 		struct xdpw_screencast_wlr_session wlr_session;
+		struct xdpw_screencast_ext_session ext_session;
 	};
+
+	struct xdpw_buffer_constraints current_constraints;
+	struct xdpw_buffer_constraints pending_constraints;
+
 	struct xdpw_screencast_target *target;
 	uint32_t max_framerate;
-	struct xdpw_screencopy_frame_info screencopy_frame_info[2];
-	int err;
-	bool quit;
-	bool teardown;
 	enum buffer_type buffer_type;
 
 	// fps limit
@@ -221,14 +237,22 @@ struct xdpw_wlr_output {
 void randname(char *buf);
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
-	enum buffer_type buffer_type, struct xdpw_screencopy_frame_info *frame_info);
+	enum buffer_type buffer_type);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
-bool wlr_query_dmabuf_modifiers(struct xdpw_screencast_context *ctx, uint32_t drm_format,
+
+void xdpw_buffer_constraints_init(struct xdpw_buffer_constraints *constraints);
+void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints);
+bool xdpw_buffer_constraints_move(struct xdpw_buffer_constraints *dst, struct xdpw_buffer_constraints *src);
+bool xdpw_query_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format,
 		uint32_t num_modifiers, uint64_t *modifiers, uint32_t *max_modifiers);
+
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format);
 uint32_t xdpw_format_drm_fourcc_from_wl_shm(enum wl_shm_format format);
+uint32_t xdpw_format_drm_fourcc_from_pw_format(enum spa_video_format format);
 enum spa_video_format xdpw_format_pw_from_drm_fourcc(uint32_t format);
 enum spa_video_format xdpw_format_pw_strip_alpha(enum spa_video_format format);
+
+int xdpw_bpp_from_drm_fourcc(uint32_t format);
 
 enum xdpw_chooser_types get_chooser_type(const char *chooser_type);
 const char *chooser_type_str(enum xdpw_chooser_types chooser_type);

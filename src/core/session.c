@@ -61,28 +61,23 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 	if (!sess) {
 		return;
 	}
+
+	sd_bus_slot_unref(sess->slot);
+	wl_list_remove(&sess->link);
+
 	struct xdpw_screencast_instance *cast = sess->screencast_data.screencast_instance;
+	sess->screencast_data.screencast_instance = NULL;
+
 	if (cast) {
 		assert(cast->refcount > 0);
 		--cast->refcount;
 		logprint(DEBUG, "xdpw: screencast instance %p now has %d references",
 			cast, cast->refcount);
 		if (cast->refcount < 1) {
-			if (cast->frame_state == XDPW_FRAME_STATE_NONE) {
-				logprint(TRACE, "xdpw: screencast instance not streaming, destroy it");
-				xdpw_screencast_instance_destroy(cast);
-			} else if (cast->teardown) {
-				logprint(TRACE, "xdpw: screencast instance marked for teardown, destroy it");
-				xdpw_screencast_instance_destroy(cast);
-			} else {
-				logprint(TRACE, "xdpw: screencast instance still streaming, set quit flag");
-				cast->quit = true;
-			}
+			logprint(TRACE, "xdpw: destroying screencast instance");
+			xdpw_screencast_instance_destroy(cast);
 		}
 	}
-
-	sd_bus_slot_unref(sess->slot);
-	wl_list_remove(&sess->link);
 	free(sess->session_handle);
 	free(sess);
 }
