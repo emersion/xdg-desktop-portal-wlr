@@ -93,6 +93,15 @@ struct xdpw_dmabuf_feedback_data {
 	bool device_used;
 };
 
+
+struct xdpw_toplevel {
+	struct wl_list link;
+	struct ext_foreign_toplevel_handle_v1 *handle;
+	char *app_id;
+	char *title;
+	char *identifier;
+};
+
 struct xdpw_screencast_context {
 
 	// xdpw
@@ -108,6 +117,7 @@ struct xdpw_screencast_context {
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
 	struct ext_output_image_capture_source_manager_v1 *ext_output_image_capture_source_manager;
 	struct ext_image_copy_capture_manager_v1 *ext_image_copy_capture_manager;
+	struct ext_foreign_toplevel_list_v1 *ext_foreign_toplevel_list;
 	struct wl_shm *shm;
 	struct zwp_linux_dmabuf_v1 *linux_dmabuf;
 	struct zwp_linux_dmabuf_feedback_v1 *linux_dmabuf_feedback;
@@ -120,6 +130,9 @@ struct xdpw_screencast_context {
 
 	// sessions
 	struct wl_list screencast_instances;
+
+	// toplevels
+	struct wl_list toplevels;
 };
 
 struct xdpw_screencast_target {

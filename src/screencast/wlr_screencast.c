@@ -5,6 +5,7 @@
 #include "xdg-output-unstable-v1-client-protocol.h"
 #include "ext-image-capture-source-v1-client-protocol.h"
 #include "ext-image-copy-capture-v1-client-protocol.h"
+#include "ext-foreign-toplevel-list-v1-client-protocol.h"
 #include <drm_fourcc.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -558,6 +559,76 @@ static const struct zwp_linux_dmabuf_feedback_v1_listener linux_dmabuf_listener_
 	.tranche_done = linux_dmabuf_feedback_tranche_done,
 };
 
+static void foreign_toplevel_handle_closed(void *data,
+		struct ext_foreign_toplevel_handle_v1 *handle) {
+	struct xdpw_toplevel *toplevel = data;
+	wl_list_remove(&toplevel->link);
+	free(toplevel->title);
+	free(toplevel->app_id);
+	free(toplevel->identifier);
+	free(toplevel);
+	ext_foreign_toplevel_handle_v1_destroy(handle);
+}
+
+static void foreign_toplevel_handle_done(void *data,
+		struct ext_foreign_toplevel_handle_v1 *handle) {
+}
+
+static void foreign_toplevel_handle_title(void *data,
+		struct ext_foreign_toplevel_handle_v1 *handle, const char *title) {
+	struct xdpw_toplevel *toplevel = data;
+	free(toplevel->title);
+	toplevel->title = strdup(title);
+}
+
+static void foreign_toplevel_handle_app_id(void *data,
+		struct ext_foreign_toplevel_handle_v1 *handle, const char *app_id) {
+	struct xdpw_toplevel *toplevel = data;
+	free(toplevel->app_id);
+	toplevel->app_id = strdup(app_id);
+}
+
+static void foreign_toplevel_handle_identifier(void *data,
+		struct ext_foreign_toplevel_handle_v1 *handle, const char *identifier) {
+	struct xdpw_toplevel *toplevel = data;
+	free(toplevel->identifier);
+	toplevel->identifier = strdup(identifier);
+}
+
+static const struct ext_foreign_toplevel_handle_v1_listener foreign_toplevel_handle_listener = {
+	.closed = foreign_toplevel_handle_closed,
+	.done = foreign_toplevel_handle_done,
+	.title = foreign_toplevel_handle_title,
+	.app_id = foreign_toplevel_handle_app_id,
+	.identifier = foreign_toplevel_handle_identifier,
+};
+
+static void foreign_toplevel_list_handle_toplevel(void *data,
+		struct ext_foreign_toplevel_list_v1 *list,
+		struct ext_foreign_toplevel_handle_v1 *handle) {
+	struct xdpw_screencast_context *ctx = data;
+
+	logprint(DEBUG, "wlroots: TOPLEVEL!");
+	struct xdpw_toplevel *toplevel = calloc(1, sizeof(*toplevel));
+	if (toplevel == NULL) {
+		return;
+	}
+
+	toplevel->handle = handle;
+	wl_list_insert(&ctx->toplevels, &toplevel->link);
+	ext_foreign_toplevel_handle_v1_add_listener(handle, &foreign_toplevel_handle_listener, toplevel);
+}
+
+static void foreign_toplevel_list_handle_finished(void *data,
+		struct ext_foreign_toplevel_list_v1 *list) {
+	// Clean up object
+}
+
+static const struct ext_foreign_toplevel_list_v1_listener foreign_toplevel_list_listener = {
+	.toplevel = foreign_toplevel_list_handle_toplevel,
+	.finished = foreign_toplevel_list_handle_finished,
+};
+
 static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
@@ -602,6 +673,14 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
 		ctx->ext_image_copy_capture_manager = wl_registry_bind(
 				reg, id, &ext_image_copy_capture_manager_v1_interface, 1);
+	}
+
+	if (!strcmp(interface, ext_foreign_toplevel_list_v1_interface.name)) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
+		ctx->ext_foreign_toplevel_list = wl_registry_bind(
+				reg, id, &ext_foreign_toplevel_list_v1_interface, 1);
+		ext_foreign_toplevel_list_v1_add_listener(ctx->ext_foreign_toplevel_list,
+				&foreign_toplevel_list_listener, ctx);
 	}
 
 	if (strcmp(interface, wl_shm_interface.name) == 0) {
