@@ -168,11 +168,11 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			return NULL;
 		}
 
+		buffer->modifier = gbm_bo_get_modifier(buffer->bo);
 		for (int plane = 0; plane < buffer->plane_count; plane++) {
 			buffer->size[plane] = 0;
 			buffer->stride[plane] = gbm_bo_get_stride_for_plane(buffer->bo, plane);
 			buffer->offset[plane] = gbm_bo_get_offset(buffer->bo, plane);
-			uint64_t mod = gbm_bo_get_modifier(buffer->bo);
 			buffer->fd[plane] = gbm_bo_get_fd_for_plane(buffer->bo, plane);
 
 			if (buffer->fd[plane] < 0) {
@@ -183,7 +183,8 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			}
 
 			zwp_linux_buffer_params_v1_add(params, buffer->fd[plane], plane,
-				buffer->offset[plane], buffer->stride[plane], mod >> 32, mod & 0xffffffff);
+				buffer->offset[plane], buffer->stride[plane], buffer->modifier >> 32,
+				buffer->modifier & 0xffffffff);
 		}
 		buffer->buffer = zwp_linux_buffer_params_v1_create_immed(params,
 			buffer->width, buffer->height,

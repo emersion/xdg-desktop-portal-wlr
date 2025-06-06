@@ -73,6 +73,7 @@ struct xdpw_buffer {
 	uint32_t height;
 	uint32_t format;
 	int plane_count;
+	uint64_t modifier;
 
 	int fd[GBM_MAX_PLANES];
 	uint32_t size[GBM_MAX_PLANES];
