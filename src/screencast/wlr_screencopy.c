@@ -93,6 +93,33 @@ static void wlr_frame_linux_dmabuf(void *data,
 
 }
 
+static bool check_constraints(struct xdpw_buffer_constraints *constraints, struct xdpw_buffer *buffer) {
+	if (constraints->width != buffer->width || constraints->height != buffer->height) {
+		return false;
+	}
+
+	switch (buffer->buffer_type) {
+	case DMABUF:;
+		struct xdpw_format_modifier_pair *fm_pair;
+		wl_array_for_each(fm_pair, &constraints->dmabuf_format_modifier_pairs) {
+			if (buffer->format == fm_pair->fourcc && buffer->modifier == fm_pair->modifier) {
+				return true;
+			}
+		}
+		return false;
+	case WL_SHM:;
+		struct xdpw_shm_format *format;
+		wl_array_for_each(format, &constraints->shm_formats) {
+			if (buffer->format == format->fourcc && buffer->stride[0] == format->stride) {
+				return true;
+			}
+		}
+		return false;
+	default:
+		abort();
+	}
+}
+
 static void wlr_frame_buffer_done(void *data,
 		struct zwlr_screencopy_frame_v1 *frame) {
 	struct xdpw_screencast_instance *cast = data;
@@ -100,13 +127,7 @@ static void wlr_frame_buffer_done(void *data,
 		return;
 	}
 
-	if (xdpw_buffer_constraints_move(&cast->current_constraints, &cast->pending_constraints)) {
-		logprint(DEBUG, "wlroots: buffer constraints changed");
-		pwr_update_stream_param(cast);
-		xdpw_pwr_enqueue_buffer(cast);
-		wlr_frame_finish(cast);
-		return;
-	}
+	xdpw_buffer_constraints_move(&cast->current_constraints, &cast->pending_constraints);
 
 	logprint(TRACE, "wlroots: buffer_done event handler");
 
@@ -117,6 +138,14 @@ static void wlr_frame_buffer_done(void *data,
 
 	if (!cast->current_frame.xdpw_buffer) {
 		logprint(WARN, "wlroots: no current buffer");
+		xdpw_pwr_enqueue_buffer(cast);
+		wlr_frame_finish(cast);
+		return;
+	}
+
+	if (!check_constraints(&cast->current_constraints, cast->current_frame.xdpw_buffer)) {
+		logprint(DEBUG, "wlroots: buffer constraints changed");
+		pwr_update_stream_param(cast);
 		xdpw_pwr_enqueue_buffer(cast);
 		wlr_frame_finish(cast);
 		return;
