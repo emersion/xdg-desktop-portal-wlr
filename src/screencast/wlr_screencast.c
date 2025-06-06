@@ -205,6 +205,108 @@ static bool wait_chooser(pid_t pid) {
 	return false;
 }
 
+struct target {
+	struct wl_list link;
+	char *name;
+	struct xdpw_toplevel *toplevel;
+	struct xdpw_wlr_output *output;
+};
+
+static bool wlr_target_chooser(struct xdpw_output_chooser *chooser,
+		struct wl_list *target_list, struct target **target) {
+	logprint(DEBUG, "wlroots: output chooser called");
+	struct target *out = NULL;
+	size_t name_size = 0;
+	char *name = NULL;
+
+	int chooser_in[2]; //p -> c
+	int chooser_out[2]; //c -> p
+
+	if (pipe(chooser_in) == -1) {
+		perror("pipe chooser_in");
+		logprint(ERROR, "Failed to open pipe chooser_in");
+		goto error_chooser_in;
+	}
+	if (pipe(chooser_out) == -1) {
+		perror("pipe chooser_out");
+		logprint(ERROR, "Failed to open pipe chooser_out");
+		goto error_chooser_out;
+	}
+
+	pid_t pid = spawn_chooser(chooser->cmd, chooser_in, chooser_out);
+	if (pid < 0) {
+		logprint(ERROR, "Failed to fork chooser");
+		goto error_fork;
+	}
+
+	switch (chooser->type) {
+	case XDPW_CHOOSER_DMENU:;
+		FILE *f = fdopen(chooser_in[1], "w");
+		if (f == NULL) {
+			perror("fdopen pipe chooser_in");
+			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
+			goto error_fork;
+		}
+		wl_list_for_each(out, target_list, link) {
+			fprintf(f, "%s\n", out->name);
+		}
+		fclose(f);
+		break;
+	default:
+		close(chooser_in[1]);
+	}
+
+	if (!wait_chooser(pid)) {
+		close(chooser_out[0]);
+		return false;
+	}
+
+	FILE *f = fdopen(chooser_out[0], "r");
+	if (f == NULL) {
+		perror("fdopen pipe chooser_out");
+		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
+		close(chooser_out[0]);
+		goto end;
+	}
+
+	ssize_t nread = getline(&name, &name_size, f);
+	fclose(f);
+	if (nread < 0) {
+		perror("getline failed");
+		goto end;
+	}
+
+	//Strip newline
+	char *p = strchr(name, '\n');
+	if (p != NULL) {
+		*p = '\0';
+	}
+
+	logprint(TRACE, "wlroots: output chooser %s selects target %s", chooser->cmd, name);
+	wl_list_for_each(out, target_list, link) {
+		if (strcmp(out->name, name) == 0) {
+			*target = out;
+			break;
+		}
+	}
+	free(name);
+
+end:
+	return true;
+
+error_fork:
+	close(chooser_out[0]);
+	close(chooser_out[1]);
+error_chooser_out:
+	close(chooser_in[0]);
+	close(chooser_in[1]);
+error_chooser_in:
+	*target = NULL;
+	return false;
+
+}
+
+// TODO: Merge with generic version above
 static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		struct wl_list *output_list, struct xdpw_wlr_output **output) {
 	logprint(DEBUG, "wlroots: output chooser called");
@@ -365,8 +467,44 @@ end:
 	return NULL;
 }
 
-bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target) {
+bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
+		bool window) {
+
+	if (window) {
+		// TODO: Properly break out to choosers
+		struct xdpw_output_chooser default_chooser =
+			{XDPW_CHOOSER_DMENU, "wofi -d -n --prompt='Select the toplevel to share:'"};
+
+		struct wl_list targets;
+		wl_list_init(&targets);
+		struct xdpw_toplevel *toplevel;
+		wl_list_for_each(toplevel, &ctx->toplevels, link) {
+			struct target *target = calloc(1, sizeof(*target));
+			target->toplevel = toplevel;
+			target->name = target->toplevel->title;
+			wl_list_insert(&targets, &target->link);
+		}
+
+		struct target *selection;
+		bool ret = wlr_target_chooser(&default_chooser, &targets, &selection);
+
+		if (ret) {
+			target->handle = selection->toplevel->handle;
+			target->type = XDPW_TARGET_TYPE_TOPLEVEL;
+		} else {
+			logprint(ERROR, "wlroots: toplevel chooser failed");
+			target->handle = NULL;
+		}
+
+		struct target *tmpa, *tmpb;
+		wl_list_for_each_safe(tmpa, tmpb, &targets, link) {
+			free(tmpa);
+		}
+		return target->handle != NULL;
+	}
+
 	target->output = xdpw_wlr_output_chooser(ctx);
+	target->type = XDPW_TARGET_TYPE_OUTPUT;
 	return target->output != NULL;
 }
 
@@ -379,6 +517,7 @@ bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_
 		return false;
 	}
 	target->output = out;
+	target->type = XDPW_TARGET_TYPE_OUTPUT;
 	return true;
 }
 
@@ -669,6 +808,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 				reg, id, &ext_output_image_capture_source_manager_v1_interface, 1);
 	}
 
+	if (!strcmp(interface, ext_foreign_toplevel_image_capture_source_manager_v1_interface.name)) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
+		ctx->ext_foreign_toplevel_image_capture_source_manager = wl_registry_bind(
+				reg, id, &ext_foreign_toplevel_image_capture_source_manager_v1_interface, 1);
+	}
+
 	if (!strcmp(interface, ext_image_copy_capture_manager_v1_interface.name)) {
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
 		ctx->ext_image_copy_capture_manager = wl_registry_bind(
@@ -742,6 +887,7 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 
 	// initialize a list of active screencast instances
 	wl_list_init(&ctx->screencast_instances);
+	wl_list_init(&ctx->toplevels);
 
 	// initialize a list of format modifier pairs
 	wl_array_init(&ctx->format_modifier_pairs);

@@ -122,13 +122,18 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	free(cast);
 }
 
-bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data) {
+bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data, bool window) {
 	bool target_initialized = false;
 
-	struct xdpw_wlr_output *output, *tmp_o;
-	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
+	struct xdpw_wlr_output *output;
+	wl_list_for_each(output, &ctx->output_list, link) {
 		logprint(INFO, "wlroots: capturable output: %s model: %s: id: %i name: %s",
 			output->make, output->model, output->id, output->name);
+	}
+	struct xdpw_toplevel *toplevel;
+	wl_list_for_each(toplevel, &ctx->toplevels, link) {
+		logprint(INFO, "wlroots: capturable toplevel: %s app_id: %s title: %s",
+			toplevel->identifier, toplevel->app_id, toplevel->title);
 	}
 
 	struct xdpw_screencast_target *target = calloc(1, sizeof(struct xdpw_screencast_target));
@@ -137,11 +142,11 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 		return false;
 	}
 	target->with_cursor = sess->screencast_data.cursor_mode == EMBEDDED;
-	if (data) {
+	if (data && !window) {
 		target_initialized = xdpw_wlr_target_from_data(ctx, target, data);
 	}
 	if (!target_initialized) {
-		target_initialized = xdpw_wlr_target_chooser(ctx, target);
+		target_initialized = xdpw_wlr_target_chooser(ctx, target, window);
 		//TODO: Chooser option to confirm the persist mode
 		const char *env_persist_str = getenv("XDPW_PERSIST_MODE");
 		if (env_persist_str) {
@@ -164,7 +169,7 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 		free(target);
 		return false;
 	}
-	assert(target->output);
+	assert(target->output || target->handle);
 
 	// Disable screencast sharing to avoid sharing between dmabuf and shm capable clients
 	/*
@@ -194,8 +199,6 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 		sess->screencast_data.screencast_instance = calloc(1, sizeof(struct xdpw_screencast_instance));
 		xdpw_screencast_instance_init(ctx, sess->screencast_data.screencast_instance, target);
 	}
-	logprint(INFO, "wlroots: output: %s",
-		sess->screencast_data.screencast_instance->target->output->name);
 
 	return true;
 
@@ -342,6 +345,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 
 	char *key;
 	int innerRet = 0;
+	uint32_t type_mask = 0;
 	struct xdpw_screencast_restore_data restore_data = {0};
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
@@ -354,13 +358,8 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 			sd_bus_message_read(msg, "v", "b", &multiple);
 			logprint(INFO, "dbus: option multiple: %d", multiple);
 		} else if (strcmp(key, "types") == 0) {
-			uint32_t mask;
-			sd_bus_message_read(msg, "v", "u", &mask);
-			if (!(mask & MONITOR)) {
-				logprint(INFO, "dbus: non-monitor cast requested, not replying");
-				return -1;
-			}
-			logprint(INFO, "dbus: option types:%x", mask);
+			sd_bus_message_read(msg, "v", "u", &type_mask);
+			logprint(INFO, "dbus: option types:%x", type_mask);
 		} else if (strcmp(key, "cursor_mode") == 0) {
 			sd_bus_message_read(msg, "v", "u", &sess->screencast_data.cursor_mode);
 			if (sess->screencast_data.cursor_mode & METADATA) {
@@ -461,13 +460,14 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	bool output_selection_canceled = !setup_target(ctx, sess, restore_data.version > 0 ? &restore_data : NULL);
+	// TODO: Plumb through the type
+	bool selection_canceled = !setup_target(ctx, sess, restore_data.version > 0 ? &restore_data : NULL, type_mask & WINDOW);
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
-	if (output_selection_canceled) {
+	if (selection_canceled) {
 		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
 	} else {
 		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
