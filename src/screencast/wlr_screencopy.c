@@ -204,6 +204,7 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 static void wlr_register_cb(struct xdpw_screencast_instance *cast) {
 	cast->wlr_session.frame_callback = zwlr_screencopy_manager_v1_capture_output(
 		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
+	assert(cast->target->type == XDPW_TARGET_TYPE_OUTPUT);
 
 	zwlr_screencopy_frame_v1_add_listener(cast->wlr_session.frame_callback,
 		&wlr_frame_listener, cast);
