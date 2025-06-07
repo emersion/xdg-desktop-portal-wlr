@@ -34,6 +34,7 @@ static void ext_session_buffer_size(void *data,
 	cast->pending_constraints.width = width;
 	cast->pending_constraints.height = height;
 	cast->pending_constraints.dirty = true;
+	logprint(TRACE, "ext: buffer_size: %d, %d", width, height);
 }
 
 static void ext_session_shm_format(void *data,
@@ -237,6 +238,7 @@ static void ext_frame_failed(void *data,
 		return;
 	case EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_BUFFER_CONSTRAINTS:
 		logprint(ERROR, "ext: frame capture failed: buffer constraint mismatch");
+		pwr_update_stream_param(cast);
 		xdpw_pwr_enqueue_buffer(cast);
 		return;
 	case EXT_IMAGE_COPY_CAPTURE_FRAME_V1_FAILURE_REASON_STOPPED:
@@ -257,10 +259,21 @@ static const struct ext_image_copy_capture_frame_v1_listener ext_frame_listener 
 };
 
 static void ext_register_session_cb(struct xdpw_screencast_instance *cast) {
-	struct ext_image_capture_source_v1 *source =
-		ext_output_image_capture_source_manager_v1_create_source(
+	struct ext_image_capture_source_v1 *source;
+	switch (cast->target->type) {
+	case XDPW_TARGET_TYPE_OUTPUT:
+		source = ext_output_image_capture_source_manager_v1_create_source(
 				cast->ctx->ext_output_image_capture_source_manager,
 				cast->target->output->output);
+		break;
+	case XDPW_TARGET_TYPE_TOPLEVEL:
+		source = ext_foreign_toplevel_image_capture_source_manager_v1_create_source(
+				cast->ctx->ext_foreign_toplevel_image_capture_source_manager,
+				cast->target->handle);
+		break;
+	default:
+		abort();
+	}
 
 	cast->ext_session.capture_session = ext_image_copy_capture_manager_v1_create_session(
 			cast->ctx->ext_image_copy_capture_manager, source,
