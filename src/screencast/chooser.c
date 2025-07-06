@@ -14,15 +14,29 @@ static struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list
 	return NULL;
 }
 
-static pid_t spawn_chooser(const char *cmd, int chooser_in[2], int chooser_out[2]) {
+static pid_t spawn_chooser(const char *cmd, int *chooser_in_ptr, int *chooser_out_ptr) {
+	int chooser_in[2]; // p -> c
+	int chooser_out[2]; // c -> p
+
+	if (pipe(chooser_in) == -1) {
+		perror("pipe chooser_in");
+		logprint(ERROR, "Failed to open pipe chooser_in");
+		return -1;
+	}
+	if (pipe(chooser_out) == -1) {
+		perror("pipe chooser_out");
+		logprint(ERROR, "Failed to open pipe chooser_out");
+		goto error_chooser_in;
+	}
+
 	logprint(TRACE,
 		"exec chooser called: cmd %s, pipe chooser_in (%d,%d), pipe chooser_out (%d,%d)",
 		cmd, chooser_in[0], chooser_in[1], chooser_out[0], chooser_out[1]);
-	pid_t pid = fork();
 
+	pid_t pid = fork();
 	if (pid < 0) {
 		perror("fork");
-		return pid;
+		goto error_chooser_out;
 	} else if (pid == 0) {
 		close(chooser_in[1]);
 		close(chooser_out[0]);
@@ -40,8 +54,18 @@ static pid_t spawn_chooser(const char *cmd, int chooser_in[2], int chooser_out[2
 
 	close(chooser_in[0]);
 	close(chooser_out[1]);
+	*chooser_in_ptr = chooser_in[1];
+	*chooser_out_ptr = chooser_out[0];
 
 	return pid;
+
+error_chooser_out:
+	close(chooser_out[0]);
+	close(chooser_out[1]);
+error_chooser_in:
+	close(chooser_in[0]);
+	close(chooser_in[1]);
+	return -1;
 }
 
 static bool wait_chooser(pid_t pid) {
@@ -85,33 +109,22 @@ static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 	struct xdpw_wlr_output *out;
 	*output = NULL;
 
-	int chooser_in[2]; //p -> c
-	int chooser_out[2]; //c -> p
-
-	if (pipe(chooser_in) == -1) {
-		perror("pipe chooser_in");
-		logprint(ERROR, "Failed to open pipe chooser_in");
-		goto error_chooser_in;
-	}
-	if (pipe(chooser_out) == -1) {
-		perror("pipe chooser_out");
-		logprint(ERROR, "Failed to open pipe chooser_out");
-		goto error_chooser_out;
-	}
-
-	pid_t pid = spawn_chooser(chooser->cmd, chooser_in, chooser_out);
+	int chooser_in = -1, chooser_out = -1;
+	pid_t pid = spawn_chooser(chooser->cmd, &chooser_in, &chooser_out);
 	if (pid < 0) {
 		logprint(ERROR, "Failed to fork chooser");
-		goto error_fork;
+		return false;
 	}
 
 	switch (chooser->type) {
 	case XDPW_CHOOSER_DMENU:;
-		FILE *f = fdopen(chooser_in[1], "w");
+		FILE *f = fdopen(chooser_in, "w");
 		if (f == NULL) {
 			perror("fdopen pipe chooser_in");
 			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
-			goto error_fork;
+			close(chooser_in);
+			close(chooser_out);
+			return false;
 		}
 		wl_list_for_each(out, output_list, link) {
 			fprintf(f, "%s\n", out->name);
@@ -119,15 +132,15 @@ static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 		fclose(f);
 		break;
 	default:
-		close(chooser_in[1]);
+		close(chooser_in);
 	}
 
 	if (!wait_chooser(pid)) {
-		close(chooser_out[0]);
+		close(chooser_out);
 		return false;
 	}
 
-	char *name = read_and_close_chooser_out(chooser_out[0]);
+	char *name = read_and_close_chooser_out(chooser_out);
 	if (name == NULL) {
 		goto end;
 	}
@@ -143,16 +156,6 @@ static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 
 end:
 	return true;
-
-error_fork:
-	close(chooser_out[0]);
-	close(chooser_out[1]);
-error_chooser_out:
-	close(chooser_in[0]);
-	close(chooser_in[1]);
-error_chooser_in:
-	*output = NULL;
-	return false;
 }
 
 static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output_list) {
