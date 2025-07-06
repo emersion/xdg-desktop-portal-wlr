@@ -57,6 +57,7 @@ xdpw_files = files(
 	'src/core/timespec_util.c',
 	'src/screenshot/screenshot.c',
 	'src/screencast/screencast.c',
+	'src/screencast/chooser.c',
 	'src/screencast/screencast_common.c',
 	'src/screencast/ext_image_copy.c',
 	'src/screencast/wlr_screencast.c',
