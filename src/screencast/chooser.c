@@ -14,7 +14,7 @@ static struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list
 	return NULL;
 }
 
-static pid_t spawn_chooser(const char *cmd, int *chooser_in_ptr, int *chooser_out_ptr) {
+static pid_t spawn_chooser(const char *cmd, FILE **chooser_in_ptr, FILE **chooser_out_ptr) {
 	int chooser_in[2]; // p -> c
 	int chooser_out[2]; // c -> p
 
@@ -54,8 +54,22 @@ static pid_t spawn_chooser(const char *cmd, int *chooser_in_ptr, int *chooser_ou
 
 	close(chooser_in[0]);
 	close(chooser_out[1]);
-	*chooser_in_ptr = chooser_in[1];
-	*chooser_out_ptr = chooser_out[0];
+
+	FILE *chooser_in_f = fdopen(chooser_in[1], "w");
+	if (chooser_in_f == NULL) {
+		close(chooser_in[1]);
+		close(chooser_out[0]);
+		return -1;
+	}
+	FILE *chooser_out_f = fdopen(chooser_out[0], "r");
+	if (chooser_out_f == NULL) {
+		fclose(chooser_in_f);
+		close(chooser_out[0]);
+		return -1;
+	}
+
+	*chooser_in_ptr = chooser_in_f;
+	*chooser_out_ptr = chooser_out_f;
 
 	return pid;
 
@@ -76,19 +90,10 @@ static bool wait_chooser(pid_t pid) {
 	return false;
 }
 
-static char *read_and_close_chooser_out(int fd) {
-	FILE *f = fdopen(fd, "r");
-	if (f == NULL) {
-		perror("fdopen pipe chooser_out");
-		close(fd);
-		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
-		return NULL;
-	}
-
+static char *read_chooser_out(FILE *f) {
 	char *name = NULL;
 	size_t name_size = 0;
 	ssize_t nread = getline(&name, &name_size, f);
-	fclose(f);
 	if (nread < 0) {
 		perror("getline failed");
 		return NULL;
@@ -109,7 +114,7 @@ static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 	struct xdpw_wlr_output *out;
 	*output = NULL;
 
-	int chooser_in = -1, chooser_out = -1;
+	FILE *chooser_in = NULL, *chooser_out = NULL;
 	pid_t pid = spawn_chooser(chooser->cmd, &chooser_in, &chooser_out);
 	if (pid < 0) {
 		logprint(ERROR, "Failed to fork chooser");
@@ -118,29 +123,22 @@ static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 
 	switch (chooser->type) {
 	case XDPW_CHOOSER_DMENU:;
-		FILE *f = fdopen(chooser_in, "w");
-		if (f == NULL) {
-			perror("fdopen pipe chooser_in");
-			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
-			close(chooser_in);
-			close(chooser_out);
-			return false;
-		}
 		wl_list_for_each(out, output_list, link) {
-			fprintf(f, "%s\n", out->name);
+			fprintf(chooser_in, "%s\n", out->name);
 		}
-		fclose(f);
+		fclose(chooser_in);
 		break;
 	default:
-		close(chooser_in);
+		fclose(chooser_in);
 	}
 
 	if (!wait_chooser(pid)) {
-		close(chooser_out);
+		fclose(chooser_out);
 		return false;
 	}
 
-	char *name = read_and_close_chooser_out(chooser_out);
+	char *name = read_chooser_out(chooser_out);
+	fclose(chooser_out);
 	if (name == NULL) {
 		goto end;
 	}
