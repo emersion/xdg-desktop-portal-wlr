@@ -45,7 +45,7 @@ enum xdpw_chooser_types {
 
 struct xdpw_output_chooser {
 	enum xdpw_chooser_types type;
-	char *cmd;
+	const char *cmd;
 };
 
 struct xdpw_frame_damage {

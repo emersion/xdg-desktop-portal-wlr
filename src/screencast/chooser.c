@@ -14,7 +14,7 @@ static struct xdpw_wlr_output *xdpw_wlr_output_first(struct wl_list *output_list
 	return NULL;
 }
 
-static pid_t spawn_chooser(char *cmd, int chooser_in[2], int chooser_out[2]) {
+static pid_t spawn_chooser(const char *cmd, int chooser_in[2], int chooser_out[2]) {
 	logprint(TRACE,
 		"exec chooser called: cmd %s, pipe chooser_in (%d,%d), pipe chooser_out (%d,%d)",
 		cmd, chooser_in[0], chooser_in[1], chooser_out[0], chooser_out[1]);
@@ -79,7 +79,7 @@ static char *read_and_close_chooser_out(int fd) {
 	return name;
 }
 
-static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
+static bool wlr_output_chooser(const struct xdpw_output_chooser *chooser,
 		struct wl_list *output_list, struct xdpw_wlr_output **output) {
 	logprint(DEBUG, "wlroots: output chooser called");
 	struct xdpw_wlr_output *out;
@@ -157,7 +157,7 @@ error_chooser_in:
 
 static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output_list) {
 	logprint(DEBUG, "wlroots: output chooser called");
-	struct xdpw_output_chooser default_chooser[] = {
+	const struct xdpw_output_chooser default_chooser[] = {
 		{XDPW_CHOOSER_SIMPLE, "slurp -f %o -or"},
 		{XDPW_CHOOSER_DMENU, "wmenu -p 'Select the monitor to share:'"},
 		{XDPW_CHOOSER_DMENU, "wofi -d -n --prompt='Select the monitor to share:'"},
