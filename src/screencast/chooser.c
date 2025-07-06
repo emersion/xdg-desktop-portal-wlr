@@ -52,12 +52,37 @@ static bool wait_chooser(pid_t pid) {
 	return false;
 }
 
+static char *read_and_close_chooser_out(int fd) {
+	FILE *f = fdopen(fd, "r");
+	if (f == NULL) {
+		perror("fdopen pipe chooser_out");
+		close(fd);
+		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
+		return NULL;
+	}
+
+	char *name = NULL;
+	size_t name_size = 0;
+	ssize_t nread = getline(&name, &name_size, f);
+	fclose(f);
+	if (nread < 0) {
+		perror("getline failed");
+		return NULL;
+	}
+
+	// Strip newline
+	char *p = strchr(name, '\n');
+	if (p != NULL) {
+		*p = '\0';
+	}
+
+	return name;
+}
+
 static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		struct wl_list *output_list, struct xdpw_wlr_output **output) {
 	logprint(DEBUG, "wlroots: output chooser called");
 	struct xdpw_wlr_output *out;
-	size_t name_size = 0;
-	char *name = NULL;
 	*output = NULL;
 
 	int chooser_in[2]; //p -> c
@@ -102,25 +127,9 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		return false;
 	}
 
-	FILE *f = fdopen(chooser_out[0], "r");
-	if (f == NULL) {
-		perror("fdopen pipe chooser_out");
-		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
-		close(chooser_out[0]);
+	char *name = read_and_close_chooser_out(chooser_out[0]);
+	if (name == NULL) {
 		goto end;
-	}
-
-	ssize_t nread = getline(&name, &name_size, f);
-	fclose(f);
-	if (nread < 0) {
-		perror("getline failed");
-		goto end;
-	}
-
-	//Strip newline
-	char *p = strchr(name, '\n');
-	if (p != NULL) {
-		*p = '\0';
 	}
 
 	logprint(TRACE, "wlroots: output chooser %s selects output %s", chooser->cmd, name);
