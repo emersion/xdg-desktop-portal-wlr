@@ -1,0 +1,53 @@
+{
+  "request": {
+    "version": 1,
+    "revision": 0,
+    "monitors": [
+      {
+        "name": "Name1",
+        "make": "Make1",
+        "model": "Model1",
+        "id": 1
+      },
+      {
+        "name": "Name2",
+        "make": "Make2",
+        "model": "Model2",
+        "id": 2
+      }
+    ],
+    "windows": [
+      {
+        "title": "Title1",
+        "app_id": "App_Id1",
+        "id": 1
+      },
+      {
+        "title": "Title2",
+        "app_id": "App_Id2",
+        "id": 2
+      }
+    ],
+    "options": {
+      "persist_mode": [
+		  {"none": 0},
+		  {"transient": 1},
+		  {"permanent": 2}
+	  ]
+    }
+  },
+  "response": {
+    "version": 1,
+    "revision": 0,
+    "target_type": "output",
+    "target": {
+      "name": "Name1",
+      "make": "Make1",
+      "model": "Model1",
+      "id": 1
+    },
+    "options": {
+      "persist_mode": 0
+    }
+  }
+}
