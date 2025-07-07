@@ -67,7 +67,7 @@ These options need to be placed under the **[screencast]** section.
 	  (slurp, wmenu, wofi, bemenu) and will fallback to an arbitrary output if none of those were found.
 	- none: xdpw will allow screencast either on the output given by **output_name**, or if empty
 	  an arbitrary output without further interaction.
-	- simple, dmenu: xdpw will launch the chooser given by **chooser_cmd**. For more details
+	- simple, dmenu, json: xdpw will launch the chooser given by **chooser_cmd**. For more details
 	  see **OUTPUT CHOOSER**.
 
 **force_mod_linear** = _bool_
@@ -92,6 +92,8 @@ The chooser can be any program or script with the following behaviour:
 Supported types of choosers via the **chooser_type** option:
 - simple: the chooser is just called without anything further on stdin.
 - dmenu: the chooser receives a newline separated list (dmenu style) of outputs on stdin.
+- json: the chooser receives a list of outputs formated as a json stdin ++
+  {"monitor":[{"name": "eDP-1","make": "<manufacturer>","model": "<model>","id": "42"}]}
 
 # SEE ALSO
 

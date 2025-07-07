@@ -232,9 +232,10 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		goto error_fork;
 	}
 
+	FILE *f;
 	switch (chooser->type) {
 	case XDPW_CHOOSER_DMENU:;
-		FILE *f = fdopen(chooser_in[1], "w");
+		f = fdopen(chooser_in[1], "w");
 		if (f == NULL) {
 			perror("fdopen pipe chooser_in");
 			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
@@ -243,6 +244,34 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		wl_list_for_each(out, output_list, link) {
 			fprintf(f, "%s\n", out->name);
 		}
+		fclose(f);
+		break;
+	case XDPW_CHOOSER_JSON:;
+		f = fdopen(chooser_in[1], "w");
+		if (f == NULL) {
+			perror("fdopen pipe chooser_in");
+			logprint(ERROR, "Failed to create stream writing to pipe chooser_in");
+			goto error_fork;
+		}
+		fprintf(f,"{");
+		fprintf(f, "\"monitor\":");
+		fprintf(f,"[");
+		bool first = true;
+		wl_list_for_each(out, output_list, link) {
+			if (first) {
+				fprintf(f,"{");
+				first = false;
+			} else {
+				fprintf(f,",{");
+			}
+			fprintf(f, "\"name\": \"%s\",", out->name);
+			fprintf(f, "\"make\": \"%s\",", out->make);
+			fprintf(f, "\"model\": \"%s\",", out->model);
+			fprintf(f, "\"id\": \"%u\"", out->id);
+			fprintf(f,"}");
+		}
+		fprintf(f,"]");
+		fprintf(f,"}");
 		fclose(f);
 		break;
 	default:
@@ -254,7 +283,7 @@ static bool wlr_output_chooser(struct xdpw_output_chooser *chooser,
 		return false;
 	}
 
-	FILE *f = fdopen(chooser_out[0], "r");
+	f = fdopen(chooser_out[0], "r");
 	if (f == NULL) {
 		perror("fdopen pipe chooser_out");
 		logprint(ERROR, "Failed to create stream reading from pipe chooser_out");
@@ -338,7 +367,8 @@ static struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_co
 			return xdpw_wlr_output_first(&ctx->output_list);
 		}
 	case XDPW_CHOOSER_DMENU:
-	case XDPW_CHOOSER_SIMPLE:;
+	case XDPW_CHOOSER_SIMPLE:
+	case XDPW_CHOOSER_JSON:;
 		struct xdpw_wlr_output *output = NULL;
 		if (!ctx->state->config->screencast_conf.chooser_cmd) {
 			logprint(ERROR, "wlroots: no output chooser given");
