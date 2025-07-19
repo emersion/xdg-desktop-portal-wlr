@@ -53,6 +53,7 @@ xdpw_files = files(
 	'src/core/config.c',
 	'src/core/request.c',
 	'src/core/session.c',
+	'src/core/string_util.c',
 	'src/core/timer.c',
 	'src/core/timespec_util.c',
 	'src/screenshot/screenshot.c',
