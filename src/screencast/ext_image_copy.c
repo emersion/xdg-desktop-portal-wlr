@@ -257,10 +257,20 @@ static const struct ext_image_copy_capture_frame_v1_listener ext_frame_listener 
 };
 
 static void ext_register_session_cb(struct xdpw_screencast_instance *cast) {
-	struct ext_image_capture_source_v1 *source =
-		ext_output_image_capture_source_manager_v1_create_source(
-				cast->ctx->ext_output_image_capture_source_manager,
-				cast->target->output->output);
+	struct ext_image_capture_source_v1 *source = NULL;
+	switch (cast->target->type) {
+	case MONITOR:
+		source = ext_output_image_capture_source_manager_v1_create_source(
+			cast->ctx->ext_output_image_capture_source_manager,
+			cast->target->output->output);
+		break;
+	case WINDOW:
+		source = ext_foreign_toplevel_image_capture_source_manager_v1_create_source(
+			cast->ctx->ext_foreign_toplevel_image_capture_source_manager,
+			cast->target->toplevel->handle);
+		break;
+	}
+	assert(source != NULL);
 
 	cast->ext_session.capture_session = ext_image_copy_capture_manager_v1_create_session(
 			cast->ctx->ext_image_copy_capture_manager, source,
