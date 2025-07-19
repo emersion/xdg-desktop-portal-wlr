@@ -164,6 +164,7 @@ bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_
 	if (!out) {
 		return false;
 	}
+	target->type = MONITOR;
 	target->output = out;
 	return true;
 }

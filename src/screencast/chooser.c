@@ -225,6 +225,7 @@ end:
 }
 
 bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target) {
+	target->type = MONITOR;
 	target->output = xdpw_wlr_output_chooser(ctx);
 	return target->output != NULL;
 }
