@@ -138,11 +138,9 @@ struct xdpw_screencast_context {
 struct xdpw_screencast_target {
 	enum source_types type;
 	bool with_cursor;
-	union {
-		struct {
-			struct xdpw_wlr_output *output;
-		};
-	};
+
+	// only for MONITOR
+	struct xdpw_wlr_output *output;
 };
 
 struct xdpw_screencast_restore_data {
