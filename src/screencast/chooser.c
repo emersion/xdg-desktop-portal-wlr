@@ -183,7 +183,7 @@ static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output
 		}
 		return output;
 	}
-	return xdpw_wlr_output_first(output_list);
+	return NULL;
 }
 
 static struct xdpw_wlr_output *xdpw_wlr_output_chooser(struct xdpw_screencast_context *ctx) {
