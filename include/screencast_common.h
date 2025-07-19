@@ -116,6 +116,7 @@ struct xdpw_screencast_context {
 	struct wl_registry *registry;
 	struct zwlr_screencopy_manager_v1 *screencopy_manager;
 	struct ext_output_image_capture_source_manager_v1 *ext_output_image_capture_source_manager;
+	struct ext_foreign_toplevel_image_capture_source_manager_v1 *ext_foreign_toplevel_image_capture_source_manager;
 	struct ext_image_copy_capture_manager_v1 *ext_image_copy_capture_manager;
 	struct ext_foreign_toplevel_list_v1 *ext_foreign_toplevel_list;
 	struct wl_shm *shm;
@@ -141,6 +142,9 @@ struct xdpw_screencast_target {
 
 	// only for MONITOR
 	struct xdpw_wlr_output *output;
+
+	// only for WINDOW
+	struct xdpw_toplevel *toplevel;
 };
 
 struct xdpw_screencast_restore_data {
