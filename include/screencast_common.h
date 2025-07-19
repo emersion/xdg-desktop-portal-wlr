@@ -43,7 +43,7 @@ enum xdpw_chooser_types {
   XDPW_CHOOSER_DMENU,
 };
 
-struct xdpw_output_chooser {
+struct xdpw_chooser {
 	enum xdpw_chooser_types type;
 	const char *cmd;
 };
