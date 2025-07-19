@@ -125,8 +125,8 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data) {
 	bool target_initialized = false;
 
-	struct xdpw_wlr_output *output, *tmp_o;
-	wl_list_for_each_reverse_safe(output, tmp_o, &ctx->output_list, link) {
+	struct xdpw_wlr_output *output;
+	wl_list_for_each(output, &ctx->output_list, link) {
 		logprint(INFO, "wlroots: capturable output: %s model: %s: id: %i name: %s",
 			output->make, output->model, output->id, output->name);
 	}
