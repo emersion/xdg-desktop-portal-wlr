@@ -467,6 +467,12 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 				reg, id, &ext_output_image_capture_source_manager_v1_interface, 1);
 	}
 
+	if (!strcmp(interface, ext_foreign_toplevel_image_capture_source_manager_v1_interface.name)) {
+		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
+		ctx->ext_foreign_toplevel_image_capture_source_manager = wl_registry_bind(
+				reg, id, &ext_foreign_toplevel_image_capture_source_manager_v1_interface, 1);
+	}
+
 	if (!strcmp(interface, ext_image_copy_capture_manager_v1_interface.name)) {
 		logprint(DEBUG, "wlroots: |-- registered to interface %s (Version %u)", interface, ver);
 		ctx->ext_image_copy_capture_manager = wl_registry_bind(
@@ -574,6 +580,10 @@ int xdpw_wlr_screencopy_init(struct xdpw_state *state) {
 		return -1;
 	}
 
+	if (ctx->ext_image_copy_capture_manager && ctx->ext_foreign_toplevel_image_capture_source_manager) {
+		state->screencast_source_types |= WINDOW;
+	}
+
 	// make sure our wlroots supports shm protocol
 	if (!ctx->shm) {
 		logprint(ERROR, "Compositor doesn't support %s!", "wl_shm");
@@ -626,6 +636,9 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	}
 	if (ctx->ext_output_image_capture_source_manager) {
 		ext_output_image_capture_source_manager_v1_destroy(ctx->ext_output_image_capture_source_manager);
+	}
+	if (ctx->ext_foreign_toplevel_image_capture_source_manager) {
+		ext_foreign_toplevel_image_capture_source_manager_v1_destroy(ctx->ext_foreign_toplevel_image_capture_source_manager);
 	}
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);

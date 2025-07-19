@@ -20,7 +20,7 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx);
 
 struct xdpw_wlr_output *xdpw_wlr_output_find_by_name(struct wl_list *output_list, const char *name);
 
-bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target);
+bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target, uint32_t type_mask);
 bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_screencast_target *target,
 		struct xdpw_screencast_restore_data *data);
 
