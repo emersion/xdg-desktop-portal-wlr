@@ -104,7 +104,6 @@ struct xdpw_toplevel {
 };
 
 struct xdpw_screencast_context {
-
 	// xdpw
 	struct xdpw_state *state;
 
@@ -137,6 +136,7 @@ struct xdpw_screencast_context {
 };
 
 struct xdpw_screencast_target {
+	enum source_types type;
 	union {
 		struct {
 			struct xdpw_wlr_output *output;

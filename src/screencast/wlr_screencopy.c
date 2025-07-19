@@ -231,6 +231,8 @@ static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
 };
 
 static void wlr_register_cb(struct xdpw_screencast_instance *cast) {
+	assert(cast->target->type == MONITOR);
+
 	cast->wlr_session.frame_callback = zwlr_screencopy_manager_v1_capture_output(
 		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
 
