@@ -1,7 +1,5 @@
 # xdg-desktop-portal-wlr
 
-[![builds.sr.ht status](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master.svg)](https://builds.sr.ht/~emersion/xdg-desktop-portal-wlr/commits/master?)
-
 [xdg-desktop-portal] backend for wlroots.
 
 Currently it only implements the following portals only and is meant to offload the missing portals to other implementations depending on the user preferences.
