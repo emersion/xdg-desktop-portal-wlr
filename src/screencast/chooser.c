@@ -226,7 +226,7 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 					default_chooser[i].cmd);
 			continue;
 		}
-		return true;
+		return target->output || target->toplevel;
 	}
 	return false;
 }
