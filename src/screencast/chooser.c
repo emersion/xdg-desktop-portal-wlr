@@ -161,15 +161,16 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 	char *selected_label = read_chooser_out(chooser_out);
 	fclose(chooser_out);
 	if (selected_label == NULL) {
-		goto end;
+		return true;
 	}
 
 	logprint(TRACE, "wlroots: chooser %s selects %s", chooser->cmd, selected_label);
 
+	bool found = false;
 	struct xdpw_wlr_output *out;
 	wl_list_for_each(out, &ctx->output_list, link) {
 		char *label = get_output_label(out);
-		bool found = strcmp(selected_label, label) == 0;
+		found = strcmp(selected_label, label) == 0;
 		free(label);
 		if (found) {
 			target->type = MONITOR;
@@ -180,8 +181,11 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 
 	struct xdpw_toplevel *toplevel;
 	wl_list_for_each(toplevel, &ctx->toplevels, link) {
+		if (found) {
+			break;
+		}
 		char *label = get_toplevel_label(toplevel);
-		bool found = strcmp(selected_label, label) == 0;
+		found = strcmp(selected_label, label) == 0;
 		free(label);
 		if (found) {
 			target->type = WINDOW;
@@ -190,9 +194,12 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 		}
 	}
 
+	if (!found) {
+		logprint(ERROR, "wlroots: chooser %s selected unknown target: %s", chooser->cmd, selected_label);
+	}
+
 	free(selected_label);
 
-end:
 	return true;
 }
 
