@@ -227,7 +227,7 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 					default_chooser[i].cmd);
 			continue;
 		}
-		return true;
+		return target->output || target->toplevel;
 	}
 	return false;
 }
@@ -260,7 +260,7 @@ bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_sc
 			logprint(ERROR, "wlroots: chooser %s failed", chooser.cmd);
 			goto end;
 		}
-		return true;
+		return target->output || target->toplevel;
 	}
 end:
 	return false;
