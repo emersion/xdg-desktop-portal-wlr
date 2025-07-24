@@ -38,6 +38,7 @@ struct xdpw_session {
 	struct wl_list link;
 	sd_bus_slot *slot;
 	char *session_handle;
+	bool closed;
 	struct xdpw_screencast_session_data screencast_data;
 };
 
