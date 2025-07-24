@@ -82,8 +82,6 @@ struct xdpw_buffer {
 
 	struct wl_array damage;
 
-	struct gbm_bo *bo;
-
 	struct wl_buffer *buffer;
 };
 
