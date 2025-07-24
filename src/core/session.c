@@ -28,6 +28,7 @@ static int method_close(sd_bus_message *msg, void *data,
 
 	sd_bus_message_unref(reply);
 
+	sess->closed = true;
 	xdpw_session_destroy(sess);
 
 	return 0;
@@ -60,6 +61,11 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 	logprint(DEBUG, "dbus: destroying session %p", sess);
 	if (!sess) {
 		return;
+	}
+
+	if (!sess->closed) {
+		sd_bus_emit_signal(sd_bus_slot_get_bus(sess->slot), sess->session_handle,
+			"org.freedesktop.impl.portal.Session", "Closed", "");
 	}
 
 	sd_bus_slot_unref(sess->slot);

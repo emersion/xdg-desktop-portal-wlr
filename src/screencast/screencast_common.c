@@ -135,49 +135,52 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		}
 		break;
 	case DMABUF:;
+		struct gbm_bo *bo;
 		uint32_t flags = GBM_BO_USE_RENDERING;
 		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
 			uint64_t *modifiers = (uint64_t*)&cast->pwr_format.modifier;
-			buffer->bo = gbm_bo_create_with_modifiers2(gbm, buffer->width, buffer->height,
+			bo = gbm_bo_create_with_modifiers2(gbm, buffer->width, buffer->height,
 				format, modifiers, 1, flags);
 		} else {
 			if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
 				flags |= GBM_BO_USE_LINEAR;
 			}
-			buffer->bo = gbm_bo_create(gbm, buffer->width, buffer->height, format, flags);
+			bo = gbm_bo_create(gbm, buffer->width, buffer->height, format, flags);
 		}
 
 		// Fallback for linear buffers via the implicit api
-		if (buffer->bo == NULL && cast->pwr_format.modifier == DRM_FORMAT_MOD_LINEAR) {
-			buffer->bo = gbm_bo_create(gbm, buffer->width, buffer->height,
+		if (bo == NULL && cast->pwr_format.modifier == DRM_FORMAT_MOD_LINEAR) {
+			bo = gbm_bo_create(gbm, buffer->width, buffer->height,
 				format, flags | GBM_BO_USE_LINEAR);
 		}
 
-		if (buffer->bo == NULL) {
+		if (bo == NULL) {
 			logprint(ERROR, "xdpw: failed to create gbm_bo");
 			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
-		buffer->plane_count = gbm_bo_get_plane_count(buffer->bo);
+		buffer->plane_count = gbm_bo_get_plane_count(bo);
 
 		struct zwp_linux_buffer_params_v1 *params;
 		params = zwp_linux_dmabuf_v1_create_params(cast->ctx->linux_dmabuf);
 		if (!params) {
 			logprint(ERROR, "xdpw: failed to create linux_buffer_params");
+			gbm_bo_destroy(bo);
 			xdpw_buffer_destroy(buffer);
 			return NULL;
 		}
 
-		buffer->modifier = gbm_bo_get_modifier(buffer->bo);
+		buffer->modifier = gbm_bo_get_modifier(bo);
 		for (int plane = 0; plane < buffer->plane_count; plane++) {
 			buffer->size[plane] = 0;
-			buffer->stride[plane] = gbm_bo_get_stride_for_plane(buffer->bo, plane);
-			buffer->offset[plane] = gbm_bo_get_offset(buffer->bo, plane);
-			buffer->fd[plane] = gbm_bo_get_fd_for_plane(buffer->bo, plane);
+			buffer->stride[plane] = gbm_bo_get_stride_for_plane(bo, plane);
+			buffer->offset[plane] = gbm_bo_get_offset(bo, plane);
+			buffer->fd[plane] = gbm_bo_get_fd_for_plane(bo, plane);
 
 			if (buffer->fd[plane] < 0) {
 				logprint(ERROR, "xdpw: failed to get file descriptor");
 				zwp_linux_buffer_params_v1_destroy(params);
+				gbm_bo_destroy(bo);
 				xdpw_buffer_destroy(buffer);
 				return NULL;
 			}
@@ -190,6 +193,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 			buffer->width, buffer->height,
 			buffer->format, /* flags */ 0);
 		zwp_linux_buffer_params_v1_destroy(params);
+		gbm_bo_destroy(bo);
 
 		if (!buffer->buffer) {
 			logprint(ERROR, "xdpw: failed to create buffer");
@@ -204,9 +208,6 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	if (buffer->buffer) {
 		wl_buffer_destroy(buffer->buffer);
-	}
-	if (buffer->bo) {
-		gbm_bo_destroy(buffer->bo);
 	}
 	for (int plane = 0; plane < buffer->plane_count; plane++) {
 		close(buffer->fd[plane]);
@@ -430,7 +431,6 @@ void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints)
 	wl_array_release(&constraints->dmabuf_format_modifier_pairs);
 	wl_array_release(&constraints->shm_formats);
 	if (constraints->gbm) {
-		// TODO: reference count gbm to keep it alive while we have BO's?
 		gbm_device_destroy(constraints->gbm);
 	}
 	*constraints = (struct xdpw_buffer_constraints){ 0 };
