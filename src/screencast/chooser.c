@@ -96,7 +96,9 @@ static char *read_chooser_out(FILE *f) {
 	size_t name_size = 0;
 	ssize_t nread = getline(&name, &name_size, f);
 	if (nread < 0) {
-		perror("getline failed");
+		if (!feof(f)) {
+			perror("getline failed");
+		}
 		return NULL;
 	}
 
