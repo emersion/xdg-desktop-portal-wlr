@@ -162,6 +162,7 @@ static struct xdpw_wlr_output *wlr_output_chooser_default(struct wl_list *output
 		{XDPW_CHOOSER_SIMPLE, "slurp -f %o -or"},
 		{XDPW_CHOOSER_DMENU, "wmenu -p 'Select the monitor to share:'"},
 		{XDPW_CHOOSER_DMENU, "wofi -d -n --prompt='Select the monitor to share:'"},
+		{XDPW_CHOOSER_DMENU, "rofi -dmenu -p 'Select the monitor to share:'"},
 		{XDPW_CHOOSER_DMENU, "bemenu --prompt='Select the monitor to share:'"},
 	};
 
