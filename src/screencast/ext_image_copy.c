@@ -326,8 +326,9 @@ void xdpw_ext_ic_session_close(struct xdpw_screencast_instance *cast) {
 }
 
 int xdpw_ext_ic_session_init(struct xdpw_screencast_instance *cast) {
-	if (cast->ctx->ext_image_copy_capture_manager == NULL ||
-			cast->ctx->ext_output_image_capture_source_manager == NULL) {
+	if (cast->ctx->ext_image_copy_capture_manager == NULL &&
+			((cast->target->type == MONITOR && cast->ctx->ext_output_image_capture_source_manager == NULL) ||
+			(cast->target->type == WINDOW && cast->ctx->ext_foreign_toplevel_image_capture_source_manager == NULL))) {
 		logprint(INFO, "ext: unsupported");
 		return -1;
 	}
