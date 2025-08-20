@@ -310,6 +310,10 @@ void xdpw_ext_ic_frame_capture(struct xdpw_screencast_instance *cast) {
 		logprint(ERROR, "ext: started frame without buffer");
 		return;
 	}
+	if (cast->ext_session.frame) {
+		logprint(DEBUG, "ext: frame already requested");
+		return;
+	}
 
 	ext_register_frame_cb(cast);
 }
