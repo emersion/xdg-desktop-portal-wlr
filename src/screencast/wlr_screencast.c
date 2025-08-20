@@ -24,14 +24,31 @@
 #include "ext_image_copy.h"
 #include "xdpw.h"
 #include "logger.h"
+#include "fps_limit.h"
 
-void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
+static void wlr_frame_capture_start(struct xdpw_screencast_instance *cast) {
+	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 	if (cast->ctx->ext_image_copy_capture_manager
 			&& cast->ctx->ext_output_image_capture_source_manager) {
 		xdpw_ext_ic_frame_capture(cast);
 	} else if (cast->ctx->screencopy_manager) {
 		xdpw_wlr_sc_frame_capture(cast);
 	}
+}
+
+static void wlr_frame_capture_timer(void *data) {
+	wlr_frame_capture_start((struct xdpw_screencast_instance *)data);
+}
+
+void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
+	if (cast->seq > 0) {
+		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+		if (delay_ns > 0) {
+			xdpw_add_timer(cast->ctx->state, delay_ns, wlr_frame_capture_timer, cast);
+			return;
+		}
+	}
+	wlr_frame_capture_start(cast);
 }
 
 void xdpw_wlr_session_close(struct xdpw_screencast_instance *cast) {
