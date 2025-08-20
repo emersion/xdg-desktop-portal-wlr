@@ -88,6 +88,8 @@ static void ext_session_dmabuf_device(void *data,
 	cast->pending_constraints.gbm = xdpw_gbm_device_create(drmDev);
 	cast->pending_constraints.dirty = true;
 	logprint(TRACE, "ext: dmabuf_device handler");
+
+	drmFreeDevice(&drmDev);
 }
 
 static void ext_session_dmabuf_format(void *data,
