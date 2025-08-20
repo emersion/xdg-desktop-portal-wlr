@@ -560,6 +560,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	}
 	if (cast->current_frame.pw_buffer == buffer) {
 		cast->current_frame.pw_buffer = NULL;
+		cast->current_frame.xdpw_buffer = NULL;
 	}
 	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
 		buffer->buffer->datas[plane].fd = -1;
