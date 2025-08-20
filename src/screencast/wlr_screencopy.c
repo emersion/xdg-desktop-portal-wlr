@@ -22,7 +22,6 @@
 #include "pipewire_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
-#include "fps_limit.h"
 
 static void wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 	if (!cast->wlr_session.wlr_frame) {
@@ -159,8 +158,6 @@ static void wlr_frame_buffer_done(void *data,
 
 	zwlr_screencopy_frame_v1_copy_with_damage(frame, cast->current_frame.xdpw_buffer->buffer);
 	logprint(TRACE, "wlroots: frame copied");
-
-	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 }
 
 static void wlr_frame_flags(void *data, struct zwlr_screencopy_frame_v1 *frame,

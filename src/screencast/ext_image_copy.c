@@ -24,7 +24,6 @@
 #include "pipewire_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
-#include "fps_limit.h"
 
 static void ext_session_buffer_size(void *data,
 		struct ext_image_copy_capture_session_v1 *ext_image_copy_capture_session_v1,
@@ -204,7 +203,6 @@ static void ext_frame_presentation_time(void *data,
 static void ext_frame_ready(void *data,
 		struct ext_image_copy_capture_frame_v1 *ext_image_copy_capture_frame_v1) {
 	struct xdpw_screencast_instance *cast = data;
-	fps_limit_measure_start(&cast->fps_limit, cast->framerate);
 
 	logprint(TRACE, "ext: ready event handler");
 
