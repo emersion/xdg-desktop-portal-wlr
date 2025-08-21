@@ -174,7 +174,6 @@ struct xdpw_screencast_ext_session {
 };
 
 struct xdpw_screencast_wlr_session {
-	struct zwlr_screencopy_frame_v1 *frame_callback;
 	struct zwlr_screencopy_frame_v1 *wlr_frame;
 };
 
