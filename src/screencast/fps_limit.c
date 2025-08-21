@@ -19,12 +19,9 @@ void fps_limit_measure_start(struct fps_limit_state *state, double max_fps) {
 }
 
 uint64_t fps_limit_measure_end(struct fps_limit_state *state, double max_fps) {
-	if (max_fps <= 0.0) {
+	if (max_fps <= 0.0 || timespec_is_zero(&state->frame_last_time)) {
 		return 0;
 	}
-
-	// `fps_limit_measure_start` was not called?
-	assert(!timespec_is_zero(&state->frame_last_time));
 
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);

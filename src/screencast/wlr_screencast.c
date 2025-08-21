@@ -41,14 +41,12 @@ static void wlr_frame_capture_timer(void *data) {
 }
 
 void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
-	if (cast->seq > 0) {
-		uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-		if (delay_ns > 0) {
-			xdpw_add_timer(cast->ctx->state, delay_ns, wlr_frame_capture_timer, cast);
-			return;
-		}
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+	if (delay_ns > 0) {
+		xdpw_add_timer(cast->ctx->state, delay_ns, wlr_frame_capture_timer, cast);
+	} else {
+		wlr_frame_capture_start(cast);
 	}
-	wlr_frame_capture_start(cast);
 }
 
 void xdpw_wlr_session_close(struct xdpw_screencast_instance *cast) {
