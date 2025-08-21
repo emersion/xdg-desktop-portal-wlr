@@ -317,7 +317,7 @@ done:
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
-	logprint(TRACE, "pipewire: stream update parameters");
+	logprint(TRACE, "pipewire: stream update parameters: %p", cast->stream);
 	struct pw_stream *stream = cast->stream;
 	if (stream == NULL) {
 		return;
@@ -381,7 +381,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
+	struct gbm_device *gbm = xdpw_get_gbm(cast);
 
 	const struct spa_pod_prop *prop_modifier;
 	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {

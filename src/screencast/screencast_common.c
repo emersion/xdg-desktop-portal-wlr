@@ -22,9 +22,14 @@ void randname(char *buf) {
 	}
 }
 
-struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
+struct xdpw_gbm_device *xdpw_gbm_device_create(drmDevice *device) {
 	if (!(device->available_nodes & (1 << DRM_NODE_RENDER))) {
 		logprint(ERROR, "xdpw: DRM device has no render node");
+		return NULL;
+	}
+
+	struct xdpw_gbm_device *dev = calloc(1, sizeof(*dev));
+	if (!dev) {
 		return NULL;
 	}
 
@@ -34,10 +39,47 @@ struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
 	int fd = open(render_node, O_RDWR | O_CLOEXEC);
 	if (fd < 0) {
 		logprint(ERROR, "xdpw: Could not open render node %s", render_node);
+		free(dev);
 		return NULL;
 	}
 
-	return gbm_create_device(fd);
+	dev->gbm = gbm_create_device(fd);
+	if (dev->gbm == NULL) {
+		free(dev);
+		close(fd);
+		return NULL;
+	}
+	dev->dmabuf_device = device;
+	dev->refcnt = 1;
+
+	return dev;
+}
+
+struct xdpw_gbm_device *xdpw_gbm_device_ref(struct xdpw_gbm_device *gbm) {
+	gbm->refcnt++;
+	return gbm;
+}
+
+void xdpw_gbm_device_unref(struct xdpw_gbm_device *gbm) {
+	if (!gbm || --gbm->refcnt > 0) {
+		return;
+	}
+
+	int fd = gbm_device_get_fd(gbm->gbm);
+	gbm_device_destroy(gbm->gbm);
+	drmFreeDevice(&gbm->dmabuf_device);
+	close(fd);
+}
+
+struct gbm_device *xdpw_get_gbm(struct xdpw_screencast_instance *cast) {
+	if (cast->current_constraints.gbm) {
+		// ext_image_copy_capture
+		return cast->current_constraints.gbm->gbm;
+	} else if (cast->ctx->gbm) {
+		// wlr_screencast
+		return cast->ctx->gbm->gbm;
+	}
+	return NULL;
 }
 
 static int anonymous_shm_open(void) {
@@ -89,7 +131,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	buffer->format = format;
 	wl_array_init(&buffer->damage);
 
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
+	struct gbm_device *gbm = xdpw_get_gbm(cast);
 
 	switch (buffer_type) {
 	case WL_SHM:;
@@ -430,9 +472,7 @@ void xdpw_buffer_constraints_init(struct xdpw_buffer_constraints *constraints) {
 void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints) {
 	wl_array_release(&constraints->dmabuf_format_modifier_pairs);
 	wl_array_release(&constraints->shm_formats);
-	if (constraints->gbm) {
-		gbm_device_destroy(constraints->gbm);
-	}
+	xdpw_gbm_device_unref(constraints->gbm);
 	*constraints = (struct xdpw_buffer_constraints){ 0 };
 }
 
@@ -451,7 +491,7 @@ bool xdpw_buffer_constraints_move(struct xdpw_buffer_constraints *dst, struct xd
 
 uint32_t xdpw_count_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format) {
 	struct xdpw_buffer_constraints *constraints = &cast->current_constraints;
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
+	struct gbm_device *gbm = xdpw_get_gbm(cast);
 
 	uint32_t modifiers = 0;
 	struct xdpw_format_modifier_pair *fm_pair;
@@ -468,7 +508,7 @@ uint32_t xdpw_count_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint
 void xdpw_query_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format,
 		uint64_t *modifiers, uint32_t num_modifiers) {
 	struct xdpw_buffer_constraints *constraints = &cast->current_constraints;
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
+	struct gbm_device *gbm = xdpw_get_gbm(cast);
 
 	uint32_t idx = 0;
 	struct xdpw_format_modifier_pair *fm_pair;

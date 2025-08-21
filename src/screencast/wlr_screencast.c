@@ -285,9 +285,7 @@ static void linux_dmabuf_feedback_tranche_target_devices(void *data,
 	}
 
 	if (ctx->gbm) {
-		drmDevice *drmDevRenderer = NULL;
-		drmGetDevice2(gbm_device_get_fd(ctx->gbm), /* flags */ 0, &drmDevRenderer);
-		ctx->feedback_data.device_used = drmDevicesEqual(drmDevRenderer, drmDev);
+		ctx->feedback_data.device_used = drmDevicesEqual(ctx->gbm->dmabuf_device, drmDev);
 	} else {
 		ctx->gbm = xdpw_gbm_device_create(drmDev);
 		ctx->feedback_data.device_used = ctx->gbm != NULL;
@@ -628,6 +626,8 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 		xdpw_screencast_instance_destroy(cast);
 	}
 
+	xdpw_gbm_device_unref(ctx->gbm);
+
 	if (ctx->screencopy_manager) {
 		zwlr_screencopy_manager_v1_destroy(ctx->screencopy_manager);
 	}
@@ -642,11 +642,6 @@ void xdpw_wlr_screencopy_finish(struct xdpw_screencast_context *ctx) {
 	}
 	if (ctx->shm) {
 		wl_shm_destroy(ctx->shm);
-	}
-	if (ctx->gbm) {
-		int fd = gbm_device_get_fd(ctx->gbm);
-		gbm_device_destroy(ctx->gbm);
-		close(fd);
 	}
 	if (ctx->linux_dmabuf_feedback) {
 		zwp_linux_dmabuf_feedback_v1_destroy(ctx->linux_dmabuf_feedback);

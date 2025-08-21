@@ -85,11 +85,16 @@ static void ext_session_dmabuf_device(void *data,
 		return;
 	}
 
-	cast->pending_constraints.gbm = xdpw_gbm_device_create(drmDev);
-	cast->pending_constraints.dirty = true;
-	logprint(TRACE, "ext: dmabuf_device handler");
+	if (cast->current_constraints.gbm && drmDevicesEqual(drmDev, cast->current_constraints.gbm->dmabuf_device)) {
+		logprint(TRACE, "ext dmabuf_device handler: drm device matches, reusing");
+		cast->pending_constraints.gbm = xdpw_gbm_device_ref(cast->current_constraints.gbm);
+		drmFreeDevice(&drmDev);
+	} else {
+		logprint(TRACE, "ext: dmabuf_device handler");
+		cast->pending_constraints.gbm = xdpw_gbm_device_create(drmDev);
+	}
 
-	drmFreeDevice(&drmDev);
+	cast->pending_constraints.dirty = true;
 }
 
 static void ext_session_dmabuf_format(void *data,

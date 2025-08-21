@@ -48,6 +48,12 @@ struct xdpw_chooser {
 	const char *cmd;
 };
 
+struct xdpw_gbm_device {
+	struct gbm_device *gbm;
+	drmDevice *dmabuf_device;
+	int refcnt;
+};
+
 struct xdpw_frame_damage {
 	uint32_t x;
 	uint32_t y;
@@ -125,7 +131,7 @@ struct xdpw_screencast_context {
 	struct wl_array format_modifier_pairs;
 
 	// gbm
-	struct gbm_device *gbm;
+	struct xdpw_gbm_device *gbm;
 
 	// sessions
 	struct wl_list screencast_instances;
@@ -160,12 +166,14 @@ struct xdpw_shm_format {
 	uint32_t stride;
 };
 
+
 struct xdpw_buffer_constraints {
 	struct wl_array dmabuf_format_modifier_pairs;
 	struct wl_array shm_formats;
 	uint32_t width, height;
 	bool dirty;
-	struct gbm_device *gbm;
+	drmDevice *dmabuf_device;
+	struct xdpw_gbm_device *gbm;
 };
 
 struct xdpw_screencast_ext_session {
@@ -239,7 +247,10 @@ struct xdpw_wlr_output {
 };
 
 void randname(char *buf);
-struct gbm_device *xdpw_gbm_device_create(drmDevice *device);
+struct xdpw_gbm_device *xdpw_gbm_device_create(drmDevice *device);
+struct xdpw_gbm_device *xdpw_gbm_device_ref(struct xdpw_gbm_device *gbm);
+void xdpw_gbm_device_unref(struct xdpw_gbm_device *gbm);
+struct gbm_device *xdpw_get_gbm(struct xdpw_screencast_instance *cast);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
