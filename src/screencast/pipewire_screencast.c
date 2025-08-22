@@ -27,7 +27,7 @@ static struct spa_pod *build_buffer(struct spa_pod_builder *b, uint32_t blocks, 
 
 	spa_pod_builder_push_object(b, &f[0], SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers);
 	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_buffers,
-			SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS, XDPW_PWR_BUFFERS_MIN, 32), 0);
+			SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS_MIN, XDPW_PWR_BUFFERS_MIN, XDPW_PWR_BUFFERS_MAX), 0);
 	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_blocks, SPA_POD_Int(blocks), 0);
 	if (size > 0) {
 		spa_pod_builder_add(b, SPA_PARAM_BUFFERS_size, SPA_POD_Int(size), 0);
