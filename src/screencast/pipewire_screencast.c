@@ -20,14 +20,18 @@
 #define DAMAGE_REGION_COUNT 16
 
 static struct spa_pod *build_buffer(struct spa_pod_builder *b, uint32_t blocks, uint32_t size,
-		uint32_t stride, uint32_t datatype) {
+		uint32_t stride, uint32_t datatype, uint32_t max_buffers) {
 	assert(blocks > 0);
 	assert(datatype > 0);
 	struct spa_pod_frame f[1];
 
+	if (max_buffers == 0) {
+		max_buffers = XDPW_PWR_BUFFERS_MAX;
+	}
+
 	spa_pod_builder_push_object(b, &f[0], SPA_TYPE_OBJECT_ParamBuffers, SPA_PARAM_Buffers);
 	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_buffers,
-			SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS_MIN, XDPW_PWR_BUFFERS_MIN, XDPW_PWR_BUFFERS_MAX), 0);
+			SPA_POD_CHOICE_RANGE_Int(XDPW_PWR_BUFFERS_MIN, XDPW_PWR_BUFFERS_MIN, max_buffers), 0);
 	spa_pod_builder_add(b, SPA_PARAM_BUFFERS_blocks, SPA_POD_Int(blocks), 0);
 	if (size > 0) {
 		spa_pod_builder_add(b, SPA_PARAM_BUFFERS_size, SPA_POD_Int(size), 0);
@@ -471,7 +475,8 @@ fixate_format:
 	logprint(DEBUG, "pipewire: size: (%u, %u)", cast->pwr_format.size.width, cast->pwr_format.size.height);
 	logprint(DEBUG, "pipewire: max_framerate: (%u / %u)", cast->pwr_format.max_framerate.num, cast->pwr_format.max_framerate.denom);
 
-	add_pod(&params, build_buffer(&builder.b, blocks, 0, 0, data_type));
+	add_pod(&params, build_buffer(&builder.b, blocks, 0, 0, data_type,
+		cast->ctx->state->config->screencast_conf.max_buffers));
 
 	add_pod(&params, spa_pod_builder_add_object(&builder.b,
 		SPA_TYPE_OBJECT_ParamMeta, SPA_PARAM_Meta,
