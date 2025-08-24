@@ -381,8 +381,6 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_format_video_raw_parse(param, &cast->pwr_format);
 	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
 
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
-
 	const struct spa_pod_prop *prop_modifier;
 	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
 		cast->buffer_type = DMABUF;
@@ -398,7 +396,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 			uint32_t flags = GBM_BO_USE_RENDERING;
 			uint64_t modifier;
 
-			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(gbm,
+			struct gbm_bo *bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm,
 				cast->current_constraints.width, cast->current_constraints.height,
 				fourcc, modifiers, n_modifiers, flags);
 			if (bo) {
@@ -420,7 +418,7 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 				default:
 					continue;
 				}
-				bo = gbm_bo_create(gbm, cast->current_constraints.width,
+				bo = gbm_bo_create(cast->ctx->gbm, cast->current_constraints.width,
 						cast->current_constraints.height, fourcc, flags);
 				if (bo) {
 					modifier = gbm_bo_get_modifier(bo);
@@ -455,7 +453,7 @@ fixate_format:
 		if (cast->pwr_format.modifier == DRM_FORMAT_MOD_INVALID) {
 			blocks = 1;
 		} else {
-			blocks = gbm_device_get_format_modifier_plane_count(gbm,
+			blocks = gbm_device_get_format_modifier_plane_count(cast->ctx->gbm,
 				fourcc, cast->pwr_format.modifier);
 		}
 	} else {
