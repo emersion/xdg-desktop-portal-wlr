@@ -79,6 +79,14 @@ These options need to be placed under the **[screencast]** section.
 
 	This option is experimental and can be removed or replaced in future versions.
 
+**max_buffers** = _limit_
+	Set the maximum number of buffers that will be offered to pipewire.
+
+	This is useful to avoid excessive buffer allocation when sinks try to
+	negotiate an unnecessarily high number of buffers. A lower number can
+	significantly speed up buffer reallocation, which is especially useful
+	during resize of a captured toplevel.
+
 ## OUTPUT CHOOSER
 
 The chooser can be any program or script with the following behaviour:
