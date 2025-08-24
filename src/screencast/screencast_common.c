@@ -40,6 +40,33 @@ struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
 	return gbm_create_device(fd);
 }
 
+void xdpw_gbm_device_update(struct xdpw_screencast_instance *cast) {
+	drmDevice *new_dev = NULL;
+	if (drmGetDeviceFromDevId(cast->current_constraints.dmabuf_device, 0, &new_dev) != 0) {
+		// No device or invalid device, nothing to do
+		return;
+	}
+
+	if (!cast->ctx->gbm) {
+		// Our first device
+		cast->ctx->gbm = xdpw_gbm_device_create(new_dev);
+		drmFreeDevice(&new_dev);
+		return;
+	}
+
+	drmDevice *old_dev = NULL;
+	int fd = gbm_device_get_fd(cast->ctx->gbm);
+	if (drmGetDevice(fd, &old_dev) != 0 || !drmDevicesEqual(new_dev, old_dev)) {
+		// We either couldn't identify the old device or they didn't match, recreate
+		gbm_device_destroy(cast->ctx->gbm);
+		close(fd);
+		cast->ctx->gbm = xdpw_gbm_device_create(new_dev);
+	}
+
+	drmFreeDevice(&old_dev);
+	drmFreeDevice(&new_dev);
+}
+
 static int anonymous_shm_open(void) {
 	char name[] = "/xdpw-shm-XXXXXX";
 	int retries = 100;
@@ -89,8 +116,6 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	buffer->format = format;
 	wl_array_init(&buffer->damage);
 
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
-
 	switch (buffer_type) {
 	case WL_SHM:;
 		struct xdpw_shm_format *fmt;
@@ -139,18 +164,18 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		uint32_t flags = GBM_BO_USE_RENDERING;
 		if (cast->pwr_format.modifier != DRM_FORMAT_MOD_INVALID) {
 			uint64_t *modifiers = (uint64_t*)&cast->pwr_format.modifier;
-			bo = gbm_bo_create_with_modifiers2(gbm, buffer->width, buffer->height,
+			bo = gbm_bo_create_with_modifiers2(cast->ctx->gbm, buffer->width, buffer->height,
 				format, modifiers, 1, flags);
 		} else {
 			if (cast->ctx->state->config->screencast_conf.force_mod_linear) {
 				flags |= GBM_BO_USE_LINEAR;
 			}
-			bo = gbm_bo_create(gbm, buffer->width, buffer->height, format, flags);
+			bo = gbm_bo_create(cast->ctx->gbm, buffer->width, buffer->height, format, flags);
 		}
 
 		// Fallback for linear buffers via the implicit api
 		if (bo == NULL && cast->pwr_format.modifier == DRM_FORMAT_MOD_LINEAR) {
-			bo = gbm_bo_create(gbm, buffer->width, buffer->height,
+			bo = gbm_bo_create(cast->ctx->gbm, buffer->width, buffer->height,
 				format, flags | GBM_BO_USE_LINEAR);
 		}
 
@@ -430,9 +455,6 @@ void xdpw_buffer_constraints_init(struct xdpw_buffer_constraints *constraints) {
 void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints) {
 	wl_array_release(&constraints->dmabuf_format_modifier_pairs);
 	wl_array_release(&constraints->shm_formats);
-	if (constraints->gbm) {
-		gbm_device_destroy(constraints->gbm);
-	}
 	*constraints = (struct xdpw_buffer_constraints){ 0 };
 }
 
@@ -451,14 +473,12 @@ bool xdpw_buffer_constraints_move(struct xdpw_buffer_constraints *dst, struct xd
 
 uint32_t xdpw_count_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format) {
 	struct xdpw_buffer_constraints *constraints = &cast->current_constraints;
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
-
 	uint32_t modifiers = 0;
 	struct xdpw_format_modifier_pair *fm_pair;
 	wl_array_for_each(fm_pair, &constraints->dmabuf_format_modifier_pairs) {
 		if (fm_pair->fourcc == drm_format &&
 				(fm_pair->modifier == DRM_FORMAT_MOD_INVALID ||
-				gbm_device_get_format_modifier_plane_count(gbm, fm_pair->fourcc, fm_pair->modifier) > 0))
+				gbm_device_get_format_modifier_plane_count(cast->ctx->gbm, fm_pair->fourcc, fm_pair->modifier) > 0))
 			modifiers += 1;
 	}
 
@@ -468,14 +488,12 @@ uint32_t xdpw_count_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint
 void xdpw_query_dmabuf_modifiers(struct xdpw_screencast_instance *cast, uint32_t drm_format,
 		uint64_t *modifiers, uint32_t num_modifiers) {
 	struct xdpw_buffer_constraints *constraints = &cast->current_constraints;
-	struct gbm_device *gbm = cast->current_constraints.gbm ? cast->current_constraints.gbm : cast->ctx->gbm;
-
 	uint32_t idx = 0;
 	struct xdpw_format_modifier_pair *fm_pair;
 	wl_array_for_each(fm_pair, &constraints->dmabuf_format_modifier_pairs) {
 		if (fm_pair->fourcc == drm_format &&
 				(fm_pair->modifier == DRM_FORMAT_MOD_INVALID ||
-				gbm_device_get_format_modifier_plane_count(gbm, fm_pair->fourcc, fm_pair->modifier) > 0)) {
+				gbm_device_get_format_modifier_plane_count(cast->ctx->gbm, fm_pair->fourcc, fm_pair->modifier) > 0)) {
 			assert(idx < num_modifiers);
 			modifiers[idx] = fm_pair->modifier;
 			idx++;

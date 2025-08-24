@@ -77,18 +77,9 @@ static void ext_session_dmabuf_device(void *data,
 
 	dev_t device;
 	assert(device_arr->size == sizeof(device));
-	memcpy(&device, device_arr->data, sizeof(device));
-
-	drmDevice *drmDev;
-	if (drmGetDeviceFromDevId(device, /* flags */ 0, &drmDev) != 0) {
-		return;
-	}
-
-	cast->pending_constraints.gbm = xdpw_gbm_device_create(drmDev);
+	memcpy(&cast->pending_constraints.dmabuf_device, device_arr->data, sizeof(device));
 	cast->pending_constraints.dirty = true;
 	logprint(TRACE, "ext: dmabuf_device handler");
-
-	drmFreeDevice(&drmDev);
 }
 
 static void ext_session_dmabuf_format(void *data,
@@ -141,6 +132,7 @@ static void ext_session_done(void *data,
 
 	if (xdpw_buffer_constraints_move(&cast->current_constraints, &cast->pending_constraints)) {
 		logprint(DEBUG, "ext: buffer constraints changed");
+		xdpw_gbm_device_update(cast);
 		pwr_update_stream_param(cast);
 		return;
 	}
