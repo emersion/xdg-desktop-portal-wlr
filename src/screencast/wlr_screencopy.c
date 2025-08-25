@@ -181,6 +181,11 @@ static void wlr_frame_damage(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	logprint(TRACE, "wlroots: damage event handler");
 
 	struct xdpw_buffer *buffer = cast->current_frame.xdpw_buffer;
+	if(!buffer){
+		logprint(TRACE, "wlroots: frame not created. Ignore frame damage");
+		return ;
+	}
+
 	logprint(TRACE, "wlroots: damage %"PRIu32": %"PRIu32",%"PRIu32"x%"PRIu32",%"PRIu32, buffer->damage.size, x, y, width, height);
 	struct xdpw_frame_damage *damage = wl_array_add(&buffer->damage, sizeof(*damage));
 	*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
