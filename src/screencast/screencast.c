@@ -130,6 +130,12 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data, uint32_t type_mask) {
 	bool target_initialized = false;
 
+	type_mask &= ctx->state->screencast_source_types;
+	if (type_mask == 0) {
+		logprint(ERROR, "wlroots: No supported targets specified");
+		return false;
+	}
+
 	if (type_mask & MONITOR) {
 		struct xdpw_wlr_output *output;
 		wl_list_for_each(output, &ctx->output_list, link) {
