@@ -26,8 +26,7 @@ ninja -C build install
 
 ### Distro Packages
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/xdg-desktop-portal-wlr.svg)](https://repology.org/project/xdg-desktop-portal-wlr/versions)
-
+[![Packaging status](https://repology.org/badge/vertical-allrepos/xdg-desktop-portal-wlr.svg?exclude_unsupported=1)](https://repology.org/project/xdg-desktop-portal-wlr/versions)
 
 ## Running
 
