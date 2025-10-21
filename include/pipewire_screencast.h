@@ -3,8 +3,8 @@
 
 #include "screencast_common.h"
 
-#define XDPW_PWR_BUFFERS 2
-#define XDPW_PWR_BUFFERS_MIN 2
+#define XDPW_PWR_BUFFERS_MIN 1
+#define XDPW_PWR_BUFFERS_MAX 2
 #define XDPW_PWR_ALIGN 16
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast);
