@@ -1,7 +1,7 @@
 project(
 	'xdg-desktop-portal-wlr',
 	'c',
-	version: '0.7.1',
+	version: '0.8.0',
 	license: 'MIT',
 	meson_version: '>=0.60.0',
 	default_options: ['c_std=c11', 'warning_level=2', 'werror=true'],
