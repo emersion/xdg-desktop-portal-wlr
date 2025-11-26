@@ -72,8 +72,6 @@ static void wlr_output_handle_geometry(void *data, struct wl_output *wl_output,
 		int32_t x, int32_t y, int32_t phys_width, int32_t phys_height,
 		int32_t subpixel, const char *make, const char *model, int32_t transform) {
 	struct xdpw_wlr_output *output = data;
-	output->make = strdup(make);
-	output->model = strdup(model);
 	output->transformation = transform;
 }
 
@@ -186,8 +184,6 @@ bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out->name);
-	free(out->make);
-	free(out->model);
 	if (out->xdg_output) {
 		zxdg_output_v1_destroy(out->xdg_output);
 	}
