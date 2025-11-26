@@ -227,6 +227,7 @@ struct xdpw_wlr_output {
 	struct wl_output *output;
 	struct zxdg_output_v1 *xdg_output;
 	char *name;
+	char *description;
 	int x;
 	int y;
 	int width;

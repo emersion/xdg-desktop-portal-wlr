@@ -111,8 +111,12 @@ static char *read_chooser_out(FILE *f) {
 	return name;
 }
 
-static char *get_output_label(struct xdpw_wlr_output *output) {
-	return format_str("Monitor: %s", output->name);
+static char *get_output_label(struct xdpw_wlr_output *output, enum xdpw_chooser_types chooser_type) {
+	if (chooser_type == XDPW_CHOOSER_DMENU) {
+		return format_str("Monitor: %s %s", output->name, output->description);
+	} else {
+		return format_str("Monitor: %s", output->name);
+	}
 }
 
 static char *get_toplevel_label(struct xdpw_toplevel *toplevel, enum xdpw_chooser_types chooser_type) {
@@ -140,7 +144,7 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 		if (type_mask & MONITOR) {
 			struct xdpw_wlr_output *out;
 			wl_list_for_each(out, &ctx->output_list, link) {
-				char *label = get_output_label(out);
+				char *label = get_output_label(out, chooser->type);
 				fprintf(chooser_in, "%s\n", label);
 				free(label);
 			}
@@ -175,7 +179,7 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 	bool found = false;
 	struct xdpw_wlr_output *out;
 	wl_list_for_each(out, &ctx->output_list, link) {
-		char *label = get_output_label(out);
+		char *label = get_output_label(out, chooser->type);
 		found = strcmp(selected_label, label) == 0;
 		free(label);
 		if (found) {

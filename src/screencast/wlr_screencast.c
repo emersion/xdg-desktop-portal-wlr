@@ -100,7 +100,9 @@ static void wlr_output_handle_name(void *data, struct wl_output *wl_output,
 
 static void wlr_output_handle_description(void *data, struct wl_output *wl_output,
 		const char *description) {
-	/* Nothing to do */
+	struct xdpw_wlr_output *output = data;
+	free(output->description);
+	output->description = strdup(description);
 }
 
 static const struct wl_output_listener wlr_output_listener = {
@@ -184,6 +186,7 @@ bool xdpw_wlr_target_from_data(struct xdpw_screencast_context *ctx, struct xdpw_
 
 static void wlr_remove_output(struct xdpw_wlr_output *out) {
 	free(out->name);
+	free(out->description);
 	if (out->xdg_output) {
 		zxdg_output_v1_destroy(out->xdg_output);
 	}
