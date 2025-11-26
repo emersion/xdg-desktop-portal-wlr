@@ -139,8 +139,8 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 	if (type_mask & MONITOR) {
 		struct xdpw_wlr_output *output;
 		wl_list_for_each(output, &ctx->output_list, link) {
-			logprint(INFO, "wlroots: capturable output: %s model: %s id: %i name: %s",
-				output->make, output->model, output->id, output->name);
+			logprint(INFO, "wlroots: capturable output: %i %s",
+				output->id, output->name);
 		}
 	}
 	if (type_mask & WINDOW) {

@@ -226,8 +226,6 @@ struct xdpw_wlr_output {
 	uint32_t id;
 	struct wl_output *output;
 	struct zxdg_output_v1 *xdg_output;
-	char *make;
-	char *model;
 	char *name;
 	int x;
 	int y;
