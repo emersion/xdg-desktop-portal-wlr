@@ -29,7 +29,7 @@ max_fps=30
 exec_before=disable_notifications.sh
 exec_after=enable_notifications.sh
 chooser_type=simple
-chooser_cmd=slurp -f %o -or
+chooser_cmd=slurp -f 'Monitor: %o' -or
 ```
 
 # SCREENCAST OPTIONS
@@ -84,8 +84,12 @@ These options need to be placed under the **[screencast]** section.
 The chooser can be any program or script with the following behaviour:
 - It returns any error code except 127. The error code 127 is internally used to signal
   that no command could be found and all output from it will be ignored.
-- It returns the name of a valid output on stdout as given by **wayland-info**(1).
-  Everything else will be handled as declined by the user.
+- It returns a string on stdout, which is valid if it matches on of the the following:
+   - For simple choosers:
+     - The prefix "Monitor: " followed by the name of a valid output as given by **wayland-info**(1).
+     - The prefix "Window: " followed by the ext-foreign-toplevel-list-v1 identifier as given by **lswt**(1).
+   - For dmenu choosers: one of the lines provided via stdin.
+   Everything else will be handled as declined by the user.
 - To signal that the user has declined screencast, the chooser should exit without
   anything on stdout.
 
