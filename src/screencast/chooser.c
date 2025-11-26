@@ -115,8 +115,12 @@ static char *get_output_label(struct xdpw_wlr_output *output) {
 	return format_str("Monitor: %s", output->name);
 }
 
-static char *get_toplevel_label(struct xdpw_toplevel *toplevel) {
-	return format_str("Window: %s (%s)", toplevel->title, toplevel->identifier);
+static char *get_toplevel_label(struct xdpw_toplevel *toplevel, enum xdpw_chooser_types chooser_type) {
+	if (chooser_type == XDPW_CHOOSER_DMENU) {
+		return format_str("Window: %s (%s)", toplevel->title, toplevel->identifier);
+	} else {
+		return format_str("Window: %s", toplevel->identifier);
+	}
 }
 
 static bool wlr_chooser(const struct xdpw_chooser *chooser,
@@ -144,7 +148,7 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 		if (type_mask & WINDOW) {
 			struct xdpw_toplevel *toplevel;
 			wl_list_for_each(toplevel, &ctx->toplevels, link) {
-				char *label = get_toplevel_label(toplevel);
+				char *label = get_toplevel_label(toplevel, chooser->type);
 				fprintf(chooser_in, "%s\n", label);
 				free(label);
 			}
@@ -186,7 +190,7 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 		if (found) {
 			break;
 		}
-		char *label = get_toplevel_label(toplevel);
+		char *label = get_toplevel_label(toplevel, chooser->type);
 		found = strcmp(selected_label, label) == 0;
 		free(label);
 		if (found) {
