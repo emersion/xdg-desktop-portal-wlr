@@ -178,6 +178,10 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 		char *label = get_output_label(out);
 		found = strcmp(selected_label, label) == 0;
 		free(label);
+		if (!found && chooser->type == XDPW_CHOOSER_SIMPLE) {
+			// Compatibility with xdg-desktop-portal-wlr < v0.8.0
+			found = strcmp(selected_label, out->name) == 0;
+		}
 		if (found) {
 			target->type = MONITOR;
 			target->output = out;
