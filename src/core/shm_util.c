@@ -37,3 +37,22 @@ int anonymous_shm_open(void) {
 
 	return -1;
 }
+
+int shm_alloc_fd(size_t size)
+{
+	int fd = anonymous_shm_open();
+	if (fd < 0)
+		return -1;
+
+	int ret;
+	do {
+		ret = ftruncate(fd, size);
+	} while (ret < 0 && errno == EINTR);
+
+	if (ret < 0) {
+		close(fd);
+		return -1;
+	}
+
+	return fd;
+}
