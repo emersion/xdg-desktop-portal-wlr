@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 		.screencast_version = XDP_CAST_PROTO_VER,
 		.screenshot_version = XDP_SHOT_PROTO_VER,
-		.remotedesktop_available_device_types = POINTER,
+		.remotedesktop_available_device_types = POINTER | KEYBOARD,
 		.remotedesktop_version = XDP_REMOTE_PROTO_VER,
 		.config = &config,
 	};
