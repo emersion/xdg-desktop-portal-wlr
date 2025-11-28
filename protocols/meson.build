@@ -14,6 +14,7 @@ client_protocols = [
 	wl_protocol_dir / 'staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
 	'wlr-virtual-pointer-unstable-v1.xml',
+	'virtual-keyboard-unstable-v1.xml',
 ]
 
 wl_proto_files = []
