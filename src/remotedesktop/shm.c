@@ -1,4 +1,6 @@
 /*
+ * Copied from wayvnc: https://github.com/any1/wayvnc/
+ *
  * Copyright (c) 2019 - 2020 Andri Yngvason
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -16,11 +18,11 @@
 
 #include <errno.h>
 #include <fcntl.h>
+// Required for SHM_ANON on BSD, by default disabled due to _POSIX_C_SOURCE
+#define __BSD_VISIBLE 1
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
-
-#include "config.h"
 
 // Linux with glibc < 2.27 has no wrapper
 #if defined(HAVE_MEMFD) && !defined(HAVE_MEMFD_CREATE)

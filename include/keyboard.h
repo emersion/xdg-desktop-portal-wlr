@@ -1,4 +1,6 @@
 /*
+ * Copied from wayvnc: https://github.com/any1/wayvnc/
+ *
  * Copyright (c) 2019 Andri Yngvason
  *
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -24,6 +26,7 @@
 
 struct zwp_virtual_keyboard_v1;
 struct table_entry;
+struct nvnc;
 
 struct keyboard {
 	struct zwp_virtual_keyboard_v1* virtual_keyboard;
@@ -44,3 +47,4 @@ void keyboard_destroy(struct keyboard* self);
 void keyboard_feed(struct keyboard* self, xkb_keysym_t symbol, bool is_pressed);
 void keyboard_feed_code(struct keyboard* self, xkb_keycode_t code,
 		bool is_pressed);
+//enum nvnc_keyboard_led_state keyboard_get_led_state(const struct keyboard*);
