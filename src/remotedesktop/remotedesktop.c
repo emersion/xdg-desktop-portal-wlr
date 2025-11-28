@@ -1,8 +1,11 @@
 #include "remotedesktop.h"
 
+#include <spa/utils/result.h>
 #include <time.h>
 
 #include "config.h"
+#include "remotedesktop_common.h"
+#include "screencast.h"
 #include "virtual_input.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 #include "xdpw.h"
@@ -190,6 +193,25 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 		return -1;
 	}
 	logprint(DEBUG, "remotedesktop: start: session found");
+	struct xdpw_screencast_instance *cast = sess->screencast_data.screencast_instance;
+	logprint(DEBUG, "remotedesktop: screencast instance %x", cast);
+
+	if (cast) {
+		logprint(DEBUG, "remotedesktop: starting screencast");
+		if (!cast->initialized) {
+			ret = xdpw_screencast_start(cast);
+			if (ret < 0) {
+				return ret;
+			}
+		}
+		while (cast->node_id == SPA_ID_INVALID) {
+			int ret = pw_loop_iterate(state->pw_loop, 0);
+			if (ret < 0) {
+				logprint(ERROR, "pipewire_loop_iterate failed: %s", spa_strerror(ret));
+				return ret;
+			}
+		}
+	}
 
 	remote = &sess->remotedesktop_data;
 	remote->virtual_pointer = zwlr_virtual_pointer_manager_v1_create_virtual_pointer(
@@ -244,11 +266,109 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 		return ret;
 	}
 
-	ret = sd_bus_reply_method_return(msg, "ua{sv}", PORTAL_RESPONSE_SUCCESS,
-		1, "devices", "u", remote->devices);
+	sd_bus_message *reply = NULL;
+	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
+	ret = sd_bus_message_append(reply, "u", PORTAL_RESPONSE_SUCCESS);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'a', "{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_append(reply, "{sv}",
+		"devices", "u", remote->devices);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_open_container(reply, 'e', "sv");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_append(reply, "s", "streams");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'v', "a(ua{sv})");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_open_container(reply, 'a', "(ua{sv})");
+	if (ret < 0) {
+		return ret;
+	}
+	if (cast) {
+		ret = sd_bus_message_open_container(reply, 'r', "ua{sv}");
+		if (ret < 0) {
+			return ret;
+		}
+		ret = sd_bus_message_append(reply, "u", cast->node_id);
+		if (ret < 0) {
+			return ret;
+		}
+		ret = sd_bus_message_open_container(reply, 'a', "{sv}");
+		if (ret < 0) {
+			return ret;
+		}
+		if (cast->target->output->xdg_output) {
+			ret = sd_bus_message_append(reply, "{sv}",
+				"position", "(ii)", cast->target->output->x, cast->target->output->y);
+			if (ret < 0) {
+				return ret;
+			}
+			ret = sd_bus_message_append(reply, "{sv}",
+				"size", "(ii)", cast->target->output->width, cast->target->output->height);
+			if (ret < 0) {
+				return ret;
+			}
+		}
+		ret = sd_bus_message_append(reply, "{sv}", "source_type", "u", MONITOR);
+		if (ret < 0) {
+			return ret;
+		}
+		ret = sd_bus_message_close_container(reply);
+		if (ret < 0) {
+			return ret;
+		}
+		ret = sd_bus_message_close_container(reply);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_append(reply, "{sv}",
+		"devices", "u", remote->devices);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_close_container(reply);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_send(NULL, reply, NULL);
+	if (ret < 0) {
+		return ret;
+	}
+	sd_bus_message_unref(reply);
 
 	return 0;
 }
