@@ -1,8 +1,8 @@
 #include "virtual_input.h"
 
+#include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wlr-virtual-pointer-unstable-v1-client-protocol.h"
 
-#include "remotedesktop.h"
 #include "xdpw.h"
 #include "logger.h"
 
@@ -25,6 +25,20 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 			interface, version);
 		ctx->virtual_pointer_manager = wl_registry_bind(reg, id,
 			&zwlr_virtual_pointer_manager_v1_interface, version);
+	} else if (!strcmp(interface, zwp_virtual_keyboard_manager_v1_interface.name)) {
+		uint32_t version = ver;
+		if (VIRTUAL_KEYBOARD_VERSION < ver) {
+			version = VIRTUAL_KEYBOARD_VERSION;
+		} else if (ver < VIRTUAL_KEYBOARD_VERSION_MIN) {
+			version = VIRTUAL_KEYBOARD_VERSION_MIN;
+		}
+		logprint(DEBUG,
+			"wlroots: |-- registered to interface %s (Version %u)",
+			interface, version);
+		ctx->virtual_keyboard_manager = wl_registry_bind(reg, id,
+			&zwp_virtual_keyboard_manager_v1_interface, version);
+	} else if (strcmp(interface, wl_seat_interface.name) == 0) {
+		ctx->seat = wl_registry_bind(reg, id, &wl_seat_interface, 7);
 	}
 }
 
@@ -56,6 +70,13 @@ int xdpw_virtual_input_init(struct xdpw_state *state) {
 	if (!ctx->virtual_pointer_manager) {
 		logprint(ERROR, "Compositor doesn't support %s!",
 			zwlr_virtual_pointer_manager_v1_interface.name);
+		return -1;
+	}
+
+	// make sure our wlroots supports virtual-keyboard protocol
+	if (!ctx->virtual_keyboard_manager) {
+		logprint(ERROR, "Compositor doesn't support %s!",
+			zwp_virtual_keyboard_manager_v1_interface.name);
 		return -1;
 	}
 
