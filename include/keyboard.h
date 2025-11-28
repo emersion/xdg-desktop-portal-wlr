@@ -1,4 +1,6 @@
 /*
+ * Copied from wayvnc: https://github.com/any1/wayvnc/
+ *
  * Copyright (c) 2019 Andri Yngvason
  *
  * Permission to use, copy, modify, and/or distribute this software for any
