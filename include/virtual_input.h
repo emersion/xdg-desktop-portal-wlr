@@ -4,6 +4,9 @@
 #define VIRTUAL_POINTER_VERSION 2
 #define VIRTUAL_POINTER_VERSION_MIN 1
 
+#define VIRTUAL_KEYBOARD_VERSION 1
+#define VIRTUAL_KEYBOARD_VERSION_MIN 1
+
 #include "remotedesktop_common.h"
 
 struct xdpw_state;
