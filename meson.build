@@ -89,11 +89,16 @@ conf_data = configuration_data()
 conf_data.set('libexecdir', get_option('prefix') / get_option('libexecdir'))
 conf_data.set('systemd_service', '')
 
-systemd = dependency('systemd', required: get_option('systemd'))
-if systemd.found()
+systemd = dependency('systemd', required: false)
+if (systemd.found() and get_option('systemd').allowed()) or get_option('systemd').enabled()
+	if systemd.found()
+		user_unit_dir = systemd.get_variable(pkgconfig: 'systemduserunitdir',
+			pkgconfig_define: ['prefix', get_option('prefix')])
+	else
+		user_unit_dir = get_option('prefix')/ 'lib' / 'systemd' / 'user'
+	endif
+
 	systemd_service_file = 'xdg-desktop-portal-wlr.service'
-	user_unit_dir = systemd.get_variable(pkgconfig: 'systemduserunitdir',
-		pkgconfig_define: ['prefix', get_option('prefix')])
 	conf_data.set('systemd_service', 'SystemdService=' + systemd_service_file)
 
 	configure_file(
