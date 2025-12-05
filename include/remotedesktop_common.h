@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include <wayland-client-protocol.h>
+#include <wlr-virtual-pointer-unstable-v1-client-protocol.h>
 
 #define XDP_REMOTE_PROTO_VER 1
 
@@ -12,12 +13,19 @@ struct xdpw_remotedesktop_context {
 	// xdpw
 	struct xdpw_state *state;
 
+	// wlroots
+	struct wl_registry *registry;
+	struct zwlr_virtual_pointer_manager_v1 *virtual_pointer_manager;
+
 	// sessions
 	struct wl_list remotedesktop_instances;
 };
 
 struct xdpw_remotedesktop_session_data {
+	struct zwlr_virtual_pointer_v1 *virtual_pointer;
+	struct timespec t_start;
 	uint32_t devices;
+	uint32_t pressed_buttons;
 };
 
 enum device_types {
