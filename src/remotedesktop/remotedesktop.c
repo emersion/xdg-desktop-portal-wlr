@@ -2,6 +2,7 @@
 
 #include <time.h>
 
+#include "virtual_input.h"
 #include "config.h"
 #include "xdpw.h"
 
@@ -189,6 +190,10 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 	}
 	logprint(DEBUG, "remotedesktop: dbus: start: session found");
 
+	remote = &sess->remotedesktop_data;
+	remote->virtual_pointer = zwlr_virtual_pointer_manager_v1_create_virtual_pointer(
+		state->remotedesktop.virtual_pointer_manager, NULL);
+
 	ret = sd_bus_message_read(msg, "s", &parent_window);
 	if (ret < 0) {
 		return ret;
@@ -221,7 +226,6 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 		return ret;
 	}
 
-	remote = &sess->remotedesktop_data;
 	ret = sd_bus_reply_method_return(msg, "ua{sv}", PORTAL_RESPONSE_SUCCESS,
 		1, "devices", "u", remote->devices);
 	if (ret < 0) {
@@ -233,32 +237,291 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 
 static int method_remotedesktop_notify_pointer_motion(sd_bus_message *msg,
 		void *data, sd_bus_error *ret_error) {
-	logprint(ERROR, "remotedesktop: notify_pointer_motion called, but not supported!");
-	return -1;
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	double dx = 0, dy = 0;
+
+	logprint(TRACE, "remotedesktop: npm: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(TRACE, "remotedesktop: npm: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npm: session not found");
+		return -1;
+	}
+	logprint(TRACE, "remotedesktop: npm: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(ERROR, "remotedesktop: npm: called, but pointer not selected!");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "dd", &dx, &dy);
+	if (ret < 0) {
+		return ret;
+	}
+
+	zwlr_virtual_pointer_v1_motion(sess->remotedesktop_data.virtual_pointer, get_time_ms(),
+		wl_fixed_from_double(dx), wl_fixed_from_double(dy));
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
+
+	return 0;
 }
 
 static int method_remotedesktop_notify_pointer_motion_absolute(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
-	logprint(ERROR, "remotedesktop: notify_pointer_motion_absolute called, but not supported!");
-	return -1;
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	double x = 0, y = 0;
+
+	logprint(TRACE, "remotedesktop: npma: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(TRACE, "remotedesktop: npma: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npma: session not found");
+		return -1;
+	}
+	logprint(TRACE, "remotedesktop: npma: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(ERROR, "remotedesktop: npma: called, but pointer not selected!");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_skip(msg, "u");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "dd", &x, &y);
+	if (ret < 0) {
+		return ret;
+	}
+
+	struct xdpw_wlr_output *output = sess->screencast_data.screencast_instance->target->output;
+	zwlr_virtual_pointer_v1_motion_absolute(sess->remotedesktop_data.virtual_pointer,
+		get_time_ms(), x, y, output->width, output->height);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
+
+	return 0;
 }
 
 static int method_remotedesktop_notify_pointer_button(sd_bus_message *msg,
 		void *data, sd_bus_error *ret_error) {
-	logprint(ERROR, "remotedesktop: notify_pointer_button called, but not supported!");
-	return -1;
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	int32_t button;
+	uint32_t btn_state;
+
+	logprint(DEBUG, "remotedesktop: npb: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: npb: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npb: session not found");
+		return -1;
+	}
+	logprint(DEBUG, "remotedesktop: npb: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(ERROR, "remotedesktop: npb: called, but pointer not selected!");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "i", &button);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "u", &btn_state);
+	if (ret < 0) {
+		return ret;
+	}
+
+	if (btn_state == WL_POINTER_BUTTON_STATE_PRESSED) {
+		if (sess->remotedesktop_data.pressed_buttons & 1<<button) {
+			logprint(WARN, "remotedesktop: npb: pointer already pressed, ignoring");
+			return 0;
+		}
+		sess->remotedesktop_data.pressed_buttons |= 1<<button;
+	} else {
+		sess->remotedesktop_data.pressed_buttons &= ~(1<<button);
+	}
+	zwlr_virtual_pointer_v1_button(sess->remotedesktop_data.virtual_pointer, get_time_ms(),
+		button, btn_state);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
+	return 0;
 }
 
 static int method_remotedesktop_notify_pointer_axis(sd_bus_message *msg,
 		void *data, sd_bus_error *ret_error) {
-	logprint(ERROR, "remotedesktop: notify_pointer_axis called, but not supported!");
-	return -1;
+	struct xdpw_state *state = data;
+
+	int ret = 0, finish = 0;
+	char *session_handle, *key;
+	struct xdpw_session *sess;
+	double dx = 0, dy = 0;
+
+	logprint(TRACE, "remotedesktop: npa: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(TRACE, "remotedesktop: npa: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npa: session not found");
+		return -1;
+	}
+	logprint(TRACE, "remotedesktop: npa: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npa: called, but pointer not selected!");
+		return -1;
+	}
+
+	ret = sd_bus_message_enter_container(msg, 'a', "{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
+		ret = sd_bus_message_read(msg, "s", &key);
+		if (ret < 0) {
+			return ret;
+		}
+
+		if (strcmp(key, "finish") == 0) {
+			sd_bus_message_read(msg, "v", "b", &finish);
+			logprint(DEBUG, "remotedesktop: npa: finish: %d", finish);
+		} else {
+			logprint(WARN, "remotedesktop: npa: unknown option: %s", key);
+			sd_bus_message_skip(msg, "v");
+		}
+
+		ret = sd_bus_message_exit_container(msg);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_exit_container(msg);
+	if (ret < 0) {
+		return ret;
+	}
+
+	ret = sd_bus_message_read(msg, "d", &dx);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "d", &dy);
+	if (ret < 0) {
+		return ret;
+	}
+
+	struct zwlr_virtual_pointer_v1 *pointer = sess->remotedesktop_data.virtual_pointer;
+	uint32_t t = get_time_ms();
+
+	zwlr_virtual_pointer_v1_axis_source(pointer, WL_POINTER_AXIS_SOURCE_CONTINUOUS);
+	zwlr_virtual_pointer_v1_axis(pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL,
+			wl_fixed_from_double(dy));
+	zwlr_virtual_pointer_v1_axis(pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL,
+			wl_fixed_from_double(dx));
+
+	if (finish) {
+		zwlr_virtual_pointer_v1_axis_stop(pointer, t, WL_POINTER_AXIS_VERTICAL_SCROLL);
+		zwlr_virtual_pointer_v1_axis_stop(pointer, t, WL_POINTER_AXIS_HORIZONTAL_SCROLL);
+	}
+
+	zwlr_virtual_pointer_v1_frame(pointer);
+	return 0;
 }
 
 static int method_remotedesktop_notify_pointer_axis_discrete(
 		sd_bus_message *msg, void *data, sd_bus_error *ret_error) {
-	logprint(ERROR, "remotedesktop: notify_pointer_axis_discrete called, but not supported!");
-	return -1;
+	struct xdpw_state *state = data;
+
+	int ret = 0;
+	char *session_handle;
+	struct xdpw_session *sess;
+	uint32_t axis;
+	int32_t steps;
+
+	logprint(DEBUG, "remotedesktop: npad: method invoked");
+
+	ret = sd_bus_message_read(msg, "o", &session_handle);
+	if (ret < 0) {
+		return ret;
+	}
+	logprint(DEBUG, "remotedesktop: npad: session_handle: %s", session_handle);
+
+	sess = get_session_from_handle(state, session_handle);
+	if (!sess) {
+		logprint(WARN, "remotedesktop: npad: session not found");
+		return -1;
+	}
+	logprint(DEBUG, "remotedesktop: npad: session found");
+
+	if (!(sess->remotedesktop_data.devices & POINTER)) {
+		logprint(DEBUG, "remotedesktop: npad: called, but pointer not selected!");
+		return -1;
+	}
+
+	ret = sd_bus_message_skip(msg, "a{sv}");
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "u", &axis);
+	if (ret < 0) {
+		return ret;
+	}
+	ret = sd_bus_message_read(msg, "i", &steps);
+	if (ret < 0) {
+		return ret;
+	}
+
+	zwlr_virtual_pointer_v1_axis_discrete(sess->remotedesktop_data.virtual_pointer,
+			get_time_ms(), axis, wl_fixed_from_double(0.1), steps);
+	zwlr_virtual_pointer_v1_frame(sess->remotedesktop_data.virtual_pointer);
+	return 0;
 }
 
 static int method_remotedesktop_notify_keyboard_keycode(
@@ -335,10 +598,25 @@ int xdpw_remotedesktop_init(struct xdpw_state *state) {
 	state->remotedesktop = (struct xdpw_remotedesktop_context) { 0 };
 	state->remotedesktop.state = state;
 
+	int err;
+	err = xdpw_virtual_input_init(state);
+	if (err) {
+		goto fail_virtual_input;
+	}
+
 	return sd_bus_add_object_vtable(state->bus, &slot, object_path,
 		interface_name, remotedesktop_vtable, state);
+
+fail_virtual_input:
+	xdpw_virtual_input_finish(&state->remotedesktop);
+
+	return err;
 }
 
 void xdpw_remotedesktop_destroy(struct xdpw_remotedesktop_session_data *data) {
 	logprint(DEBUG, "remotedesktop: destroy called.");
+	if (data->virtual_pointer) {
+		zwlr_virtual_pointer_v1_destroy(data->virtual_pointer);
+		data->virtual_pointer = NULL;
+	}
 }
