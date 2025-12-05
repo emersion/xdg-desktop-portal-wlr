@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <stdint.h>
+
 #include "logger.h"
 #include "screencast_common.h"
 
@@ -14,8 +16,13 @@ struct config_screencast {
 	bool force_mod_linear;
 };
 
+struct config_remotedesktop {
+	uint32_t allowed_devices;
+};
+
 struct xdpw_config {
 	struct config_screencast screencast_conf;
+	struct config_remotedesktop remotedesktop_conf;
 };
 
 void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config);
