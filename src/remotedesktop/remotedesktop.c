@@ -125,7 +125,19 @@ static int method_remotedesktop_select_devices(sd_bus_message *msg, void *data,
 		}
 
 		if (strcmp(key, "types") == 0) {
-			// TODO: compare to allowed types
+			uint32_t types;
+			ret = sd_bus_message_read(msg, "v", "u", &types);
+			if (ret < 0) {
+				return ret;
+			}
+			logprint(DEBUG, "remotedesktop: select devices: option types: %x", types);
+			uint32_t allowed_types = state->config->remotedesktop_conf.allowed_devices;
+			if ((types & ~allowed_types) != 0) {
+				logprint(DEBUG, "remotedesktop: tried to select not allowed device, "
+						"selected types: 0x%x, allowed types: 0x%x.", types, allowed_types);
+				types &= allowed_types;
+			}
+			sess->remotedesktop_data.devices = types;
 		} else {
 			logprint(WARN, "remotedesktop: select devices: unknown option: %s", key);
 			sd_bus_message_skip(msg, "v");
@@ -157,6 +169,7 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 	int ret = 0;
 	char *request_handle, *session_handle, *app_id, *parent_window, *key;
 	struct xdpw_session *sess;
+	struct xdpw_remotedesktop_session_data *remote;
 
 	logprint(DEBUG, "remotedesktop: start: method invoked");
 
@@ -208,8 +221,9 @@ static int method_remotedesktop_start(sd_bus_message *msg, void *data, sd_bus_er
 		return ret;
 	}
 
+	remote = &sess->remotedesktop_data;
 	ret = sd_bus_reply_method_return(msg, "ua{sv}", PORTAL_RESPONSE_SUCCESS,
-		1, "devices", "u", 0);
+		1, "devices", "u", remote->devices);
 	if (ret < 0) {
 		return ret;
 	}

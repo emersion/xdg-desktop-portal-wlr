@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/timerfd.h>
@@ -8,6 +9,7 @@
 #include <spa/utils/result.h>
 #include <unistd.h>
 
+#include "remotedesktop_common.h"
 #include "xdpw.h"
 #include "logger.h"
 
@@ -120,7 +122,7 @@ int main(int argc, char *argv[]) {
 		.screencast_cursor_modes = HIDDEN | EMBEDDED,
 		.screencast_version = XDP_CAST_PROTO_VER,
 		.screenshot_version = XDP_SHOT_PROTO_VER,
-		.remotedesktop_available_device_types = 0,
+		.remotedesktop_available_device_types = config.remotedesktop_conf.allowed_devices,
 		.remotedesktop_version = XDP_REMOTE_PROTO_VER,
 		.config = &config,
 	};

@@ -16,6 +16,13 @@ struct xdpw_remotedesktop_context {
 };
 
 struct xdpw_remotedesktop_session_data {
+	uint32_t devices;
+};
+
+enum device_types {
+	KEYBOARD = 1,
+	POINTER = 2,
+	TOUCHSCREEN = 4,
 };
 
 #endif
