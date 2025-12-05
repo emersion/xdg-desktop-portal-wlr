@@ -85,12 +85,29 @@ static int handle_ini_screencast(struct config_screencast *screencast_conf, cons
 	return 1;
 }
 
+static int handle_ini_remotedesktop(struct config_remotedesktop *conf, const char *key, const char *value) {
+	if (strcmp(key, "allow_keyboard") == 0) {
+		parse_bool(&conf->allow_keyboard, value);
+	} else if (strcmp(key, "allow_pointer") == 0) {
+		parse_bool(&conf->allow_pointer, value);
+	} else if (strcmp(key, "allow_touchscreen") == 0) {
+		parse_bool(&conf->allow_touchscreen, value);
+	} else {
+		logprint(TRACE, "config: skipping invalid key in config file");
+		return 0;
+	}
+	return 1;
+}
+
 static int handle_ini_config(void *data, const char* section, const char *key, const char *value) {
 	struct xdpw_config *config = (struct xdpw_config*)data;
 	logprint(TRACE, "config: parsing setction %s, key %s, value %s", section, key, value);
 
 	if (strcmp(section, "screencast") == 0) {
 		return handle_ini_screencast(&config->screencast_conf, key, value);
+	}
+	if (strcmp(section, "remotedesktop") == 0) {
+		return handle_ini_remotedesktop(&config->remotedesktop_conf, key, value);
 	}
 
 	logprint(TRACE, "config: skipping invalid key in config file");
@@ -100,6 +117,9 @@ static int handle_ini_config(void *data, const char* section, const char *key, c
 static void default_config(struct xdpw_config *config) {
 	config->screencast_conf.max_fps = 0;
 	config->screencast_conf.chooser_type = XDPW_CHOOSER_DEFAULT;
+	config->remotedesktop_conf.allow_keyboard = true;
+	config->remotedesktop_conf.allow_pointer= true;
+	config->remotedesktop_conf.allow_touchscreen= true;
 }
 
 static bool file_exists(const char *path) {
