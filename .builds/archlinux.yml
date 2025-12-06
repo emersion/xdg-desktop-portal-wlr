@@ -9,6 +9,8 @@ packages:
   - libinih
   - scdoc
   - mesa
+  - libei
+  - libxkbcommon
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:
