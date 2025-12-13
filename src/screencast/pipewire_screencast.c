@@ -221,7 +221,6 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		logprint(WARN, "pipewire: no buffer to queue");
 		goto done;
 	}
-	struct xdpw_buffer *xdpw_buf = cast->current_frame.xdpw_buffer;
 	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
@@ -256,7 +255,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		uint32_t damage_counter = 0;
 		struct xdpw_frame_damage *fdamage;
 		bool stopped_for_spa = false;
-		wl_array_for_each(fdamage, &xdpw_buf->damage) {
+		wl_array_for_each(fdamage, &cast->current_frame.damage) {
 			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
 			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
 					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
@@ -274,7 +273,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 				{d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height};
 
 			uint32_t combined_damage_counter = 0;
-			wl_array_for_each(fdamage, &xdpw_buf->damage) {
+			wl_array_for_each(fdamage, &cast->current_frame.damage) {
 				if (combined_damage_counter++ < damage_counter) {
 					continue;
 				}
