@@ -63,6 +63,7 @@ struct xdpw_frame {
 	uint32_t transformation;
 	struct xdpw_buffer *xdpw_buffer;
 	struct pw_buffer *pw_buffer;
+	struct wl_array damage;
 };
 
 struct xdpw_buffer {
