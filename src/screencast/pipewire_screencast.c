@@ -257,31 +257,40 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		struct xdpw_frame_damage *fdamage;
 		bool stopped_for_spa = false;
 		wl_array_for_each(fdamage, &xdpw_buf->damage) {
+			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
+			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
+					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+			damage_counter++;
+
 			if (!spa_meta_check(d_region + 1, damage)) {
 				stopped_for_spa = true;
 				break;
 			}
 			d_region++;
-
-			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
-			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
-					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
-			damage_counter++;
 		}
 
 		if (stopped_for_spa) {
 			struct xdpw_frame_damage new_fdamage =
 				{d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height};
 
+			uint32_t combined_damage_counter = 0;
 			wl_array_for_each(fdamage, &xdpw_buf->damage) {
-				if (damage_counter-- > 0) {
+				if (combined_damage_counter++ < damage_counter) {
 					continue;
 				}
 				new_fdamage = merge_damage(&new_fdamage, fdamage);
 			}
 			*d_region = SPA_REGION(new_fdamage.x, new_fdamage.y, new_fdamage.width, new_fdamage.height);
-			logprint(TRACE, "pipewire: collected damage %u %u,%u (%ux%u)", damage_counter,
+			logprint(TRACE, "pipewire: collected damage %u %u,%u (%ux%u)", combined_damage_counter,
 					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+		} else {
+			while (spa_meta_check(d_region, damage)) {
+				*d_region = SPA_REGION(0, 0, 0, 0);
+				logprint(TRACE, "pipewire: end damage %u %u,%u (%ux%u)", damage_counter,
+						d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+				damage_counter++;
+				d_region++;
+			}
 		}
 	}
 
