@@ -180,6 +180,9 @@ static void ext_frame_damage(void *data,
 		struct xdpw_frame_damage *damage = wl_array_add(&buffer->damage, sizeof(*damage));
 		*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
 	}
+
+	struct xdpw_frame_damage *damage = wl_array_add(&cast->current_frame.damage, sizeof(*damage));
+	*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
 }
 
 static void ext_frame_presentation_time(void *data,
@@ -210,6 +213,7 @@ static void ext_frame_ready(void *data,
 		// Clear damage for the buffer that was just submitted
 		buffer->damage.size = 0;
 	}
+	cast->current_frame.damage.size = 0;
 }
 
 static void ext_frame_failed(void *data,
