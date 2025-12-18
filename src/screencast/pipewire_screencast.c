@@ -221,7 +221,6 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		logprint(WARN, "pipewire: no buffer to queue");
 		goto done;
 	}
-	struct xdpw_buffer *xdpw_buf = cast->current_frame.xdpw_buffer;
 	struct pw_buffer *pw_buf = cast->current_frame.pw_buffer;
 	struct spa_buffer *spa_buf = pw_buf->buffer;
 	struct spa_data *d = spa_buf->datas;
@@ -256,32 +255,41 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 		uint32_t damage_counter = 0;
 		struct xdpw_frame_damage *fdamage;
 		bool stopped_for_spa = false;
-		wl_array_for_each(fdamage, &xdpw_buf->damage) {
+		wl_array_for_each(fdamage, &cast->current_frame.damage) {
+			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
+			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
+					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+			damage_counter++;
+
 			if (!spa_meta_check(d_region + 1, damage)) {
 				stopped_for_spa = true;
 				break;
 			}
 			d_region++;
-
-			*d_region = SPA_REGION(fdamage->x, fdamage->y, fdamage->width, fdamage->height);
-			logprint(TRACE, "pipewire: damage %u %u,%u (%ux%u)", damage_counter,
-					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
-			damage_counter++;
 		}
 
 		if (stopped_for_spa) {
 			struct xdpw_frame_damage new_fdamage =
 				{d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height};
 
-			wl_array_for_each(fdamage, &xdpw_buf->damage) {
-				if (damage_counter-- > 0) {
+			uint32_t combined_damage_counter = 0;
+			wl_array_for_each(fdamage, &cast->current_frame.damage) {
+				if (combined_damage_counter++ < damage_counter) {
 					continue;
 				}
 				new_fdamage = merge_damage(&new_fdamage, fdamage);
 			}
 			*d_region = SPA_REGION(new_fdamage.x, new_fdamage.y, new_fdamage.width, new_fdamage.height);
-			logprint(TRACE, "pipewire: collected damage %u %u,%u (%ux%u)", damage_counter,
+			logprint(TRACE, "pipewire: collected damage %u %u,%u (%ux%u)", combined_damage_counter,
 					d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+		} else {
+			while (spa_meta_check(d_region, damage)) {
+				*d_region = SPA_REGION(0, 0, 0, 0);
+				logprint(TRACE, "pipewire: end damage %u %u,%u (%ux%u)", damage_counter,
+						d_region->position.x, d_region->position.y, d_region->size.width, d_region->size.height);
+				damage_counter++;
+				d_region++;
+			}
 		}
 	}
 
