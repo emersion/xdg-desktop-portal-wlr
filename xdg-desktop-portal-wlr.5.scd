@@ -67,7 +67,7 @@ These options need to be placed under the **[screencast]** section.
 	  (slurp, wmenu, wofi, rofi, bemenu, mew) and will fallback to an arbitrary output if none of those were found.
 	- none: xdpw will allow screencast either on the output given by **output_name**, or if empty
 	  an arbitrary output without further interaction.
-	- simple, dmenu: xdpw will launch the chooser given by **chooser_cmd**. For more details
+	- simple, menu: xdpw will launch the chooser given by **chooser_cmd**. For more details
 	  see **OUTPUT CHOOSER**.
 
 **force_mod_linear** = _bool_
@@ -88,14 +88,14 @@ The chooser can be any program or script with the following behaviour:
    - For simple choosers:
      - The prefix "Monitor: " followed by the name of a valid output as given by **wayland-info**(1).
      - The prefix "Window: " followed by the ext-foreign-toplevel-list-v1 identifier as given by **lswt**(1).
-   - For dmenu choosers: one of the lines provided via stdin.
+   - For menu choosers: one of the lines provided via stdin.
    Everything else will be handled as declined by the user.
 - To signal that the user has declined screencast, the chooser should exit without
   anything on stdout.
 
 Supported types of choosers via the **chooser_type** option:
 - simple: the chooser is just called without anything further on stdin.
-- dmenu: the chooser receives a newline separated list (dmenu style) of outputs on stdin.
+- menu: the chooser receives a newline separated list (dmenu style) of outputs on stdin.
 
 # SEE ALSO
 
