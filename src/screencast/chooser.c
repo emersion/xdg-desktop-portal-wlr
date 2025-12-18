@@ -112,7 +112,7 @@ static char *read_chooser_out(FILE *f) {
 }
 
 static char *get_output_label(struct xdpw_wlr_output *output, enum xdpw_chooser_types chooser_type) {
-	if (chooser_type == XDPW_CHOOSER_DMENU) {
+	if (chooser_type == XDPW_CHOOSER_MENU) {
 		return format_str("Monitor: %s %s", output->name, output->description);
 	} else {
 		return format_str("Monitor: %s", output->name);
@@ -120,7 +120,7 @@ static char *get_output_label(struct xdpw_wlr_output *output, enum xdpw_chooser_
 }
 
 static char *get_toplevel_label(struct xdpw_toplevel *toplevel, enum xdpw_chooser_types chooser_type) {
-	if (chooser_type == XDPW_CHOOSER_DMENU) {
+	if (chooser_type == XDPW_CHOOSER_MENU) {
 		return format_str("Window: %s (%s)", toplevel->title, toplevel->identifier);
 	} else {
 		return format_str("Window: %s", toplevel->identifier);
@@ -140,7 +140,7 @@ static bool wlr_chooser(const struct xdpw_chooser *chooser,
 	}
 
 	switch (chooser->type) {
-	case XDPW_CHOOSER_DMENU:
+	case XDPW_CHOOSER_MENU:
 		if (type_mask & MONITOR) {
 			struct xdpw_wlr_output *out;
 			wl_list_for_each(out, &ctx->output_list, link) {
@@ -222,11 +222,11 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 
 	const struct xdpw_chooser default_chooser[] = {
 		{XDPW_CHOOSER_SIMPLE, "slurp -f 'Monitor: %o' -or"},
-		{XDPW_CHOOSER_DMENU, "wmenu -p 'Select a source to share:' -l 10"},
-		{XDPW_CHOOSER_DMENU, "wofi -d -n --prompt='Select a source to share:'"},
-		{XDPW_CHOOSER_DMENU, "rofi -dmenu -p 'Select a source to share:'"},
-		{XDPW_CHOOSER_DMENU, "bemenu --prompt='Select a source to share:'"},
-		{XDPW_CHOOSER_DMENU, "mew -l 10 -p 'Select a source to share:'"},
+		{XDPW_CHOOSER_MENU, "wmenu -p 'Select a source to share:' -l 10"},
+		{XDPW_CHOOSER_MENU, "wofi -d -n --prompt='Select a source to share:'"},
+		{XDPW_CHOOSER_MENU, "rofi -dmenu -p 'Select a source to share:'"},
+		{XDPW_CHOOSER_MENU, "bemenu --prompt='Select a source to share:'"},
+		{XDPW_CHOOSER_MENU, "mew -l 10 -p 'Select a source to share:'"},
 	};
 
 	size_t N = sizeof(default_chooser)/sizeof(default_chooser[0]);
@@ -259,7 +259,7 @@ bool xdpw_wlr_target_chooser(struct xdpw_screencast_context *ctx, struct xdpw_sc
 			target->output = xdpw_wlr_output_first(&ctx->output_list);
 		}
 		return target->output != NULL;
-	case XDPW_CHOOSER_DMENU:
+	case XDPW_CHOOSER_MENU:
 	case XDPW_CHOOSER_SIMPLE:;
 		if (!ctx->state->config->screencast_conf.chooser_cmd) {
 			logprint(ERROR, "wlroots: no chooser given");
