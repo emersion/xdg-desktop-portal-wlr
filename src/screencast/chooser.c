@@ -227,6 +227,7 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 		{XDPW_CHOOSER_DMENU, "rofi -dmenu -p 'Select a source to share:'"},
 		{XDPW_CHOOSER_DMENU, "bemenu --prompt='Select a source to share:'"},
 		{XDPW_CHOOSER_DMENU, "mew -l 10 -p 'Select a source to share:'"},
+		{XDPW_CHOOSER_DMENU, "fuzzel -d -l 10 -p 'Select a source to share:'"},
 	};
 
 	size_t N = sizeof(default_chooser)/sizeof(default_chooser[0]);
