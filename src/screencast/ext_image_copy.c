@@ -180,6 +180,9 @@ static void ext_frame_damage(void *data,
 		struct xdpw_frame_damage *damage = wl_array_add(&buffer->damage, sizeof(*damage));
 		*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
 	}
+
+	struct xdpw_frame_damage *damage = wl_array_add(&cast->current_frame.damage, sizeof(*damage));
+	*damage = (struct xdpw_frame_damage){ .x = x, .y = y, .width = width, .height = height };
 }
 
 static void ext_frame_presentation_time(void *data,
@@ -210,6 +213,7 @@ static void ext_frame_ready(void *data,
 		// Clear damage for the buffer that was just submitted
 		buffer->damage.size = 0;
 	}
+	cast->current_frame.damage.size = 0;
 }
 
 static void ext_frame_failed(void *data,
@@ -283,13 +287,10 @@ static void ext_register_frame_cb(struct xdpw_screencast_instance *cast) {
 
 	ext_image_copy_capture_frame_v1_attach_buffer(cast->ext_session.frame,
 			cast->current_frame.xdpw_buffer->buffer);
-	struct xdpw_buffer *buffer;
-	wl_list_for_each(buffer, &cast->buffer_list, link) {
-		struct xdpw_frame_damage *damage;
-		wl_array_for_each(damage, &buffer->damage) {
-			ext_image_copy_capture_frame_v1_damage_buffer(
-					cast->ext_session.frame, damage->x, damage->y, damage->width, damage->height);
-		}
+	struct xdpw_frame_damage *damage;
+	wl_array_for_each(damage, &cast->current_frame.xdpw_buffer->damage) {
+		ext_image_copy_capture_frame_v1_damage_buffer(
+				cast->ext_session.frame, damage->x, damage->y, damage->width, damage->height);
 	}
 	ext_image_copy_capture_frame_v1_capture(cast->ext_session.frame);
 
