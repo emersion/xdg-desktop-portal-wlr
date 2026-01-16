@@ -84,6 +84,8 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 			xdpw_screencast_instance_destroy(cast);
 		}
 	}
+
 	free(sess->session_handle);
+	xdpw_input_capture_session_data_free(&sess->input_capture_data);
 	free(sess);
 }
