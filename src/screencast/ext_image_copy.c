@@ -248,15 +248,23 @@ static const struct ext_image_copy_capture_frame_v1_listener ext_frame_listener 
 	.failed = ext_frame_failed,
 };
 
-static void ext_register_session_cb(struct xdpw_screencast_instance *cast) {
+static int ext_register_session_cb(struct xdpw_screencast_instance *cast) {
 	struct ext_image_capture_source_v1 *source = NULL;
 	switch (cast->target->type) {
 	case MONITOR:
+		if (cast->ctx->ext_output_image_capture_source_manager == NULL) {
+			logprint(INFO, "ext: screencast output: unsupported");
+			return -1;
+		}
 		source = ext_output_image_capture_source_manager_v1_create_source(
 			cast->ctx->ext_output_image_capture_source_manager,
 			cast->target->output->output);
 		break;
 	case WINDOW:
+		if (cast->ctx->ext_foreign_toplevel_image_capture_source_manager == NULL) {
+			logprint(INFO, "ext: screencast window: unsupported");
+			return -1;
+		}
 		source = ext_foreign_toplevel_image_capture_source_manager_v1_create_source(
 			cast->ctx->ext_foreign_toplevel_image_capture_source_manager,
 			cast->target->toplevel->handle);
@@ -270,11 +278,15 @@ static void ext_register_session_cb(struct xdpw_screencast_instance *cast) {
 	ext_image_copy_capture_session_v1_add_listener(cast->ext_session.capture_session,
 			&ext_session_listener, cast);
 	logprint(TRACE, "ext: session callbacks registered");
+	return 0;
 }
 
 static void ext_register_frame_cb(struct xdpw_screencast_instance *cast) {
 	if (!cast->ext_session.capture_session) {
-		ext_register_session_cb(cast);
+		if (ext_register_session_cb(cast) != 0) {
+			logprint(ERROR, "ext: failed to register session");
+			return;
+		}
 	}
 	cast->ext_session.frame = ext_image_copy_capture_session_v1_create_frame(
 			cast->ext_session.capture_session);
@@ -318,12 +330,13 @@ void xdpw_ext_ic_session_close(struct xdpw_screencast_instance *cast) {
 }
 
 int xdpw_ext_ic_session_init(struct xdpw_screencast_instance *cast) {
-	if (cast->ctx->ext_image_copy_capture_manager == NULL ||
-			cast->ctx->ext_output_image_capture_source_manager == NULL) {
+	if (cast->ctx->ext_image_copy_capture_manager == NULL) {
 		logprint(INFO, "ext: unsupported");
 		return -1;
 	}
-	ext_register_session_cb(cast);
+	if (ext_register_session_cb(cast) != 0) {
+		return -1;
+	}
 
 	// process at least one frame so that we know
 	// some of the metadata required for the pipewire
