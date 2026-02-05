@@ -13,6 +13,10 @@ client_protocols = [
 	wl_protocol_dir / 'staging/ext-image-copy-capture/ext-image-copy-capture-v1.xml',
 	wl_protocol_dir / 'staging/ext-foreign-toplevel-list/ext-foreign-toplevel-list-v1.xml',
 	'wlr-screencopy-unstable-v1.xml',
+	'keyboard-shortcuts-inhibit-unstable-v1.xml',
+	'pointer-constraints-unstable-v1.xml',
+	'wlr-layer-shell-unstable-v1.xml',
+	'xdg-shell.xml',
 ]
 
 wl_proto_files = []
