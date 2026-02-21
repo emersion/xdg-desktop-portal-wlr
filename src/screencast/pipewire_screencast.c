@@ -7,6 +7,7 @@
 #include <spa/param/format-utils.h>
 #include <spa/param/video/format-utils.h>
 #include <spa/pod/dynamic.h>
+#include <stdio.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <assert.h>
@@ -619,11 +620,19 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	struct wl_array params;
 	wl_array_init(&params);
 
+	const struct pw_properties *props = pw_context_get_properties(ctx->pwr_context);
+	const char *clock_rate = spa_dict_lookup(&props->dict, "default.clock.rate");
+	if (!clock_rate) clock_rate = "48000";
+
+	char max_latency[] = "00256/48000";
+	snprintf(max_latency, strlen(max_latency), "256/%s", clock_rate);
+
 	char name[] = "xdpw-stream-XXXXXX";
 	randname(name + strlen(name) - 6);
 	cast->stream = pw_stream_new(ctx->core, name,
 		pw_properties_new(
 			PW_KEY_MEDIA_CLASS, "Video/Source",
+			PW_KEY_NODE_MAX_LATENCY, max_latency,
 			NULL));
 
 	if (!cast->stream) {
