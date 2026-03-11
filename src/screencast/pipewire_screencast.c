@@ -543,7 +543,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 		d[plane].chunk->size = xdpw_buffer->size[plane];
 		d[plane].chunk->stride = xdpw_buffer->stride[plane];
 		d[plane].chunk->offset = xdpw_buffer->offset[plane];
-		d[plane].flags = 0;
+		d[plane].flags = SPA_DATA_FLAG_READABLE;
 		d[plane].fd = xdpw_buffer->fd[plane];
 		d[plane].data = NULL;
 		// clients have implemented to check chunk->size if the buffer is valid instead
