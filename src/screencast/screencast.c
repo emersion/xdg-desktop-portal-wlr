@@ -65,6 +65,9 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 	if (target->type == MONITOR) {
 		output_framerate = target->output->framerate;
 	}
+	if (output_framerate == 0) {
+		output_framerate = 60;
+	}
 
 	cast->ctx = ctx;
 	cast->target = target;
