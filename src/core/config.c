@@ -1,4 +1,5 @@
 #include "config.h"
+#include "remotedesktop_common.h"
 #include "xdpw.h"
 #include "logger.h"
 #include "screencast_common.h"
@@ -85,12 +86,36 @@ static int handle_ini_screencast(struct config_screencast *screencast_conf, cons
 	return 1;
 }
 
+static int handle_ini_remotedesktop(struct config_remotedesktop *conf, const char *key, const char *value) {
+	bool is_allowed;
+	uint32_t device;
+	if (strcmp(key, "allow_keyboard") == 0) {
+		parse_bool(&is_allowed, value);
+		device = KEYBOARD;
+	} else if (strcmp(key, "allow_pointer") == 0) {
+		parse_bool(&is_allowed, value);
+		device = POINTER;
+	} else {
+		logprint(TRACE, "config: skipping invalid key in config file");
+		return 0;
+	}
+	if (is_allowed) {
+		conf->allowed_devices |= device;
+	} else {
+		conf->allowed_devices &= ~device;
+	}
+	return 1;
+}
+
 static int handle_ini_config(void *data, const char* section, const char *key, const char *value) {
 	struct xdpw_config *config = (struct xdpw_config*)data;
 	logprint(TRACE, "config: parsing setction %s, key %s, value %s", section, key, value);
 
 	if (strcmp(section, "screencast") == 0) {
 		return handle_ini_screencast(&config->screencast_conf, key, value);
+	}
+	if (strcmp(section, "remotedesktop") == 0) {
+		return handle_ini_remotedesktop(&config->remotedesktop_conf, key, value);
 	}
 
 	logprint(TRACE, "config: skipping invalid key in config file");
@@ -100,6 +125,7 @@ static int handle_ini_config(void *data, const char* section, const char *key, c
 static void default_config(struct xdpw_config *config) {
 	config->screencast_conf.max_fps = 0;
 	config->screencast_conf.chooser_type = XDPW_CHOOSER_DEFAULT;
+	config->remotedesktop_conf.allowed_devices = KEYBOARD & POINTER;
 }
 
 static bool file_exists(const char *path) {
