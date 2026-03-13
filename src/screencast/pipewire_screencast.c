@@ -506,6 +506,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	struct xdpw_screencast_instance *cast = data;
 	struct spa_data *d;
 	enum spa_data_type t;
+	uint32_t flags = SPA_DATA_FLAG_READABLE;
 
 	logprint(DEBUG, "pipewire: add buffer event handle");
 
@@ -515,6 +516,9 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 	if ((d[0].type & (1u << SPA_DATA_MemFd)) > 0) {
 		assert(cast->buffer_type == WL_SHM);
 		t = SPA_DATA_MemFd;
+#ifdef SPA_DATA_FLAG_MAPPABLE
+		flags = flags | SPA_DATA_FLAG_MAPPABLE;
+#endif
 	} else if ((d[0].type & (1u << SPA_DATA_DmaBuf)) > 0) {
 		assert(cast->buffer_type == DMABUF);
 		t = SPA_DATA_DmaBuf;
@@ -543,7 +547,7 @@ static void pwr_handle_stream_add_buffer(void *data, struct pw_buffer *buffer) {
 		d[plane].chunk->size = xdpw_buffer->size[plane];
 		d[plane].chunk->stride = xdpw_buffer->stride[plane];
 		d[plane].chunk->offset = xdpw_buffer->offset[plane];
-		d[plane].flags = 0;
+		d[plane].flags = flags;
 		d[plane].fd = xdpw_buffer->fd[plane];
 		d[plane].data = NULL;
 		// clients have implemented to check chunk->size if the buffer is valid instead
