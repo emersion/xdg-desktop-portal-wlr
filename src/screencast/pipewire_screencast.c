@@ -69,12 +69,14 @@ static struct spa_pod *fixate_format(struct spa_pod_builder *b, enum spa_video_f
 	// variable framerate
 	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_framerate,
 		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
-	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_maxFramerate,
-		SPA_POD_CHOICE_RANGE_Fraction(
-			&SPA_FRACTION(framerate, 1),
-			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(framerate, 1)),
-		0);
+	if (framerate > 0) {
+		spa_pod_builder_add(b, SPA_FORMAT_VIDEO_maxFramerate,
+			SPA_POD_CHOICE_RANGE_Fraction(
+				&SPA_FRACTION(framerate, 1),
+				&SPA_FRACTION(1, 1),
+				&SPA_FRACTION(framerate, 1)),
+			0);
+	}
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
@@ -117,12 +119,14 @@ static struct spa_pod *build_format(struct spa_pod_builder *b, enum spa_video_fo
 	// variable framerate
 	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_framerate,
 		SPA_POD_Fraction(&SPA_FRACTION(0, 1)), 0);
-	spa_pod_builder_add(b, SPA_FORMAT_VIDEO_maxFramerate,
-		SPA_POD_CHOICE_RANGE_Fraction(
-			&SPA_FRACTION(framerate, 1),
-			&SPA_FRACTION(1, 1),
-			&SPA_FRACTION(framerate, 1)),
-		0);
+	if (framerate > 0) {
+		spa_pod_builder_add(b, SPA_FORMAT_VIDEO_maxFramerate,
+			SPA_POD_CHOICE_RANGE_Fraction(
+				&SPA_FRACTION(framerate, 1),
+				&SPA_FRACTION(1, 1),
+				&SPA_FRACTION(framerate, 1)),
+			0);
+	}
 	return spa_pod_builder_pop(b, &f[0]);
 }
 
@@ -387,7 +391,11 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	spa_pod_dynamic_builder_init(&builder, params_buffer, sizeof(params_buffer), 2048);
 
 	spa_format_video_raw_parse(param, &cast->pwr_format);
-	cast->framerate = (uint32_t)(cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom);
+	if (cast->pwr_format.max_framerate.denom > 0) {
+		cast->framerate = cast->pwr_format.max_framerate.num / cast->pwr_format.max_framerate.denom;
+	} else {
+		cast->framerate = 0;
+	}
 
 	const struct spa_pod_prop *prop_modifier;
 	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
