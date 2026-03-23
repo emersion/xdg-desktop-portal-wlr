@@ -1,6 +1,6 @@
 #ifndef SCREENSHOT_COMMON_H
 #define SCREENSHOT_COMMON_H
 
-#define XDP_SHOT_PROTO_VER 1
+#define XDP_SHOT_PROTO_VER 2
 
 #endif
