@@ -16,6 +16,7 @@
 #include "wlr_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
+#include "timespec_util.h"
 
 #define DAMAGE_REGION_COUNT 16
 
@@ -328,6 +329,31 @@ done:
 	cast->current_frame.pw_buffer = NULL;
 }
 
+static void pwr_capture_one(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+
+	if (!cast->pwr_stream_state) {
+		logprint(INFO, "pipewire: not streaming");
+		return;
+	}
+
+	if (cast->current_frame.pw_buffer) {
+		logprint(DEBUG, "pipewire: buffer already exported");
+		goto trigger_graph;
+	}
+
+	xdpw_pwr_dequeue_buffer(cast);
+	if (!cast->current_frame.pw_buffer) {
+		logprint(WARN, "pipewire: unable to export buffer");
+		goto trigger_graph;
+	}
+
+	xdpw_wlr_frame_capture(cast);
+
+trigger_graph:
+	pw_stream_trigger_process(cast->stream);
+}
+
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: stream update parameters");
 	struct pw_stream *stream = cast->stream;
@@ -359,6 +385,7 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
+		pwr_capture_one(cast);
 		break;
 	case PW_STREAM_STATE_PAUSED:
 		if (old == PW_STREAM_STATE_STREAMING) {
@@ -586,27 +613,13 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	buffer->user_data = NULL;
 }
 
-static void pwr_handle_stream_on_process(void *data) {
+static void pwr_handle_stream_trigger_done(void *data) {
 	struct xdpw_screencast_instance *cast = data;
-
-	logprint(TRACE, "pipewire: on process event handle");
-
-	if (!cast->pwr_stream_state) {
-		logprint(INFO, "pipewire: not streaming");
-		return;
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+	if (delay_ns <= 0) {
+		delay_ns = (1.0 / cast->framerate) * TIMESPEC_NSEC_PER_SEC;
 	}
-
-	if (cast->current_frame.pw_buffer) {
-		logprint(DEBUG, "pipewire: buffer already exported");
-		return;
-	}
-
-	xdpw_pwr_dequeue_buffer(cast);
-	if (!cast->current_frame.pw_buffer) {
-		logprint(WARN, "pipewire: unable to export buffer");
-		return;
-	}
-	xdpw_wlr_frame_capture(cast);
+	xdpw_add_timer(cast->ctx->state, delay_ns, pwr_capture_one, cast);
 }
 
 static const struct pw_stream_events pwr_stream_events = {
@@ -615,7 +628,7 @@ static const struct pw_stream_events pwr_stream_events = {
 	.param_changed = pwr_handle_stream_param_changed,
 	.add_buffer = pwr_handle_stream_add_buffer,
 	.remove_buffer = pwr_handle_stream_remove_buffer,
-	.process = pwr_handle_stream_on_process,
+	.trigger_done = pwr_handle_stream_trigger_done,
 };
 
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
@@ -652,7 +665,8 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	pw_stream_connect(cast->stream,
 		PW_DIRECTION_OUTPUT,
 		PW_ID_ANY,
-		PW_STREAM_FLAG_ALLOC_BUFFERS,
+		(PW_STREAM_FLAG_ALLOC_BUFFERS |
+			PW_STREAM_FLAG_DRIVER),
 		params.data, params.size / sizeof(struct spa_pod *));
 
 	spa_pod_dynamic_builder_clean(&builder);
