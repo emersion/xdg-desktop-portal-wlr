@@ -292,6 +292,11 @@ static void ext_register_frame_cb(struct xdpw_screencast_instance *cast) {
 			return;
 		}
 	}
+	if (cast->ext_session.frame) {
+		logprint(WARN, "ext: destroying stale frame before creating a new one");
+		ext_image_copy_capture_frame_v1_destroy(cast->ext_session.frame);
+		cast->ext_session.frame = NULL;
+	}
 	cast->ext_session.frame = ext_image_copy_capture_session_v1_create_frame(
 			cast->ext_session.capture_session);
 	ext_image_copy_capture_frame_v1_add_listener(cast->ext_session.frame,
