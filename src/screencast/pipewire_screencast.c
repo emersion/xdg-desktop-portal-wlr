@@ -10,6 +10,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <assert.h>
+#include <errno.h>
+#include <inttypes.h>
+#include <stdlib.h>
 #include <libdrm/drm_fourcc.h>
 
 #include "screencast.h"
@@ -347,14 +350,34 @@ void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	wl_array_release(&params);
 }
 
+static uint64_t read_object_serial(struct pw_stream *stream) {
+	const struct pw_properties *props = pw_stream_get_properties(stream);
+	if (!props) {
+		return 0;
+	}
+	const char *serial_str = pw_properties_get(props, PW_KEY_OBJECT_SERIAL);
+	if (!serial_str) {
+		return 0;
+	}
+	char *end = NULL;
+	errno = 0;
+	uint64_t serial = strtoull(serial_str, &end, 10);
+	if (errno != 0 || end == serial_str || end[0] != '\0') {
+		return 0;
+	}
+	return serial;
+}
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
 	cast->node_id = pw_stream_get_node_id(cast->stream);
+	cast->pipewire_serial = read_object_serial(cast->stream);
 
 	logprint(INFO, "pipewire: stream state changed to \"%s\"",
 		pw_stream_state_as_string(state));
-	logprint(INFO, "pipewire: node id is %d", (int)cast->node_id);
+	logprint(INFO, "pipewire: node id is %d, object.serial is %" PRIu64,
+		(int)cast->node_id, cast->pipewire_serial);
 
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:

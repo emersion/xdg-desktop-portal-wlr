@@ -663,6 +663,20 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		return ret;
 	}
+	if (cast->target->output && cast->target->output->name) {
+		ret = sd_bus_message_append(reply, "{sv}",
+			"mapping_id", "s", cast->target->output->name);
+		if (ret < 0) {
+			return ret;
+		}
+	}
+	if (cast->pipewire_serial != 0) {
+		ret = sd_bus_message_append(reply, "{sv}",
+			"pipewire-serial", "t", cast->pipewire_serial);
+		if (ret < 0) {
+			return ret;
+		}
+	}
 	ret = sd_bus_message_close_container(reply);
 	if (ret < 0) {
 		return ret;
