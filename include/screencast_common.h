@@ -9,9 +9,13 @@
 
 #include "fps_limit.h"
 
-// this seems to be right based on
-// https://github.com/flatpak/xdg-desktop-portal/blob/309a1fc0cf2fb32cceb91dbc666d20cf0a3202c2/src/screen-cast.c#L955
-#define XDP_CAST_PROTO_VER 4
+// Backend implements ScreenCast v6:
+//   v4 restore tokens, v5 mapping_id, v6 pipewire-serial.
+// The xdg-desktop-portal frontend exposes MIN(backend_version, 6) to
+// apps (see flatpak/xdg-desktop-portal#1942), so apps see v6 only when
+// this backend is loaded and supplies pipewire-serial in the stream
+// dict.
+#define XDP_CAST_PROTO_VER 6
 #define XDP_CAST_DATA_VER 1
 
 enum cursor_modes {
@@ -196,6 +200,7 @@ struct xdpw_screencast_instance {
 	struct spa_video_info_raw pwr_format;
 	uint32_t seq;
 	uint32_t node_id;
+	uint64_t pipewire_serial;
 	bool pwr_stream_state;
 	uint32_t framerate;
 
