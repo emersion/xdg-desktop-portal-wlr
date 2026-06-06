@@ -89,7 +89,7 @@ The chooser can be any program or script with the following behaviour:
      - The prefix "Monitor: " followed by the name of a valid output as given by **wayland-info**(1).
      - The prefix "Window: " followed by the ext-foreign-toplevel-list-v1 identifier as given by **lswt**(1).
    - For dmenu choosers: one of the lines provided via stdin.
-   Everything else will be handled as declined by the user.
+   Everything else will be handled as defined by the user.
 - To signal that the user has declined screencast, the chooser should exit without
   anything on stdout.
 
