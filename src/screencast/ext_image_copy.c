@@ -18,6 +18,7 @@
 #include <wayland-client-protocol.h>
 #include <xf86drm.h>
 #include <sys/types.h>
+#include <pipewire/pipewire.h>
 
 #include "ext_image_copy.h"
 #include "screencast.h"
@@ -214,6 +215,7 @@ static void ext_frame_ready(void *data,
 		buffer->damage.size = 0;
 	}
 	cast->current_frame.damage.size = 0;
+	pw_stream_trigger_process(cast->stream);
 }
 
 static void ext_frame_failed(void *data,
