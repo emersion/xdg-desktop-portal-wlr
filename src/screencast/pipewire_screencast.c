@@ -611,6 +611,11 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	buffer->user_data = NULL;
 }
 
+static void pwr_process_retry(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+	pw_stream_trigger_process(cast->stream);
+}
+
 static void pwr_handle_stream_on_process(void *data) {
 	struct xdpw_screencast_instance *cast = data;
 
@@ -623,15 +628,25 @@ static void pwr_handle_stream_on_process(void *data) {
 
 	if (cast->current_frame.pw_buffer) {
 		logprint(DEBUG, "pipewire: buffer already exported");
-		return;
+		goto retry;
 	}
 
 	xdpw_pwr_dequeue_buffer(cast);
 	if (!cast->current_frame.pw_buffer) {
 		logprint(WARN, "pipewire: unable to export buffer");
-		return;
+		goto retry;
 	}
+
 	xdpw_wlr_frame_capture(cast);
+	return;
+
+retry:
+	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
+	if (delay_ns > 0) {
+		xdpw_add_timer(cast->ctx->state, delay_ns, pwr_process_retry, cast);
+	} else {
+		pwr_process_retry(cast);
+	}
 }
 
 
