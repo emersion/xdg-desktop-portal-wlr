@@ -641,6 +641,8 @@ static void pwr_handle_stream_on_process(void *data) {
 	return;
 
 retry:
+	; // Empty statement because declaration cannot follow a goto label.
+
 	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 	if (delay_ns > 0) {
 		xdpw_add_timer(cast->ctx->state, delay_ns, pwr_process_retry, cast);
@@ -648,7 +650,6 @@ retry:
 		pwr_process_retry(cast);
 	}
 }
-
 
 static const struct pw_stream_events pwr_stream_events = {
 	PW_VERSION_STREAM_EVENTS,
