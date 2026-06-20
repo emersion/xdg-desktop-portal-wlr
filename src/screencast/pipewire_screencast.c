@@ -611,12 +611,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	buffer->user_data = NULL;
 }
 
-static void pwr_process_retry(void *data) {
-	struct xdpw_screencast_instance *cast = data;
-	pw_stream_trigger_process(cast->stream);
-}
-
-static void pwr_handle_stream_on_process(void *data) {
+static void pwr_handle_stream_on_trigger_done(void *data) {
 	struct xdpw_screencast_instance *cast = data;
 
 	logprint(TRACE, "pipewire: on process event handle");
@@ -628,27 +623,17 @@ static void pwr_handle_stream_on_process(void *data) {
 
 	if (cast->current_frame.pw_buffer) {
 		logprint(DEBUG, "pipewire: buffer already exported");
-		goto retry;
+		return;
 	}
 
 	xdpw_pwr_dequeue_buffer(cast);
 	if (!cast->current_frame.pw_buffer) {
 		logprint(WARN, "pipewire: unable to export buffer");
-		goto retry;
+		pw_stream_trigger_process(cast->stream);
+		return;
 	}
 
 	xdpw_wlr_frame_capture(cast);
-	return;
-
-retry:
-	; // Empty statement because declaration cannot follow a goto label.
-
-	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
-	if (delay_ns > 0) {
-		xdpw_add_timer(cast->ctx->state, delay_ns, pwr_process_retry, cast);
-	} else {
-		pwr_process_retry(cast);
-	}
 }
 
 static const struct pw_stream_events pwr_stream_events = {
@@ -657,7 +642,7 @@ static const struct pw_stream_events pwr_stream_events = {
 	.param_changed = pwr_handle_stream_param_changed,
 	.add_buffer = pwr_handle_stream_add_buffer,
 	.remove_buffer = pwr_handle_stream_remove_buffer,
-	.process = pwr_handle_stream_on_process,
+	.trigger_done = pwr_handle_stream_on_trigger_done,
 };
 
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
