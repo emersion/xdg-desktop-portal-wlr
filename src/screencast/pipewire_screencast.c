@@ -364,7 +364,7 @@ static void pwr_handle_stream_state_changed(void *data,
 		xdpw_wlr_frame_capture(cast);
 		break;
 	case PW_STREAM_STATE_PAUSED:
-		if (old == PW_STREAM_STATE_STREAMING) {
+		if (old == PW_STREAM_STATE_STREAMING && cast->current_frame.pw_buffer) {
 			xdpw_pwr_enqueue_buffer(cast);
 		}
 		// fall through
