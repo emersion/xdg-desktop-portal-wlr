@@ -233,6 +233,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 
 	if (cast->current_frame.y_invert) {
 		//TODO: Flip buffer or set stride negative
+		logprint(ERROR, "pipewire: Y-invert flag is not supported");
 		xdpw_screencast_instance_destroy(cast);
 		return;
 	}
