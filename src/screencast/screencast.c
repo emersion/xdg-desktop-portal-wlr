@@ -371,7 +371,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 
 	char *key;
 	int innerRet = 0;
-	uint32_t type_mask = 0;
+	uint32_t type_mask = MONITOR;
 	struct xdpw_screencast_restore_data restore_data = {0};
 	while ((ret = sd_bus_message_enter_container(msg, 'e', "sv")) > 0) {
 		innerRet = sd_bus_message_read(msg, "s", &key);
