@@ -348,6 +348,11 @@ void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
 	wl_array_release(&params);
 }
 
+static void pwr_disarm_process_retry(struct xdpw_screencast_instance *cast) {
+	xdpw_destroy_timer(cast->process_retry);
+	cast->process_retry = NULL;
+}
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -370,6 +375,7 @@ static void pwr_handle_stream_state_changed(void *data,
 		// fall through
 	default:
 		cast->pwr_stream_state = false;
+		pwr_disarm_process_retry(cast);
 		break;
 	}
 }
@@ -589,6 +595,38 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 	buffer->user_data = NULL;
 }
 
+static uint64_t pwr_process_retry_delay(struct xdpw_screencast_instance *cast) {
+	// max_framerate is only valid when framerate is (0/1) (variable rate negotiated)
+	struct spa_fraction *rate = &cast->pwr_format.framerate;
+	if (rate->num == 0) {
+		rate = &cast->pwr_format.max_framerate;
+	}
+	if (rate->num > 0 && rate->denom > 0) {
+		return (uint64_t)SPA_NSEC_PER_SEC * rate->denom / rate->num;
+	}
+	return SPA_NSEC_PER_SEC / 60; // ~16ms/60fps fallback
+}
+
+static void pwr_process_retry(void *data);
+
+static void pwr_arm_process_retry(struct xdpw_screencast_instance *cast) {
+	if (cast->process_retry) {
+		return;
+	}
+	cast->process_retry = xdpw_add_timer(cast->ctx->state,
+		pwr_process_retry_delay(cast), pwr_process_retry, cast);
+	if (!cast->process_retry) {
+		logprint(ERROR, "pipewire: failed to arm process retry timer, stream may stall");
+	}
+}
+
+static void pwr_process_retry(void *data) {
+	struct xdpw_screencast_instance *cast = data;
+	cast->process_retry = NULL; // timer destroyed in event loop
+	pwr_arm_process_retry(cast);
+	pw_stream_trigger_process(cast->stream);
+}
+
 static void pwr_handle_stream_on_process(void *data) {
 	struct xdpw_screencast_instance *cast = data;
 
@@ -606,12 +644,14 @@ static void pwr_handle_stream_on_process(void *data) {
 
 	xdpw_pwr_dequeue_buffer(cast);
 	if (!cast->current_frame.pw_buffer) {
-		logprint(WARN, "pipewire: unable to export buffer");
+		logprint(WARN, "pipewire: unable to export buffer, dropping frame");
+		pwr_arm_process_retry(cast);
 		return;
 	}
+
+	pwr_disarm_process_retry(cast);
 	xdpw_wlr_frame_capture(cast);
 }
-
 
 static const struct pw_stream_events pwr_stream_events = {
 	PW_VERSION_STREAM_EVENTS,

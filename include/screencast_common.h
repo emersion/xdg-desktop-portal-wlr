@@ -198,6 +198,7 @@ struct xdpw_screencast_instance {
 	uint32_t node_id;
 	bool pwr_stream_state;
 	uint32_t framerate;
+	struct xdpw_timer *process_retry;
 
 	// wlroots
 	union {
