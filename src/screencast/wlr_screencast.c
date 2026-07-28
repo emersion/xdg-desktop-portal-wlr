@@ -445,7 +445,7 @@ static void wlr_registry_handle_add(void *data, struct wl_registry *reg,
 		uint32_t id, const char *interface, uint32_t ver) {
 	struct xdpw_screencast_context *ctx = data;
 
-	logprint(DEBUG, "wlroots: interface to register %s  (Version: %u)",interface, ver);
+	logprint(TRACE, "wlroots: interface to register %s  (Version: %u)",interface, ver);
 	if (!strcmp(interface, wl_output_interface.name)) {
 		struct xdpw_wlr_output *output = calloc(1, sizeof(*output));
 
