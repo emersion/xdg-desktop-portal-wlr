@@ -208,17 +208,18 @@ static bool has_drm_fourcc(struct xdpw_screencast_instance *cast, uint32_t forma
 	return false;
 }
 
-static void xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
+static bool xdpw_pwr_dequeue_buffer(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "pipewire: dequeueing buffer");
 
 	assert(!cast->current_frame.pw_buffer);
 	if ((cast->current_frame.pw_buffer = pw_stream_dequeue_buffer(cast->stream)) == NULL) {
 		logprint(WARN, "pipewire: out of buffers");
-		return;
+		return false;
 	}
 
 	cast->current_frame.xdpw_buffer = cast->current_frame.pw_buffer->user_data;
 	cast->current_frame.completed = false;
+	return true;
 }
 
 void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
@@ -665,8 +666,7 @@ static void pwr_handle_stream_on_process(void *data) {
 		return;
 	}
 
-	xdpw_pwr_dequeue_buffer(cast);
-	if (!cast->current_frame.pw_buffer) {
+	if (!xdpw_pwr_dequeue_buffer(cast)) {
 		logprint(WARN, "pipewire: unable to dequeue buffer, dropping frame");
 		pwr_arm_process_retry(cast);
 		return;
