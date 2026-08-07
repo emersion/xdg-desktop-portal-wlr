@@ -610,6 +610,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 		xdpw_buffer_destroy(xdpw_buffer);
 	}
 	if (cast->current_frame.pw_buffer == buffer) {
+		logprint(DEBUG, "pipewire: current buffer has been removed");
 		cast->current_frame.pw_buffer = NULL;
 		cast->current_frame.xdpw_buffer = NULL;
 	}
