@@ -661,13 +661,13 @@ static void pwr_handle_stream_on_process(void *data) {
 	}
 
 	if (cast->current_frame.pw_buffer) {
-		logprint(DEBUG, "pipewire: buffer already exported");
+		logprint(DEBUG, "pipewire: buffer already dequeued");
 		return;
 	}
 
 	xdpw_pwr_dequeue_buffer(cast);
 	if (!cast->current_frame.pw_buffer) {
-		logprint(WARN, "pipewire: unable to export buffer, dropping frame");
+		logprint(WARN, "pipewire: unable to dequeue buffer, dropping frame");
 		pwr_arm_process_retry(cast);
 		return;
 	}
