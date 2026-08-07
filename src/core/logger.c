@@ -62,15 +62,18 @@ void logprint(enum LOGLEVEL level, char *msg, ...) {
 	va_list args;
 
 	char timestr[200];
-	time_t t = time(NULL);
-	struct tm *tmp = localtime(&t);
+	struct timespec ts = {0};
+	clock_gettime(CLOCK_REALTIME, &ts);
+	struct tm *tmp = localtime(&ts.tv_sec);
 
 	if (strftime(timestr, sizeof(timestr), "%Y/%m/%d %H:%M:%S", tmp) == 0) {
 		fprintf(stderr, "strftime returned 0");
 		abort();
 	}
 
-	fprintf(logprops.dst, "%s", timestr);
+	int msec = ts.tv_nsec / (1000 * 1000);
+
+	fprintf(logprops.dst, "%s:%03d", timestr, msec);
 	fprintf(logprops.dst, " ");
 	fprintf(logprops.dst, "[%s]", print_loglevel(level));
 	fprintf(logprops.dst, " - ");
