@@ -637,8 +637,9 @@ static void pwr_arm_process_retry(struct xdpw_screencast_instance *cast) {
 	if (cast->process_retry) {
 		return;
 	}
-	cast->process_retry = xdpw_add_timer(cast->ctx->state,
-		pwr_process_retry_delay(cast), pwr_process_retry, cast);
+	uint64_t delay_ns = pwr_process_retry_delay(cast);
+	logprint(DEBUG, "pipewire: retrying buffer dequeue in %"PRIu64" ms", delay_ns / (1000 * 1000));
+	cast->process_retry = xdpw_add_timer(cast->ctx->state, delay_ns, pwr_process_retry, cast);
 	if (!cast->process_retry) {
 		logprint(ERROR, "pipewire: failed to arm process retry timer, stream may stall");
 	}
