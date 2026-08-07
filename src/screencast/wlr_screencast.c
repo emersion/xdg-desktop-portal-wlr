@@ -43,6 +43,7 @@ static void wlr_frame_capture_timer(void *data) {
 void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
 	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 	if (delay_ns > 0) {
+		logprint(TRACE, "pipewire: scheduling capture in %"PRIu64" ms", delay_ns / (1000 * 1000));
 		xdpw_add_timer(cast->ctx->state, delay_ns, wlr_frame_capture_timer, cast);
 	} else {
 		wlr_frame_capture_start(cast);
