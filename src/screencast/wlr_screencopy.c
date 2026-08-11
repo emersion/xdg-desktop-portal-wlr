@@ -33,10 +33,11 @@ static void wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 }
 
 // Ends the current capture cycle: hand the buffer back to PipeWire and drop
-// the wlr frame.
+// the wlr frame. We drive the graph, so ask for the next cycle ourselves.
 static void wlr_frame_done(struct xdpw_screencast_instance *cast) {
 	xdpw_pwr_enqueue_buffer(cast);
 	wlr_frame_finish(cast);
+	pw_stream_trigger_process(cast->stream);
 }
 
 static void wlr_frame_buffer_done(void *data,
