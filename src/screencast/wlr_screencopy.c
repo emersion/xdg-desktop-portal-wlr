@@ -32,6 +32,13 @@ static void wlr_frame_finish(struct xdpw_screencast_instance *cast) {
 	logprint(TRACE, "wlroots: frame destroyed");
 }
 
+// Ends the current capture cycle: hand the buffer back to PipeWire and drop
+// the wlr frame.
+static void wlr_frame_done(struct xdpw_screencast_instance *cast) {
+	xdpw_pwr_enqueue_buffer(cast);
+	wlr_frame_finish(cast);
+}
+
 static void wlr_frame_buffer_done(void *data,
 		struct zwlr_screencopy_frame_v1 *frame);
 
@@ -137,16 +144,14 @@ static void wlr_frame_buffer_done(void *data,
 
 	if (!cast->current_frame.xdpw_buffer) {
 		logprint(WARN, "wlroots: no current buffer");
-		xdpw_pwr_enqueue_buffer(cast);
-		wlr_frame_finish(cast);
+		wlr_frame_done(cast);
 		return;
 	}
 
 	if (!check_constraints(&cast->current_constraints, cast->current_frame.xdpw_buffer)) {
 		logprint(DEBUG, "wlroots: buffer constraints changed");
 		pwr_update_stream_param(cast);
-		xdpw_pwr_enqueue_buffer(cast);
-		wlr_frame_finish(cast);
+		wlr_frame_done(cast);
 		return;
 	}
 
@@ -199,8 +204,7 @@ static void wlr_frame_ready(void *data, struct zwlr_screencopy_frame_v1 *frame,
 	cast->current_frame.completed = true;
 	logprint(TRACE, "wlroots: timestamp %"PRIu64":%"PRIu32, cast->current_frame.tv_sec, cast->current_frame.tv_nsec);
 
-	xdpw_pwr_enqueue_buffer(cast);
-	wlr_frame_finish(cast);
+	wlr_frame_done(cast);
 }
 
 static void wlr_frame_failed(void *data,
@@ -212,8 +216,7 @@ static void wlr_frame_failed(void *data,
 
 	logprint(TRACE, "wlroots: failed event handler");
 
-	xdpw_pwr_enqueue_buffer(cast);
-	wlr_frame_finish(cast);
+	wlr_frame_done(cast);
 }
 
 static const struct zwlr_screencopy_frame_v1_listener wlr_frame_listener = {
