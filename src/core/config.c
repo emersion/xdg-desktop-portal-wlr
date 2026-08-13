@@ -17,6 +17,7 @@ void print_config(enum LOGLEVEL loglevel, struct xdpw_config *config) {
 	logprint(loglevel, "config: chooser_cmd: %s", config->screencast_conf.chooser_cmd);
 	logprint(loglevel, "config: chooser_type: %s", chooser_type_str(config->screencast_conf.chooser_type));
 	logprint(loglevel, "config: force_mod_linear: %d", config->screencast_conf.force_mod_linear);
+	logprint(loglevel, "config: max_buffers: %u", config->screencast_conf.max_buffers);
 }
 
 // NOTE: calling finish_config won't prepare the config to be read again from config file
@@ -38,6 +39,19 @@ static void parse_string(char **dest, const char* value) {
 	}
 	free(*dest);
 	*dest = strdup(value);
+}
+
+static void parse_uint32(uint32_t *dest, const char* value) {
+	if (value == NULL || *value == '\0') {
+		logprint(TRACE, "config: skipping empty value in config file");
+		return;
+	}
+	long v = strtol(value, (char**)NULL, 10);
+	if (v < 0) {
+		logprint(ERROR, "config: skipping negative value");
+		return;
+	}
+	*dest = v;
 }
 
 static void parse_double(double *dest, const char* value) {
@@ -78,6 +92,8 @@ static int handle_ini_screencast(struct config_screencast *screencast_conf, cons
 		free(chooser_type);
 	} else if (strcmp(key, "force_mod_linear") == 0) {
 		parse_bool(&screencast_conf->force_mod_linear, value);
+	} else if (strcmp(key, "max_buffers") == 0) {
+		parse_uint32(&screencast_conf->max_buffers, value);
 	} else {
 		logprint(TRACE, "config: skipping invalid key in config file");
 		return 0;
@@ -99,6 +115,7 @@ static int handle_ini_config(void *data, const char* section, const char *key, c
 
 static void default_config(struct xdpw_config *config) {
 	config->screencast_conf.max_fps = 0;
+	config->screencast_conf.max_buffers = 0;
 	config->screencast_conf.chooser_type = XDPW_CHOOSER_DEFAULT;
 }
 
