@@ -230,7 +230,7 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 
 }
 
-static int start_screencast(struct xdpw_screencast_instance *cast) {
+int xdpw_screencast_start(struct xdpw_screencast_instance *cast) {
 	int ret;
 	ret = xdpw_wlr_session_init(cast);
 	if (ret < 0) {
@@ -590,7 +590,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 
 	if (!cast->initialized) {
-		ret = start_screencast(cast);
+		ret = xdpw_screencast_start(cast);
 	}
 	if (ret < 0) {
 		return ret;
