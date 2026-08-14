@@ -12,6 +12,7 @@
 
 #include "screencast_common.h"
 #include "screenshot_common.h"
+#include "input_capture_common.h"
 #include "config.h"
 
 struct xdpw_state {
@@ -28,6 +29,10 @@ struct xdpw_state {
 	int timer_poll_fd;
 	struct wl_list timers;
 	struct xdpw_timer *next_timer;
+
+	struct {
+		int libei_fd;
+	} input_capture;
 };
 
 struct xdpw_request {
@@ -40,6 +45,7 @@ struct xdpw_session {
 	char *session_handle;
 	bool closed;
 	struct xdpw_screencast_session_data screencast_data;
+	struct xdpw_input_capture_session_data input_capture_data;
 };
 
 typedef void (*xdpw_event_loop_timer_func_t)(void *data);
@@ -60,6 +66,10 @@ enum {
 
 int xdpw_screenshot_init(struct xdpw_state *state);
 int xdpw_screencast_init(struct xdpw_state *state);
+
+int xdpw_input_capture_init(struct xdpw_state *state);
+void xdpw_input_capture_dispatch_eis(struct xdpw_state *state);
+void xdpw_input_capture_destroy(void);
 
 struct xdpw_request *xdpw_request_create(sd_bus *bus, const char *object_path);
 void xdpw_request_destroy(struct xdpw_request *req);
