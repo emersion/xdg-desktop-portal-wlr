@@ -120,22 +120,27 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	case WL_SHM:;
 		struct xdpw_shm_format *fmt;
 		bool found = false;
+		uint32_t shm_stride;
 		wl_array_for_each(fmt, &cast->current_constraints.shm_formats) {
 			if (fmt->fourcc == format) {
 				found = true;
+				shm_stride = fmt->stride;
 				break;
 			}
 		}
 		if (!found) {
-			logprint(ERROR, "xdpw: unable to find format: %d", format);
-			xdpw_buffer_destroy(buffer);
-			return NULL;
-
+			int bpp = xdpw_bpp_from_drm_fourcc(format);
+			if (bpp <= 0) {
+				logprint(ERROR, "xdpw: unable to find format: %d", format);
+				xdpw_buffer_destroy(buffer);
+				return NULL;
+			}
+			shm_stride = bpp * buffer->width;
 		}
 
 		buffer->plane_count = 1;
-		buffer->size[0] = fmt->stride * buffer->height;
-		buffer->stride[0] = fmt->stride;
+		buffer->size[0] = shm_stride * buffer->height;
+		buffer->stride[0] = shm_stride;
 		buffer->offset[0] = 0;
 		buffer->fd[0] = anonymous_shm_open();
 		if (buffer->fd[0] == -1) {
@@ -151,7 +156,7 @@ struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 		}
 
 		buffer->buffer = import_wl_shm_buffer(cast, buffer->fd[0], xdpw_format_wl_shm_from_drm_fourcc(format),
-			buffer->width, buffer->height, fmt->stride);
+			buffer->width, buffer->height, shm_stride);
 		if (buffer->buffer == NULL) {
 			logprint(ERROR, "xdpw: unable to create wl_buffer");
 			close(buffer->fd[0]);
