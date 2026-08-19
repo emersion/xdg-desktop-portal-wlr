@@ -111,11 +111,6 @@ configure_file(
 	install_dir: get_option('datadir') / 'dbus-1' / 'services',
 )
 
-install_data(
-	'wlr.portal',
-	install_dir: get_option('datadir') / 'xdg-desktop-portal' / 'portals',
-)
-
 scdoc = dependency('scdoc', required: get_option('man-pages'), version: '>= 1.9.7', native: true)
 if scdoc.found()
 	scdoc_prog = find_program(scdoc.get_variable(pkgconfig: 'scdoc'), native: true)
