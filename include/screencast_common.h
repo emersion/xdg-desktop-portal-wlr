@@ -226,6 +226,11 @@ struct xdpw_screencast_session_data {
 	struct xdpw_screencast_instance *screencast_instance;
 	uint32_t cursor_mode;
 	uint32_t persist_mode;
+
+	bool target_pending;
+	uint32_t type_mask;
+	uint32_t restore_version;
+	char *restore_output_name;
 };
 
 struct xdpw_wlr_output {

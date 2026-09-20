@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <assert.h>
 #include <sys/wait.h>
@@ -330,7 +331,6 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		sd_bus_error *ret_error) {
 	struct xdpw_state *state = data;
-	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	int ret = 0;
 	struct xdpw_session *sess, *tmp_s;
@@ -490,17 +490,18 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	bool selection_canceled = !setup_target(ctx, sess, restore_data.version > 0 ? &restore_data : NULL, type_mask);
+	sess->screencast_data.target_pending = true;
+	sess->screencast_data.type_mask = type_mask;
+	sess->screencast_data.restore_version = restore_data.version;
+	free(sess->screencast_data.restore_output_name);
+	sess->screencast_data.restore_output_name =
+		restore_data.output_name ? strdup(restore_data.output_name) : NULL;
 
 	ret = sd_bus_message_new_method_return(msg, &reply);
 	if (ret < 0) {
 		return ret;
 	}
-	if (selection_canceled) {
-		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
-	} else {
-		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
-	}
+	ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
 	if (ret < 0) {
 		return ret;
 	}
@@ -578,13 +579,52 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 
 	struct xdpw_screencast_instance *cast = NULL;
-	struct xdpw_session *sess, *tmp_s;
+	struct xdpw_session *sess = NULL, *tmp_s;
 	wl_list_for_each_reverse_safe(sess, tmp_s, &state->xdpw_sessions, link) {
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: start: found matching session %s", sess->session_handle);
 				cast = sess->screencast_data.screencast_instance;
+				break;
 		}
 	}
+	if (!sess) {
+		logprint(WARN, "dbus: start: no matching session %s found", session_handle);
+		return -1;
+	}
+
+	if (cast == NULL && sess->screencast_data.target_pending) {
+		struct xdpw_screencast_restore_data restore_data = {
+			.version = sess->screencast_data.restore_version,
+			.output_name = sess->screencast_data.restore_output_name,
+		};
+		bool selected = setup_target(&state->screencast, sess,
+				restore_data.version > 0 ? &restore_data : NULL,
+				sess->screencast_data.type_mask);
+
+		sess->screencast_data.target_pending = false;
+		free(sess->screencast_data.restore_output_name);
+		sess->screencast_data.restore_output_name = NULL;
+		cast = sess->screencast_data.screencast_instance;
+
+		if (!selected || cast == NULL) {
+			logprint(INFO, "dbus: start: source selection cancelled");
+
+			sd_bus_message *cancel_reply = NULL;
+			ret = sd_bus_message_new_method_return(msg, &cancel_reply);
+			if (ret < 0) {
+				return ret;
+			}
+			ret = sd_bus_message_append(cancel_reply, "ua{sv}",
+					PORTAL_RESPONSE_CANCELLED, 0);
+			if (ret < 0) {
+				return ret;
+			}
+			sd_bus_send(NULL, cancel_reply, NULL);
+			sd_bus_message_unref(cancel_reply);
+			return 0;
+		}
+	}
+
 	if (!cast) {
 		return -1;
 	}
