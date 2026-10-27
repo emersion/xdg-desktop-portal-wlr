@@ -28,6 +28,7 @@ struct xdpw_state {
 	int timer_poll_fd;
 	struct wl_list timers;
 	struct xdpw_timer *next_timer;
+	struct wl_list children; // xdpw_child::link
 };
 
 struct xdpw_request {
