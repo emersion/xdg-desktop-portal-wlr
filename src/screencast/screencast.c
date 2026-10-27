@@ -129,58 +129,42 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 	free(cast);
 }
 
-bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess, struct xdpw_screencast_restore_data *data, uint32_t type_mask) {
-	bool target_initialized = false;
+struct select_sources_job {
+	struct xdpw_screencast_context *ctx;
+	struct xdpw_session *sess;
+	struct xdpw_request *req;
+	sd_bus_message *msg; // pending SelectSources call
+	struct xdpw_screencast_target *target;
+	struct xdpw_chooser_job *chooser;
+};
 
-	type_mask &= ctx->state->screencast_source_types;
-	if (type_mask == 0) {
-		logprint(ERROR, "wlroots: No supported targets specified");
-		return false;
-	}
+enum setup_target_result {
+	SETUP_TARGET_FAILED,
+	SETUP_TARGET_DONE,
+	SETUP_TARGET_PENDING, // waiting for the chooser
+};
 
-	if (type_mask & MONITOR) {
-		struct xdpw_wlr_output *output;
-		wl_list_for_each(output, &ctx->output_list, link) {
-			logprint(INFO, "wlroots: capturable output: %i %s",
-				output->id, output->name);
-		}
-	}
-	if (type_mask & WINDOW) {
-		struct xdpw_toplevel *toplevel;
-		wl_list_for_each(toplevel, &ctx->toplevels, link) {
-			logprint(INFO, "wlroots: capturable toplevel: %s app_id: %s title: %s",
-				toplevel->identifier, toplevel->app_id, toplevel->title);
-		}
-	}
-
-	struct xdpw_screencast_target *target = calloc(1, sizeof(struct xdpw_screencast_target));
-	if (!target) {
-		logprint(ERROR, "wlroots: unable to allocate target");
-		return false;
-	}
-	target->with_cursor = sess->screencast_data.cursor_mode == EMBEDDED;
-	if (data) {
-		target_initialized = xdpw_wlr_target_from_data(ctx, target, data);
-	}
-	if (!target_initialized) {
-		target_initialized = xdpw_wlr_target_chooser(ctx, target, type_mask);
-		//TODO: Chooser option to confirm the persist mode
-		const char *env_persist_str = getenv("XDPW_PERSIST_MODE");
-		if (env_persist_str) {
-			if (strcmp(env_persist_str, "transient") == 0) {
-				sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_TRANSIENT
-					? PERSIST_TRANSIENT : sess->screencast_data.persist_mode;
-			} else if (strcmp(env_persist_str, "permanent") == 0) {
-				sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_PERMANENT
-					? PERSIST_PERMANENT : sess->screencast_data.persist_mode;
-			} else {
-				sess->screencast_data.persist_mode = PERSIST_NONE;
-			}
-
+static void update_persist_mode_after_chooser(struct xdpw_session *sess) {
+	//TODO: Chooser option to confirm the persist mode
+	const char *env_persist_str = getenv("XDPW_PERSIST_MODE");
+	if (env_persist_str) {
+		if (strcmp(env_persist_str, "transient") == 0) {
+			sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_TRANSIENT
+				? PERSIST_TRANSIENT : sess->screencast_data.persist_mode;
+		} else if (strcmp(env_persist_str, "permanent") == 0) {
+			sess->screencast_data.persist_mode = sess->screencast_data.persist_mode > PERSIST_PERMANENT
+				? PERSIST_PERMANENT : sess->screencast_data.persist_mode;
 		} else {
 			sess->screencast_data.persist_mode = PERSIST_NONE;
 		}
+
+	} else {
+		sess->screencast_data.persist_mode = PERSIST_NONE;
 	}
+}
+
+static bool finish_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess,
+		struct xdpw_screencast_target *target, bool target_initialized) {
 	if (!target_initialized) {
 		logprint(ERROR, "wlroots: no output found");
 		free(target);
@@ -228,6 +212,124 @@ bool setup_target(struct xdpw_screencast_context *ctx, struct xdpw_session *sess
 
 	return true;
 
+}
+
+static int reply_select_sources(sd_bus_message *msg, bool selection_canceled) {
+	return sd_bus_reply_method_return(msg, "ua{sv}",
+		selection_canceled ? PORTAL_RESPONSE_CANCELLED : PORTAL_RESPONSE_SUCCESS, 0);
+}
+
+static void select_sources_job_destroy(struct select_sources_job *job) {
+	job->sess->screencast_data.pending_request = NULL;
+	sd_bus_message_unref(job->msg);
+	free(job);
+}
+
+static void select_sources_chooser_done(bool selected, void *data) {
+	struct select_sources_job *job = data;
+	job->chooser = NULL;
+
+	update_persist_mode_after_chooser(job->sess);
+	bool selection_canceled = !finish_target(job->ctx, job->sess, job->target, selected);
+
+	int ret = reply_select_sources(job->msg, selection_canceled);
+	if (ret < 0) {
+		logprint(ERROR, "dbus: failed to reply: %s", strerror(-ret));
+	}
+
+	xdpw_request_destroy(job->req);
+	select_sources_job_destroy(job);
+}
+
+// Called on Request.Close, and when the session is closed
+static void select_sources_close(struct xdpw_request *req) {
+	struct select_sources_job *job = req->data;
+	logprint(DEBUG, "dbus: select sources: request closed, cancelling chooser");
+
+	xdpw_wlr_target_chooser_cancel(job->chooser);
+	free(job->target);
+
+	int ret = sd_bus_reply_method_return(job->msg, "ua{sv}", PORTAL_RESPONSE_ENDED, 0);
+	if (ret < 0) {
+		logprint(ERROR, "dbus: failed to reply: %s", strerror(-ret));
+	}
+
+	req->close = NULL;
+	req->data = NULL;
+	select_sources_job_destroy(job);
+}
+
+static enum setup_target_result setup_target(struct xdpw_screencast_context *ctx,
+		struct xdpw_session *sess, struct xdpw_screencast_restore_data *data,
+		uint32_t type_mask, sd_bus_message *msg, const char *request_handle) {
+	bool target_initialized = false;
+
+	type_mask &= ctx->state->screencast_source_types;
+	if (type_mask == 0) {
+		logprint(ERROR, "wlroots: No supported targets specified");
+		return SETUP_TARGET_FAILED;
+	}
+
+	if (type_mask & MONITOR) {
+		struct xdpw_wlr_output *output;
+		wl_list_for_each(output, &ctx->output_list, link) {
+			logprint(INFO, "wlroots: capturable output: %i %s",
+				output->id, output->name);
+		}
+	}
+	if (type_mask & WINDOW) {
+		struct xdpw_toplevel *toplevel;
+		wl_list_for_each(toplevel, &ctx->toplevels, link) {
+			logprint(INFO, "wlroots: capturable toplevel: %s app_id: %s title: %s",
+				toplevel->identifier, toplevel->app_id, toplevel->title);
+		}
+	}
+
+	struct xdpw_screencast_target *target = calloc(1, sizeof(struct xdpw_screencast_target));
+	if (!target) {
+		logprint(ERROR, "wlroots: unable to allocate target");
+		return SETUP_TARGET_FAILED;
+	}
+	target->with_cursor = sess->screencast_data.cursor_mode == EMBEDDED;
+	if (data) {
+		target_initialized = xdpw_wlr_target_from_data(ctx, target, data);
+	}
+	if (!target_initialized) {
+		if (ctx->state->config->screencast_conf.chooser_type == XDPW_CHOOSER_NONE) {
+			target_initialized = xdpw_wlr_target_chooser_none(ctx, target);
+		} else {
+			// Wait for the user's choice without blocking other requests
+			struct select_sources_job *job = calloc(1, sizeof(*job));
+			if (job == NULL) {
+				free(target);
+				return SETUP_TARGET_FAILED;
+			}
+			job->req = xdpw_request_create(sd_bus_message_get_bus(msg), request_handle);
+			if (job->req == NULL) {
+				free(job);
+				free(target);
+				return SETUP_TARGET_FAILED;
+			}
+			job->chooser = xdpw_wlr_target_chooser_start(ctx, target, type_mask,
+				select_sources_chooser_done, job);
+			if (job->chooser != NULL) {
+				job->ctx = ctx;
+				job->sess = sess;
+				job->target = target;
+				job->msg = sd_bus_message_ref(msg);
+				job->req->close = select_sources_close;
+				job->req->data = job;
+				sess->screencast_data.pending_request = job->req;
+				return SETUP_TARGET_PENDING;
+			}
+			xdpw_request_destroy(job->req);
+			free(job);
+		}
+		update_persist_mode_after_chooser(sess);
+	}
+
+	return finish_target(ctx, sess, target, target_initialized) ?
+		SETUP_TARGET_DONE : SETUP_TARGET_FAILED;
 }
 
 static int start_screencast(struct xdpw_screencast_instance *cast) {
@@ -492,25 +594,23 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 
-	bool selection_canceled = !setup_target(ctx, sess, restore_data.version > 0 ? &restore_data : NULL, type_mask);
+	if (sess->screencast_data.pending_request) {
+		logprint(WARN, "dbus: select sources: a chooser is already running for session %s",
+			sess->session_handle);
+		return -EBUSY;
+	}
 
-	ret = sd_bus_message_new_method_return(msg, &reply);
+	enum setup_target_result result = setup_target(ctx, sess,
+		restore_data.version > 0 ? &restore_data : NULL, type_mask, msg, request_handle);
+	if (result == SETUP_TARGET_PENDING) {
+		// Replied to once the chooser exits or the request is closed
+		return 1;
+	}
+
+	ret = reply_select_sources(msg, result != SETUP_TARGET_DONE);
 	if (ret < 0) {
 		return ret;
 	}
-	if (selection_canceled) {
-		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_CANCELLED, 0);
-	} else {
-		ret = sd_bus_message_append(reply, "ua{sv}", PORTAL_RESPONSE_SUCCESS, 0);
-	}
-	if (ret < 0) {
-		return ret;
-	}
-	ret = sd_bus_send(NULL, reply, NULL);
-	if (ret < 0) {
-		return ret;
-	}
-	sd_bus_message_unref(reply);
 	return 0;
 
 error:

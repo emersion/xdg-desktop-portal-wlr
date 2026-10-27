@@ -63,6 +63,13 @@ void xdpw_session_destroy(struct xdpw_session *sess) {
 		return;
 	}
 
+	struct xdpw_request *pending = sess->screencast_data.pending_request;
+	if (pending) {
+		// Close the chooser and answer the pending call
+		pending->close(pending);
+		xdpw_request_destroy(pending);
+	}
+
 	if (!sess->closed) {
 		sd_bus_emit_signal(sd_bus_slot_get_bus(sess->slot), sess->session_handle,
 			"org.freedesktop.impl.portal.Session", "Closed", "");
