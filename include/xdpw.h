@@ -28,10 +28,22 @@ struct xdpw_state {
 	int timer_poll_fd;
 	struct wl_list timers;
 	struct xdpw_timer *next_timer;
+	struct wl_list children; // xdpw_child::link
 };
+
+struct xdpw_request;
+
+/**
+ * Called when the request is closed with Request.Close. It must answer the
+ * pending method call and stop the user interaction; the request is
+ * destroyed afterwards.
+ */
+typedef void (*xdpw_request_close_func_t)(struct xdpw_request *req);
 
 struct xdpw_request {
 	sd_bus_slot *slot;
+	xdpw_request_close_func_t close;
+	void *data;
 };
 
 struct xdpw_session {

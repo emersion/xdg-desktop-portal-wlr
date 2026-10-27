@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/timerfd.h>
 #include <getopt.h>
 #include <poll.h>
@@ -8,6 +9,7 @@
 #include <spa/utils/result.h>
 #include <unistd.h>
 
+#include "child.h"
 #include "xdpw.h"
 #include "logger.h"
 
@@ -16,6 +18,7 @@ enum event_loop_fd {
 	EVENT_LOOP_WAYLAND,
 	EVENT_LOOP_PIPEWIRE,
 	EVENT_LOOP_TIMER,
+	EVENT_LOOP_CHILD, // first of the child process output FDs
 };
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
@@ -124,6 +127,7 @@ int main(int argc, char *argv[]) {
 	};
 
 	wl_list_init(&state.xdpw_sessions);
+	wl_list_init(&state.children);
 
 	ret = xdpw_screenshot_init(&state);
 	if (ret < 0) {
@@ -174,7 +178,7 @@ int main(int argc, char *argv[]) {
 
 	wl_list_init(&state.timers);
 
-	struct pollfd pollfds[] = {
+	struct pollfd core_pollfds[] = {
 		[EVENT_LOOP_DBUS] = {0}, // Filled in later
 		[EVENT_LOOP_WAYLAND] = {
 			.fd = wl_display_get_fd(state.wl_display),
@@ -190,9 +194,32 @@ int main(int argc, char *argv[]) {
 		}
 	};
 
-	state.timer_poll_fd = pollfds[EVENT_LOOP_TIMER].fd;
+	state.timer_poll_fd = core_pollfds[EVENT_LOOP_TIMER].fd;
 
+	struct pollfd *pollfds = NULL;
+	size_t pollfds_cap = 0;
 	while (1) {
+		// Child processes come and go, so rebuild the FD list every time
+		size_t nfds = EVENT_LOOP_CHILD + wl_list_length(&state.children);
+		if (nfds > pollfds_cap) {
+			struct pollfd *fds = realloc(pollfds, nfds * sizeof(*fds));
+			if (fds == NULL) {
+				logprint(ERROR, "event-loop: allocation failed");
+				goto error;
+			}
+			pollfds = fds;
+			pollfds_cap = nfds;
+		}
+		memcpy(pollfds, core_pollfds, sizeof(core_pollfds));
+		size_t i = EVENT_LOOP_CHILD;
+		struct xdpw_child *child;
+		wl_list_for_each(child, &state.children, link) {
+			pollfds[i++] = (struct pollfd){
+				.fd = child->out_fd,
+				.events = POLLIN,
+			};
+		}
+
 		// sd-bus requires that we update FD/events/timeout every time we poll
 		pollfds[EVENT_LOOP_DBUS].fd = sd_bus_get_fd(state.bus);
 		if (pollfds[EVENT_LOOP_DBUS].fd < 0) {
@@ -216,7 +243,7 @@ int main(int argc, char *argv[]) {
 		// timeout, i.e. poll forever.
 		int msec_timeout = usec_timeout == UINT64_MAX ? -1 : (int)((usec_timeout + 999) / 1000);
 
-		ret = poll(pollfds, sizeof(pollfds) / sizeof(pollfds[0]), msec_timeout);
+		ret = poll(pollfds, nfds, msec_timeout);
 		if (ret < 0) {
 			logprint(ERROR, "poll failed: %s", strerror(errno));
 			goto error;
@@ -287,6 +314,14 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		for (i = EVENT_LOOP_CHILD; i < nfds; i++) {
+			if (pollfds[i].revents) {
+				logprint(TRACE, "event-loop: got child process event");
+				// May run callbacks which spawn or cancel children
+				xdpw_child_handle_fd(&state, pollfds[i].fd);
+			}
+		}
+
 		do {
 			ret = wl_display_dispatch_pending(state.wl_display);
 			wl_display_flush(state.wl_display);
@@ -296,6 +331,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	// TODO: cleanup
+	xdpw_child_finish_all(&state);
+	free(pollfds);
 	finish_config(&config);
 	free(configfile);
 

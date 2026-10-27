@@ -222,8 +222,11 @@ struct xdpw_screencast_instance {
 	struct fps_limit_state fps_limit;
 };
 
+struct xdpw_request;
+
 struct xdpw_screencast_session_data {
 	struct xdpw_screencast_instance *screencast_instance;
+	struct xdpw_request *pending_request; // SelectSources waiting for the chooser
 	uint32_t cursor_mode;
 	uint32_t persist_mode;
 };
