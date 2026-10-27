@@ -583,6 +583,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 		if (strcmp(sess->session_handle, session_handle) == 0) {
 				logprint(DEBUG, "dbus: start: found matching session %s", sess->session_handle);
 				cast = sess->screencast_data.screencast_instance;
+				break;
 		}
 	}
 	if (!cast) {
