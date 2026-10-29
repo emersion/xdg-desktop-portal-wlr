@@ -49,6 +49,7 @@ subdir('protocols')
 
 xdpw_files = files(
 	'src/core/main.c',
+	'src/core/wayland_dispatch.c',
 	'src/core/logger.c',
 	'src/core/config.c',
 	'src/core/request.c',

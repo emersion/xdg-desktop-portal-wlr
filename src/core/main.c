@@ -4,6 +4,7 @@
 #include <sys/timerfd.h>
 #include <getopt.h>
 #include <poll.h>
+#include "wayland_dispatch.h"
 #include <pipewire/pipewire.h>
 #include <spa/utils/result.h>
 #include <unistd.h>
@@ -250,9 +251,9 @@ int main(int argc, char *argv[]) {
 
 		if (pollfds[EVENT_LOOP_WAYLAND].revents & POLLIN) {
 			logprint(TRACE, "event-loop: got wayland event");
-			ret = wl_display_dispatch(state.wl_display);
+			ret = xdpw_wl_dispatch(state.wl_display);
 			if (ret < 0) {
-				logprint(ERROR, "wl_display_dispatch failed: %s", strerror(errno));
+				logprint(ERROR, "Wayland dispatch failed: %s", strerror(errno));
 				goto error;
 			}
 		}
