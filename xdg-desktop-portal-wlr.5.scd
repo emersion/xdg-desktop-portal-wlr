@@ -64,7 +64,8 @@ These options need to be placed under the **[screencast]** section.
 
 	The supported types are:
 	- default: xdpw will try to use the first chooser found in the list of hardcoded choosers
-	  (slurp, wmenu, wofi, rofi, bemenu, mew, fuzzel) and will fallback to an arbitrary output if none of those were found.
+	  (slurp only for whole monitors, wmenu, wofi, rofi, bemenu, mew, fuzzel) and will fall back
+	  to an arbitrary output if none of those were found.
 	- none: xdpw will allow screencast either on the output given by **output_name**, or if empty
 	  an arbitrary output without further interaction.
 	- simple, dmenu: xdpw will launch the chooser given by **chooser_cmd**. For more details
