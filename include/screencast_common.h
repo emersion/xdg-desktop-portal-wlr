@@ -113,6 +113,11 @@ struct xdpw_screencast_context {
 	// pipewire
 	struct pw_context *pwr_context;
 	struct pw_core *core;
+	struct pw_registry *pwr_registry;
+	struct spa_hook pwr_registry_listener;
+	uint32_t pwr_metadata_id;
+	bool pwr_session_manager;
+	bool pwr_session_manager_notified;
 
 	// wlroots
 	struct wl_list output_list;

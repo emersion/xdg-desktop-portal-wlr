@@ -1,6 +1,7 @@
 #include "pipewire_screencast.h"
 
 #include <pipewire/pipewire.h>
+#include <pipewire/extensions/metadata.h>
 #include <spa/buffer/meta.h>
 #include <spa/utils/result.h>
 #include <spa/param/props.h>
@@ -13,6 +14,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <stdlib.h>
+#include <string.h>
 #include <libdrm/drm_fourcc.h>
 
 #include "screencast.h"
@@ -687,11 +689,60 @@ static const struct pw_stream_events pwr_stream_events = {
 	.process = pwr_handle_stream_on_process,
 };
 
+// Show a desktop notification (best effort, fire and forget), since the
+// failure otherwise shows up only as a client that captures nothing.
+static void pwr_notify(struct xdpw_screencast_context *ctx, const char *body) {
+	sd_bus_message *msg = NULL;
+	int ret = sd_bus_message_new_method_call(ctx->state->bus, &msg,
+		"org.freedesktop.Notifications", "/org/freedesktop/Notifications",
+		"org.freedesktop.Notifications", "Notify");
+	if (ret < 0) {
+		goto err;
+	}
+	ret = sd_bus_message_append(msg, "susss", "xdg-desktop-portal-wlr", 0u,
+		"dialog-warning", "Screen sharing will not work", body);
+	if (ret < 0) {
+		goto err;
+	}
+	ret = sd_bus_message_append(msg, "asa{sv}i", 0, 0, 15000);
+	if (ret < 0) {
+		goto err;
+	}
+	ret = sd_bus_send(ctx->state->bus, msg, NULL);
+	if (ret < 0) {
+		goto err;
+	}
+	sd_bus_message_unref(msg);
+	return;
+
+err:
+	logprint(DEBUG, "pipewire: failed to send notification: %s", strerror(-ret));
+	sd_bus_message_unref(msg);
+}
+
+static void pwr_notify_no_session_manager(struct xdpw_screencast_context *ctx) {
+	if (ctx->pwr_session_manager_notified) {
+		return;
+	}
+	ctx->pwr_session_manager_notified = true;
+	pwr_notify(ctx,
+		"PipeWire has no session manager running (is WirePlumber started?). "
+		"Screencast streams will stay paused and the sharing application "
+		"will show nothing.");
+}
+
 void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 	struct xdpw_screencast_context *ctx = cast->ctx;
 	struct xdpw_state *state = ctx->state;
 
 	pw_loop_enter(state->pw_loop);
+
+	if (!ctx->pwr_session_manager) {
+		logprint(WARN, "pipewire: no session manager detected (no 'default' "
+			"metadata found); the stream will most likely stay paused and "
+			"clients will fail to capture. Is WirePlumber running?");
+		pwr_notify_no_session_manager(ctx);
+	}
 
 	uint8_t buffer[2 * 1024];
 	struct spa_pod_dynamic_builder builder;;
@@ -756,6 +807,39 @@ static const struct pw_core_events core_events = {
 
 static struct spa_hook core_listener;
 
+// A session manager (e.g. WirePlumber) is what links and activates streams.
+// Without one the stream stays paused and no error is reported anywhere, so
+// track the "default" metadata object it publishes to be able to say so.
+static void pwr_registry_global(void *data, uint32_t id, uint32_t permissions,
+		const char *type, uint32_t version, const struct spa_dict *props) {
+	struct xdpw_screencast_context *ctx = data;
+	if (props == NULL || strcmp(type, PW_TYPE_INTERFACE_Metadata) != 0) {
+		return;
+	}
+	const char *name = spa_dict_lookup(props, PW_KEY_METADATA_NAME);
+	if (name == NULL || strcmp(name, "default") != 0) {
+		return;
+	}
+	ctx->pwr_metadata_id = id;
+	ctx->pwr_session_manager = true;
+	ctx->pwr_session_manager_notified = false;
+	logprint(INFO, "pipewire: session manager detected ('default' metadata, id %u)", id);
+}
+
+static void pwr_registry_global_remove(void *data, uint32_t id) {
+	struct xdpw_screencast_context *ctx = data;
+	if (ctx->pwr_session_manager && id == ctx->pwr_metadata_id) {
+		ctx->pwr_session_manager = false;
+		logprint(WARN, "pipewire: session manager went away ('default' metadata removed)");
+	}
+}
+
+static const struct pw_registry_events registry_events = {
+	PW_VERSION_REGISTRY_EVENTS,
+	.global = pwr_registry_global,
+	.global_remove = pwr_registry_global_remove,
+};
+
 int xdpw_pwr_context_create(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
@@ -773,6 +857,7 @@ int xdpw_pwr_context_create(struct xdpw_state *state) {
 		ctx->core = pw_context_connect(ctx->pwr_context, NULL, 0);
 		if (!ctx->core) {
 			logprint(ERROR, "pipewire: couldn't connect to context");
+			pwr_notify(ctx, "PipeWire is not running.");
 			return -1;
 		}
 
@@ -780,6 +865,17 @@ int xdpw_pwr_context_create(struct xdpw_state *state) {
 		// (i.e. in case the pipewire daemon is restarted).
 		spa_zero(core_listener);
 		pw_core_add_listener(ctx->core, &core_listener, &core_events, state);
+
+		ctx->pwr_session_manager = false;
+		ctx->pwr_registry = pw_core_get_registry(ctx->core, PW_VERSION_REGISTRY, 0);
+		if (ctx->pwr_registry) {
+			spa_zero(ctx->pwr_registry_listener);
+			pw_registry_add_listener(ctx->pwr_registry,
+				&ctx->pwr_registry_listener, &registry_events, ctx);
+		} else {
+			logprint(WARN, "pipewire: failed to get registry, "
+				"can't detect a missing session manager");
+		}
 	}
 	return 0;
 }
@@ -788,6 +884,13 @@ void xdpw_pwr_context_destroy(struct xdpw_state *state) {
 	struct xdpw_screencast_context *ctx = &state->screencast;
 
 	logprint(DEBUG, "pipewire: disconnecting fom core");
+
+	if (ctx->pwr_registry) {
+		spa_hook_remove(&ctx->pwr_registry_listener);
+		pw_proxy_destroy((struct pw_proxy *)ctx->pwr_registry);
+		ctx->pwr_registry = NULL;
+		ctx->pwr_session_manager = false;
+	}
 
 	if (ctx->core) {
 		pw_core_disconnect(ctx->core);
