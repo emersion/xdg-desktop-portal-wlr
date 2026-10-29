@@ -79,7 +79,7 @@ please open an issue or come chat with us in #sway on Libera Chat.
 ## Contributing
 
 If you're interested in testing or development, check out
-[CONTRIBUTING.md] for more information.
+[CONTRIBUTING.md] for more information. We follow the [wlroots code style].
 
 ## License
 
@@ -88,4 +88,5 @@ MIT
 [xdg-desktop-portal]: https://github.com/flatpak/xdg-desktop-portal
 [FAQ]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/FAQ
 [screencast compatibility]: https://github.com/emersion/xdg-desktop-portal-wlr/wiki/Screencast-Compatibility
-[CONTRIBUTING.md]: CONTRIBUTING.md
+[CONTRIBUTING.md]: https://github.com/emersion/.github/blob/main/CONTRIBUTING.md
+[wlroots code style]: https://gitlab.freedesktop.org/wlroots/wlroots/-/blob/master/CONTRIBUTING.md?ref_type=heads#style-reference
