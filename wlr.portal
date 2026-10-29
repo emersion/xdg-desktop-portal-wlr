@@ -1,4 +1,4 @@
 [portal]
 DBusName=org.freedesktop.impl.portal.desktop.wlr
-Interfaces=org.freedesktop.impl.portal.Screenshot;org.freedesktop.impl.portal.ScreenCast;
+Interfaces=org.freedesktop.impl.portal.Screenshot;org.freedesktop.impl.portal.ScreenCast;org.freedesktop.impl.portal.RemoteDesktop;
 UseIn=wlroots;sway;Wayfire;river;phosh;Hyprland;

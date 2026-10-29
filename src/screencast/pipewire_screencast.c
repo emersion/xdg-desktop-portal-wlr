@@ -16,6 +16,7 @@
 #include <libdrm/drm_fourcc.h>
 
 #include "screencast.h"
+#include "shm_util.h"
 #include "wlr_screencast.h"
 #include "xdpw.h"
 #include "logger.h"
