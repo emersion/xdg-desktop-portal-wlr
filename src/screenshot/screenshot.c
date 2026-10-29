@@ -143,6 +143,7 @@ static int method_screenshot(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		goto unref_reply;
 	}
+	ret = 1;
 
 unref_reply:
 	sd_bus_message_unref(reply);
@@ -280,6 +281,7 @@ static int method_pick_color(sd_bus_message *msg, void *data,
 	if (ret < 0) {
 		goto unref_reply;
 	}
+	ret = 1;
 
 unref_reply:
 	sd_bus_message_unref(reply);
