@@ -182,9 +182,40 @@ static void build_formats(struct spa_pod_builder *builder, struct xdpw_screencas
 		}
 	}
 
-	uint32_t *format;
-	wl_array_for_each(format, &cast->current_constraints.shm_formats) {
-		enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(*format);
+	struct xdpw_shm_format *shm_fmt;
+	wl_array_for_each(shm_fmt, &cast->current_constraints.shm_formats) {
+		enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(shm_fmt->fourcc);
+		if (pw_format != SPA_VIDEO_FORMAT_UNKNOWN) {
+			add_pod(params, build_format(builder, pw_format,
+						cast->current_constraints.width, cast->current_constraints.height,
+						cast->framerate, NULL, 0));
+		}
+	}
+
+	uint32_t fallback_formats[] = { DRM_FORMAT_ARGB8888, DRM_FORMAT_XRGB8888 };
+	for (size_t i = 0; i < sizeof(fallback_formats) / sizeof(fallback_formats[0]); i++) {
+		bool already_advertised = false;
+		wl_array_for_each(shm_fmt, &cast->current_constraints.shm_formats) {
+			if (shm_fmt->fourcc == fallback_formats[i]) {
+				already_advertised = true;
+				break;
+			}
+		}
+		if (already_advertised) {
+			continue;
+		}
+		bool in_dmabuf = false;
+		struct xdpw_format_modifier_pair *fm_pair;
+		wl_array_for_each(fm_pair, &cast->current_constraints.dmabuf_format_modifier_pairs) {
+			if (fm_pair->fourcc == fallback_formats[i]) {
+				in_dmabuf = true;
+				break;
+			}
+		}
+		if (!in_dmabuf) {
+			continue;
+		}
+		enum spa_video_format pw_format = xdpw_format_pw_from_drm_fourcc(fallback_formats[i]);
 		if (pw_format != SPA_VIDEO_FORMAT_UNKNOWN) {
 			add_pod(params, build_format(builder, pw_format,
 						cast->current_constraints.width, cast->current_constraints.height,
