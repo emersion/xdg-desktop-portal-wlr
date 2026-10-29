@@ -294,6 +294,13 @@ static void ext_register_frame_cb(struct xdpw_screencast_instance *cast) {
 			return;
 		}
 	}
+	// A frame object may still be alive if the capture was re-armed before
+	// the previous frame was completed with a ready/failed event. Creating
+	// a second frame on the same session is a protocol violation.
+	if (cast->ext_session.frame) {
+		ext_image_copy_capture_frame_v1_destroy(cast->ext_session.frame);
+		cast->ext_session.frame = NULL;
+	}
 	cast->ext_session.frame = ext_image_copy_capture_session_v1_create_frame(
 			cast->ext_session.capture_session);
 	ext_image_copy_capture_frame_v1_add_listener(cast->ext_session.frame,
