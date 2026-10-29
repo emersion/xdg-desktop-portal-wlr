@@ -87,12 +87,7 @@ void xdpw_screencast_instance_init(struct xdpw_screencast_context *ctx,
 }
 
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
-	struct xdpw_timer *timer, *ttmp;
-	wl_list_for_each_safe(timer, ttmp, &cast->ctx->state->timers, link) {
-		if (timer->user_data == cast) {
-			xdpw_destroy_timer(timer);
-		}
-	}
+	xdpw_wlr_session_close(cast);
 	struct xdpw_session *sess, *stmp;
 	wl_list_for_each_safe(sess, stmp, &cast->ctx->state->xdpw_sessions, link) {
 		if (sess->screencast_data.screencast_instance == cast) {
@@ -103,8 +98,6 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 			xdpw_session_destroy(sess);
 		}
 	}
-
-	xdpw_wlr_session_close(cast);
 
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
@@ -118,9 +111,9 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 		}
 	}
 
-	free(cast->target);
 	wl_list_remove(&cast->link);
 	xdpw_pwr_stream_destroy(cast);
+	free(cast->target);
 	assert(wl_list_length(&cast->buffer_list) == 0);
 	wl_array_release(&cast->current_frame.damage);
 
