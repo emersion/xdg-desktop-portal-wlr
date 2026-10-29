@@ -375,6 +375,8 @@ static void pwr_disarm_process_retry(struct xdpw_screencast_instance *cast) {
 	cast->process_retry = NULL;
 }
 
+static void pwr_handle_stream_on_process(void *data);
+
 static void pwr_handle_stream_state_changed(void *data,
 		enum pw_stream_state old, enum pw_stream_state state, const char *error) {
 	struct xdpw_screencast_instance *cast = data;
@@ -389,17 +391,19 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
-		xdpw_pwr_dequeue_buffer(cast);
-		xdpw_wlr_frame_capture(cast);
-		break;
-	case PW_STREAM_STATE_PAUSED:
-		if (old == PW_STREAM_STATE_STREAMING && cast->current_frame.pw_buffer) {
-			xdpw_pwr_enqueue_buffer(cast);
+		if (cast->current_frame.pw_buffer) {
+			// Resume the capture cancelled on pause, unless PipeWire removed its buffer.
+			xdpw_wlr_frame_capture(cast);
+		} else {
+			pwr_handle_stream_on_process(cast);
 		}
-		// fall through
+		break;
 	default:
 		cast->pwr_stream_state = false;
 		pwr_disarm_process_retry(cast);
+		// Keep the buffer for resume. Queuing an unfinished first frame would send
+		// a zero timestamp and stall consumers when real timestamps follow.
+		xdpw_wlr_frame_capture_cancel(cast);
 		break;
 	}
 }
@@ -604,15 +608,16 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 
 	logprint(DEBUG, "pipewire: remove buffer event handle");
 
+	if (cast->current_frame.pw_buffer == buffer) {
+		logprint(DEBUG, "pipewire: current buffer has been removed");
+		xdpw_wlr_frame_capture_cancel(cast);
+		cast->current_frame.pw_buffer = NULL;
+		cast->current_frame.xdpw_buffer = NULL;
+	}
 	struct xdpw_buffer *xdpw_buffer = buffer->user_data;
 	if (xdpw_buffer) {
 		wl_list_remove(&xdpw_buffer->link);
 		xdpw_buffer_destroy(xdpw_buffer);
-	}
-	if (cast->current_frame.pw_buffer == buffer) {
-		logprint(DEBUG, "pipewire: current buffer has been removed");
-		cast->current_frame.pw_buffer = NULL;
-		cast->current_frame.xdpw_buffer = NULL;
 	}
 	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
 		buffer->buffer->datas[plane].fd = -1;
@@ -730,6 +735,7 @@ void xdpw_pwr_stream_create(struct xdpw_screencast_instance *cast) {
 }
 
 void xdpw_pwr_stream_destroy(struct xdpw_screencast_instance *cast) {
+	pwr_disarm_process_retry(cast);
 	if (!cast->stream) {
 		return;
 	}

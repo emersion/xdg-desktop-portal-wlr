@@ -235,6 +235,7 @@ static void wlr_register_cb(struct xdpw_screencast_instance *cast) {
 
 	struct zwlr_screencopy_frame_v1 *frame = zwlr_screencopy_manager_v1_capture_output(
 		cast->ctx->screencopy_manager, cast->target->with_cursor, cast->target->output->output);
+	cast->wlr_session.wlr_frame = frame;
 	zwlr_screencopy_frame_v1_add_listener(frame, &wlr_frame_listener, cast);
 	logprint(TRACE, "wlroots: callbacks registered");
 }

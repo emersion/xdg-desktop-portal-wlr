@@ -37,20 +37,43 @@ static void wlr_frame_capture_start(struct xdpw_screencast_instance *cast) {
 }
 
 static void wlr_frame_capture_timer(void *data) {
-	wlr_frame_capture_start((struct xdpw_screencast_instance *)data);
+	struct xdpw_screencast_instance *cast = data;
+	cast->capture_timer = NULL; // timer destroyed in event loop
+	wlr_frame_capture_start(cast);
 }
 
 void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
 	uint64_t delay_ns = fps_limit_measure_end(&cast->fps_limit, cast->framerate);
 	if (delay_ns > 0) {
 		logprint(TRACE, "pipewire: scheduling capture in %"PRIu64" ms", delay_ns / (1000 * 1000));
-		xdpw_add_timer(cast->ctx->state, delay_ns, wlr_frame_capture_timer, cast);
+		cast->capture_timer = xdpw_add_timer(cast->ctx->state, delay_ns,
+			wlr_frame_capture_timer, cast);
+		if (!cast->capture_timer) {
+			wlr_frame_capture_start(cast);
+		}
 	} else {
 		wlr_frame_capture_start(cast);
 	}
 }
 
+void xdpw_wlr_frame_capture_cancel(struct xdpw_screencast_instance *cast) {
+	xdpw_destroy_timer(cast->capture_timer);
+	cast->capture_timer = NULL;
+
+	if (cast->ctx->ext_image_copy_capture_manager
+			&& cast->ctx->ext_output_image_capture_source_manager) {
+		if (cast->ext_session.frame) {
+			ext_image_copy_capture_frame_v1_destroy(cast->ext_session.frame);
+			cast->ext_session.frame = NULL;
+		}
+	} else if (cast->ctx->screencopy_manager) {
+		xdpw_wlr_sc_session_close(cast);
+	}
+	cast->current_frame.damage.size = 0;
+}
+
 void xdpw_wlr_session_close(struct xdpw_screencast_instance *cast) {
+	xdpw_wlr_frame_capture_cancel(cast);
 	if (cast->ctx->ext_image_copy_capture_manager
 			&& cast->ctx->ext_output_image_capture_source_manager) {
 		xdpw_ext_ic_session_close(cast);
