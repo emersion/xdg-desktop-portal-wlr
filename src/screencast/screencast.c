@@ -324,7 +324,7 @@ static int method_screencast_create_session(sd_bus_message *msg, void *data,
 	}
 
 	sd_bus_message_unref(reply);
-	return 0;
+	return 1;
 }
 
 static int method_screencast_select_sources(sd_bus_message *msg, void *data,
@@ -511,7 +511,7 @@ static int method_screencast_select_sources(sd_bus_message *msg, void *data,
 		return ret;
 	}
 	sd_bus_message_unref(reply);
-	return 0;
+	return 1;
 
 error:
 	if (sess) {
@@ -531,7 +531,7 @@ error:
 		return ret;
 	}
 	sd_bus_message_unref(reply);
-	return -1;
+	return 1;
 }
 
 static int method_screencast_start(sd_bus_message *msg, void *data,
@@ -728,7 +728,7 @@ static int method_screencast_start(sd_bus_message *msg, void *data,
 	}
 	sd_bus_message_unref(reply);
 
-	return 0;
+	return 1;
 }
 
 static const sd_bus_vtable screencast_vtable[] = {

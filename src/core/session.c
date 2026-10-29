@@ -31,7 +31,7 @@ static int method_close(sd_bus_message *msg, void *data,
 	sess->closed = true;
 	xdpw_session_destroy(sess);
 
-	return 0;
+	return 1;
 }
 
 static const sd_bus_vtable session_vtable[] = {
