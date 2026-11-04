@@ -390,8 +390,7 @@ static void pwr_handle_stream_state_changed(void *data,
 	switch (state) {
 	case PW_STREAM_STATE_STREAMING:
 		cast->pwr_stream_state = true;
-		xdpw_pwr_dequeue_buffer(cast);
-		xdpw_wlr_frame_capture(cast);
+		pw_stream_trigger_process(cast->stream);
 		break;
 	case PW_STREAM_STATE_PAUSED:
 		if (old == PW_STREAM_STATE_STREAMING && cast->current_frame.pw_buffer) {
