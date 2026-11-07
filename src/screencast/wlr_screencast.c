@@ -50,6 +50,15 @@ void xdpw_wlr_frame_capture(struct xdpw_screencast_instance *cast) {
 	}
 }
 
+void xdpw_wlr_frame_cancel(struct xdpw_screencast_instance *cast) {
+	if (cast->ctx->ext_image_copy_capture_manager
+			&& cast->ctx->ext_output_image_capture_source_manager) {
+		xdpw_ext_ic_frame_cancel(cast);
+	} else if (cast->ctx->screencopy_manager) {
+		xdpw_wlr_sc_frame_cancel(cast);
+	}
+}
+
 void xdpw_wlr_session_close(struct xdpw_screencast_instance *cast) {
 	if (cast->ctx->ext_image_copy_capture_manager
 			&& cast->ctx->ext_output_image_capture_source_manager) {

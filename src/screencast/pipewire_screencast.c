@@ -331,6 +331,7 @@ void xdpw_pwr_enqueue_buffer(struct xdpw_screencast_instance *cast) {
 done:
 	cast->current_frame.xdpw_buffer = NULL;
 	cast->current_frame.pw_buffer = NULL;
+	xdpw_wlr_frame_cancel(cast);
 }
 
 void pwr_update_stream_param(struct xdpw_screencast_instance *cast) {
@@ -613,6 +614,7 @@ static void pwr_handle_stream_remove_buffer(void *data, struct pw_buffer *buffer
 		logprint(DEBUG, "pipewire: current buffer has been removed");
 		cast->current_frame.pw_buffer = NULL;
 		cast->current_frame.xdpw_buffer = NULL;
+		xdpw_wlr_frame_cancel(cast);
 	}
 	for (uint32_t plane = 0; plane < buffer->buffer->n_datas; plane++) {
 		buffer->buffer->datas[plane].fd = -1;

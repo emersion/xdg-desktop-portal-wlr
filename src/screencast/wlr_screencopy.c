@@ -248,8 +248,12 @@ void xdpw_wlr_sc_frame_capture(struct xdpw_screencast_instance *cast) {
 	wlr_register_cb(cast);
 }
 
-void xdpw_wlr_sc_session_close(struct xdpw_screencast_instance *cast) {
+void xdpw_wlr_sc_frame_cancel(struct xdpw_screencast_instance *cast) {
 	wlr_frame_finish(cast);
+}
+
+void xdpw_wlr_sc_session_close(struct xdpw_screencast_instance *cast) {
+	xdpw_wlr_sc_frame_cancel(cast);
 }
 
 int xdpw_wlr_sc_session_init(struct xdpw_screencast_instance *cast) {
