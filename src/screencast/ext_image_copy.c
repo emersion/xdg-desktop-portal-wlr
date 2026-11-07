@@ -321,11 +321,15 @@ void xdpw_ext_ic_frame_capture(struct xdpw_screencast_instance *cast) {
 	ext_register_frame_cb(cast);
 }
 
-void xdpw_ext_ic_session_close(struct xdpw_screencast_instance *cast) {
+void xdpw_ext_ic_frame_cancel(struct xdpw_screencast_instance *cast) {
 	if (cast->ext_session.frame) {
 		ext_image_copy_capture_frame_v1_destroy(cast->ext_session.frame);
 		cast->ext_session.frame = NULL;
 	}
+}
+
+void xdpw_ext_ic_session_close(struct xdpw_screencast_instance *cast) {
+	xdpw_ext_ic_frame_cancel(cast);
 	if (cast->ext_session.capture_session) {
 		ext_image_copy_capture_session_v1_destroy(cast->ext_session.capture_session);
 		cast->ext_session.capture_session = NULL;
