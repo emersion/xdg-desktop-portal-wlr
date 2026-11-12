@@ -6,4 +6,6 @@
 void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast);
 void xdpw_screencast_instance_teardown(struct xdpw_screencast_instance *cast);
 
+int xdpw_screencast_start(struct xdpw_screencast_instance *cast);
+
 #endif

@@ -31,6 +31,7 @@ wayland_protos = dependency('wayland-protocols', version: '>=1.24')
 iniparser = dependency('inih')
 gbm = dependency('gbm')
 drm = dependency('libdrm')
+xkbcommon = dependency('xkbcommon')
 
 epoll = dependency('', required: false)
 if not cc.has_function('timerfd_create', prefix: '#include <sys/timerfd.h>')
@@ -53,6 +54,7 @@ xdpw_files = files(
 	'src/core/config.c',
 	'src/core/request.c',
 	'src/core/session.c',
+	'src/core/shm_util.c',
 	'src/core/string_util.c',
 	'src/core/timer.c',
 	'src/core/timespec_util.c',
@@ -65,6 +67,11 @@ xdpw_files = files(
 	'src/screencast/wlr_screencopy.c',
 	'src/screencast/pipewire_screencast.c',
 	'src/screencast/fps_limit.c',
+	'src/remotedesktop/intset.c',
+	'src/remotedesktop/remotedesktop.c',
+	'src/remotedesktop/remotedesktop_common.c',
+	'src/remotedesktop/virtual_input.c',
+	'src/remotedesktop/keyboard.c',
 )
 
 executable(
@@ -79,6 +86,7 @@ executable(
 		gbm,
 		drm,
 		epoll,
+		xkbcommon,
 	],
 	include_directories: [inc],
 	install: true,

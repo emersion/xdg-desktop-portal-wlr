@@ -10,6 +10,7 @@ packages:
   - scdoc
   - libdrm
   - mesa-dev
+  - libxkbcommon-dev
 sources:
   - https://github.com/emersion/xdg-desktop-portal-wlr
 tasks:

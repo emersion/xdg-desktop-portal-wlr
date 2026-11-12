@@ -1,5 +1,6 @@
 #include "xdpw.h"
 #include "screencast_common.h"
+#include "shm_util.h"
 #include <assert.h>
 #include <fcntl.h>
 #include <string.h>
@@ -10,17 +11,6 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 
 #include "logger.h"
-
-void randname(char *buf) {
-	struct timespec ts;
-	clock_gettime(CLOCK_REALTIME, &ts);
-	long r = ts.tv_nsec;
-	for (int i = 0; i < 6; ++i) {
-		assert(buf[i] == 'X');
-		buf[i] = 'A'+(r&15)+(r&16)*2;
-		r >>= 5;
-	}
-}
 
 struct gbm_device *xdpw_gbm_device_create(drmDevice *device) {
 	if (!(device->available_nodes & (1 << DRM_NODE_RENDER))) {
@@ -65,25 +55,6 @@ void xdpw_gbm_device_update(struct xdpw_screencast_instance *cast) {
 
 	drmFreeDevice(&old_dev);
 	drmFreeDevice(&new_dev);
-}
-
-static int anonymous_shm_open(void) {
-	char name[] = "/xdpw-shm-XXXXXX";
-	int retries = 100;
-
-	do {
-		randname(name + strlen(name) - 6);
-
-		--retries;
-		// shm_open guarantees that O_CLOEXEC is set
-		int fd = shm_open(name, O_RDWR | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
-		if (fd >= 0) {
-			shm_unlink(name);
-			return fd;
-		}
-	} while (retries > 0 && errno == EEXIST);
-
-	return -1;
 }
 
 static struct wl_buffer *import_wl_shm_buffer(struct xdpw_screencast_instance *cast, int fd,
