@@ -232,9 +232,15 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 
 	size_t N = sizeof(default_chooser)/sizeof(default_chooser[0]);
 	bool ret;
+	const struct xdpw_chooser *fallback = NULL;
 	for (size_t i = 0; i<N; i++) {
 		const struct xdpw_chooser *chooser = &default_chooser[i];
+		// Simple choosers might only select outputs, so when toplevels are also requested,
+		// set one as a fallback to use if all the dmenu choosers fail
 		if (chooser->type == XDPW_CHOOSER_SIMPLE && type_mask != MONITOR) {
+			if (!fallback && (type_mask & MONITOR)) {
+				fallback = chooser;
+			}
 			continue;
 		}
 		ret = wlr_chooser(chooser, ctx, target, type_mask);
@@ -243,6 +249,11 @@ static bool wlr_chooser_default(struct xdpw_screencast_context *ctx, struct xdpw
 					default_chooser[i].cmd);
 			continue;
 		}
+		return target->output || target->toplevel;
+	}
+
+	// Try the simple loader we set as the fallback
+	if (fallback && wlr_chooser(fallback, ctx, target, MONITOR)) {
 		return target->output || target->toplevel;
 	}
 	return false;
