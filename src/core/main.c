@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/signalfd.h>
 #include <sys/timerfd.h>
 #include <getopt.h>
 #include <poll.h>
@@ -16,6 +17,7 @@ enum event_loop_fd {
 	EVENT_LOOP_WAYLAND,
 	EVENT_LOOP_PIPEWIRE,
 	EVENT_LOOP_TIMER,
+	EVENT_LOOP_SIGNAL,
 };
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
@@ -172,6 +174,20 @@ int main(int argc, char *argv[]) {
 		goto error;
 	}
 
+	sigset_t sigmask;
+	sigemptyset(&sigmask);
+	sigaddset(&sigmask, SIGINT);
+	sigaddset(&sigmask, SIGTERM);
+	if (sigprocmask(SIG_BLOCK, &sigmask, NULL) != 0) {
+		logprint(ERROR, "sigprocmask() failed");
+		goto error;
+	}
+	int signal_fd = signalfd(-1, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
+	if (signal_fd < 0) {
+		logprint(ERROR, "signalfd() failed");
+		goto error;
+	}
+
 	wl_list_init(&state.timers);
 
 	struct pollfd pollfds[] = {
@@ -187,7 +203,11 @@ int main(int argc, char *argv[]) {
 		[EVENT_LOOP_TIMER] = {
 			.fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC),
 			.events = POLLIN,
-		}
+		},
+		[EVENT_LOOP_SIGNAL] = {
+			.fd = signal_fd,
+			.events = POLLIN,
+		},
 	};
 
 	state.timer_poll_fd = pollfds[EVENT_LOOP_TIMER].fd;
@@ -285,6 +305,11 @@ int main(int argc, char *argv[]) {
 
 				func(user_data);
 			}
+		}
+
+		if (pollfds[EVENT_LOOP_SIGNAL].revents & POLLIN) {
+			logprint(INFO, "event-loop: exiting due to signal");
+			break;
 		}
 
 		do {
