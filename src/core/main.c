@@ -16,6 +16,7 @@ enum event_loop_fd {
 	EVENT_LOOP_WAYLAND,
 	EVENT_LOOP_PIPEWIRE,
 	EVENT_LOOP_TIMER,
+	EVENT_LOOP_LIBEI,
 };
 
 static const char service_name[] = "org.freedesktop.impl.portal.desktop.wlr";
@@ -122,6 +123,7 @@ int main(int argc, char *argv[]) {
 		.screenshot_version = XDP_SHOT_PROTO_VER,
 		.config = &config,
 	};
+	state.input_capture.libei_fd = -1;
 
 	wl_list_init(&state.xdpw_sessions);
 
@@ -135,6 +137,13 @@ int main(int argc, char *argv[]) {
 	if (ret < 0) {
 		logprint(ERROR, "xdpw: failed to initialize screencast");
 		goto error;
+	}
+
+	ret = xdpw_input_capture_init(&state);
+	if (ret < 0) {
+		logprint(ERROR, "xdpw: failed to initialize input capture");
+		logprint(WARN, "xdpw: input capture disabled");
+		// Note: we dont goto error, as this is optional
 	}
 
 	uint64_t flags = SD_BUS_NAME_ALLOW_REPLACEMENT;
@@ -187,7 +196,11 @@ int main(int argc, char *argv[]) {
 		[EVENT_LOOP_TIMER] = {
 			.fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC),
 			.events = POLLIN,
-		}
+		},
+		[EVENT_LOOP_LIBEI] = {
+			.fd = state.input_capture.libei_fd,
+			.events = (state.input_capture.libei_fd >= 0) ? POLLIN : 0,
+		},
 	};
 
 	state.timer_poll_fd = pollfds[EVENT_LOOP_TIMER].fd;
@@ -266,6 +279,11 @@ int main(int argc, char *argv[]) {
 			}
 		}
 
+		if (pollfds[EVENT_LOOP_LIBEI].revents & POLLIN) {
+			logprint(TRACE, "event-loop: got libei event");
+			xdpw_input_capture_dispatch_eis(&state);
+		}
+
 		if (pollfds[EVENT_LOOP_TIMER].revents & POLLIN) {
 			logprint(TRACE, "event-loop: got a timer event");
 
@@ -295,6 +313,7 @@ int main(int argc, char *argv[]) {
 		sd_bus_flush(state.bus);
 	}
 
+	xdpw_input_capture_destroy();
 	// TODO: cleanup
 	finish_config(&config);
 	free(configfile);
@@ -302,6 +321,7 @@ int main(int argc, char *argv[]) {
 	return EXIT_SUCCESS;
 
 error:
+	xdpw_input_capture_destroy();
 	sd_bus_unref(bus);
 	pw_loop_leave(state.pw_loop);
 	pw_loop_destroy(state.pw_loop);
