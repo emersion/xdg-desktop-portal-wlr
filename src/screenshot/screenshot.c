@@ -18,6 +18,7 @@ static bool exec_screenshooter(const char *path) {
 	} else if (pid == 0) {
 		char *const argv[] = {
 			"grim",
+			"-l", "1",
 			"--",
 			(char *)path,
 			NULL,
@@ -42,8 +43,8 @@ static bool exec_screenshooter_interactive(const char *path) {
 		perror("fork");
 		return false;
 	} else if (pid == 0) {
-		char cmd[strlen(path) + 25];
-		snprintf(cmd, sizeof(cmd), "grim -g \"$(slurp)\" -- %s", path);
+		char cmd[strlen(path) + 30];
+		snprintf(cmd, sizeof(cmd), "grim -l 1 -g \"$(slurp)\" -- %s", path);
 		execl("/bin/sh", "/bin/sh", "-c", cmd, NULL);
 		perror("execl");
 		exit(127);
