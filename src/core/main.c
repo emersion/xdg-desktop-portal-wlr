@@ -175,7 +175,7 @@ int main(int argc, char *argv[]) {
 	wl_list_init(&state.timers);
 
 	struct pollfd pollfds[] = {
-		[EVENT_LOOP_DBUS] = {0}, // Filled in later
+		[EVENT_LOOP_DBUS] = { .fd = -1 }, // Filled in later
 		[EVENT_LOOP_WAYLAND] = {
 			.fd = wl_display_get_fd(state.wl_display),
 			.events = POLLIN,
