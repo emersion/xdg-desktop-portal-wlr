@@ -157,6 +157,22 @@ static void wlr_frame_buffer_done(void *data,
 	}
 
 	cast->current_frame.transformation = cast->target->output->transformation;
+	/*
+	 * The wlr-screencopy protocol has no transform event, so the compositor
+	 * decides the orientation of the captured frames. wlroots delivers them
+	 * in mode space (the consumer has to rotate them), but other compositors
+	 * (e.g. niri) already deliver them in the output's logical orientation.
+	 * Publishing the output transform in that case makes consumers rotate
+	 * the frames a second time, and the video comes out sideways.
+	 *
+	 * Only publish the transform when the captured frame is not already in
+	 * the output's logical orientation.
+	 */
+	if (cast->target->output->transformation != WL_OUTPUT_TRANSFORM_NORMAL &&
+			(int) cast->current_constraints.width == cast->target->output->width &&
+			(int) cast->current_constraints.height == cast->target->output->height) {
+		cast->current_frame.transformation = WL_OUTPUT_TRANSFORM_NORMAL;
+	}
 	logprint(TRACE, "wlroots: transformation %u", cast->current_frame.transformation);
 
 	cast->current_frame.damage.size = 0;
