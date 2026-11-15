@@ -69,7 +69,7 @@ static void wlr_prepare_rotation(struct xdpw_screencast_instance *cast,
 		constraints->height = output->height;
 		wl_array_for_each(candidate, &constraints->shm_formats) {
 			if (xdpw_bpp_from_drm_fourcc(candidate->fourcc) == 4) {
-				candidate->stride = (constraints->width * 4 + 63) & ~63U;
+				candidate->stride = constraints->width * 4;
 			}
 		}
 		return;
@@ -111,7 +111,14 @@ static void wlr_prepare_rotation(struct xdpw_screencast_instance *cast,
 	constraints->height = output->height;
 	wl_array_for_each(candidate, &constraints->shm_formats) {
 		if (xdpw_bpp_from_drm_fourcc(candidate->fourcc) == 4) {
-			candidate->stride = (constraints->width * 4 + 63) & ~63U;
+			/*
+			 * The stride must be the natural one (width * 4): the
+			 * consumers compute the linesize of the frame from the
+			 * size of the format, not from the stride of the buffer.
+			 * A padded stride makes every row drift a few bytes and
+			 * the image comes out sheared.
+			 */
+			candidate->stride = constraints->width * 4;
 		}
 	}
 
