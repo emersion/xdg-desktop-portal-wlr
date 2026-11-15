@@ -431,7 +431,12 @@ static void pwr_handle_stream_param_changed(void *data, uint32_t id,
 	}
 
 	const struct spa_pod_prop *prop_modifier;
-	if ((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) {
+	if (((prop_modifier = spa_pod_find_prop(param, NULL, SPA_FORMAT_VIDEO_modifier)) != NULL) &&
+			!cast->needs_rotation) {
+		/*
+		 * A dmabuf can not be rotated on the CPU: it may not be mappable.
+		 * When the frame has to be rotated, use SHM instead.
+		 */
 		cast->buffer_type = DMABUF;
 		data_type = 1<<SPA_DATA_DmaBuf;
 		uint32_t fourcc = xdpw_format_drm_fourcc_from_pw_format(cast->pwr_format.format);

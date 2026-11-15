@@ -106,6 +106,11 @@ void xdpw_screencast_instance_destroy(struct xdpw_screencast_instance *cast) {
 
 	xdpw_wlr_session_close(cast);
 
+	if (cast->rotation_source != NULL) {
+		xdpw_buffer_destroy(cast->rotation_source);
+		cast->rotation_source = NULL;
+	}
+
 	assert(cast->refcount == 0); // Fails assert if called by screencast_finish
 	logprint(DEBUG, "xdpw: destroying cast instance");
 
