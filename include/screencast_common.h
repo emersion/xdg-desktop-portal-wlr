@@ -214,6 +214,25 @@ struct xdpw_screencast_instance {
 	struct xdpw_buffer_constraints current_constraints;
 	struct xdpw_buffer_constraints pending_constraints;
 
+	/*
+	 * Rotation of captured frames for transformed outputs.
+	 *
+	 * The wlr-screencopy protocol has no transform event: the compositor
+	 * delivers the frame in mode space (e.g. 1920x1080 for a 90°-rotated
+	 * output), and the client is expected to rotate it. The portal can
+	 * advertise the transform through SPA_META_VideoTransform, but most
+	 * consumers (Chromium/Electron) ignore that meta, so the video ends up
+	 * sideways. When the captured size is the transpose of the output's
+	 * logical size, we rotate the pixels ourselves before publishing them.
+	 */
+	bool needs_rotation;
+	uint32_t rotation_degrees;   // 90 or 270, counter-clockwise degrees
+	uint32_t capture_width;       // size of the frame the compositor delivers
+	uint32_t capture_height;
+	uint32_t capture_stride;
+	uint32_t capture_format;      // DRM fourcc of the captured frame
+	struct xdpw_buffer *rotation_source; // buffer the compositor copies into
+
 	struct xdpw_screencast_target *target;
 	uint32_t max_framerate;
 	enum buffer_type buffer_type;
@@ -249,6 +268,10 @@ void xdpw_gbm_device_update(struct xdpw_screencast_instance *cast);
 struct xdpw_buffer *xdpw_buffer_create(struct xdpw_screencast_instance *cast,
 	enum buffer_type buffer_type);
 void xdpw_buffer_destroy(struct xdpw_buffer *buffer);
+struct xdpw_buffer *xdpw_shm_buffer_create(struct xdpw_screencast_instance *cast,
+		uint32_t width, uint32_t height, uint32_t stride, uint32_t fourcc);
+bool xdpw_rotate_buffer(struct xdpw_buffer *src, struct xdpw_buffer *dst,
+		uint32_t degrees);
 
 void xdpw_buffer_constraints_init(struct xdpw_buffer_constraints *constraints);
 void xdpw_buffer_constraints_finish(struct xdpw_buffer_constraints *constraints);

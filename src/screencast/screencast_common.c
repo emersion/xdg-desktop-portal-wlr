@@ -241,6 +241,154 @@ void xdpw_buffer_destroy(struct xdpw_buffer *buffer) {
 	free(buffer);
 }
 
+/*
+ * Create a standalone SHM buffer of an arbitrary size. Used as the copy
+ * target for frames that have to be rotated before being published.
+ */
+struct xdpw_buffer *xdpw_shm_buffer_create(struct xdpw_screencast_instance *cast,
+		uint32_t width, uint32_t height, uint32_t stride, uint32_t fourcc) {
+	struct xdpw_buffer *buffer = calloc(1, sizeof(struct xdpw_buffer));
+
+	buffer->width = width;
+	buffer->height = height;
+	buffer->buffer_type = WL_SHM;
+	buffer->format = fourcc;
+	buffer->plane_count = 1;
+	buffer->stride[0] = stride;
+	buffer->offset[0] = 0;
+	buffer->size[0] = stride * height;
+	wl_array_init(&buffer->damage);
+
+	buffer->fd[0] = anonymous_shm_open();
+	if (buffer->fd[0] == -1) {
+		logprint(ERROR, "xdpw: unable to create anonymous filedescriptor");
+		free(buffer);
+		return NULL;
+	}
+	if (ftruncate(buffer->fd[0], buffer->size[0]) < 0) {
+		logprint(ERROR, "xdpw: unable to truncate filedescriptor");
+		close(buffer->fd[0]);
+		free(buffer);
+		return NULL;
+	}
+	buffer->buffer = import_wl_shm_buffer(cast, buffer->fd[0],
+		xdpw_format_wl_shm_from_drm_fourcc(fourcc), width, height, stride);
+	if (buffer->buffer == NULL) {
+		logprint(ERROR, "xdpw: unable to create wl_buffer");
+		close(buffer->fd[0]);
+		free(buffer);
+		return NULL;
+	}
+
+	return buffer;
+}
+
+/*
+ * Rotate a captured frame on the CPU.
+ *
+ * The wlr-screencopy protocol has no transform event, so the compositor
+ * delivers the frame in mode space and the client is expected to rotate it.
+ * Most consumers (Chromium/Electron) ignore SPA_META_VideoTransform, so the
+ * portal rotates the pixels itself.
+ *
+ * degrees is the counter-clockwise rotation to apply:
+ *   90  -> the source's top-right corner ends up at the top-left
+ *   180 -> upside down
+ *   270 -> clockwise
+ *
+ * Both buffers must be SHM with 4 bytes per pixel.
+ */
+bool xdpw_rotate_buffer(struct xdpw_buffer *src, struct xdpw_buffer *dst,
+		uint32_t degrees) {
+	if (src == NULL || dst == NULL) {
+		return false;
+	}
+	if (src->buffer_type != WL_SHM || dst->buffer_type != WL_SHM) {
+		logprint(ERROR, "xdpw: rotation needs SHM buffers");
+		return false;
+	}
+	if (src->plane_count < 1 || dst->plane_count < 1) {
+		return false;
+	}
+	if (xdpw_bpp_from_drm_fourcc(src->format) != 4 ||
+			xdpw_bpp_from_drm_fourcc(dst->format) != 4) {
+		logprint(ERROR, "xdpw: rotation needs 4 bytes per pixel");
+		return false;
+	}
+
+	const uint32_t sw = src->width, sh = src->height;
+	const uint32_t dw = dst->width, dh = dst->height;
+
+	/* the rotated frame must fit exactly */
+	uint32_t expected_w, expected_h;
+	switch (degrees) {
+	case 90:
+	case 270:
+		expected_w = sh;
+		expected_h = sw;
+		break;
+	case 180:
+		expected_w = sw;
+		expected_h = sh;
+		break;
+	default:
+		logprint(ERROR, "xdpw: unsupported rotation %u", degrees);
+		return false;
+	}
+	if (dw != expected_w || dh != expected_h) {
+		logprint(ERROR, "xdpw: rotation size mismatch (%ux%u -> %ux%u, expected %ux%u)",
+			sw, sh, dw, dh, expected_w, expected_h);
+		return false;
+	}
+
+	const size_t src_size = (size_t) src->stride[0] * sh;
+	const size_t dst_size = (size_t) dst->stride[0] * dh;
+
+	const uint8_t *s = mmap(NULL, src_size, PROT_READ, MAP_SHARED, src->fd[0], 0);
+	if (s == MAP_FAILED) {
+		logprint(ERROR, "xdpw: unable to map the source buffer");
+		return false;
+	}
+	uint8_t *d = mmap(NULL, dst_size, PROT_READ | PROT_WRITE, MAP_SHARED, dst->fd[0], 0);
+	if (d == MAP_FAILED) {
+		logprint(ERROR, "xdpw: unable to map the destination buffer");
+		munmap((void *) s, src_size);
+		return false;
+	}
+
+	/*
+	 * Iterate over the destination so the writes are sequential; the reads
+	 * jump by one source row per output pixel.
+	 */
+	for (uint32_t dy = 0; dy < dh; dy++) {
+		uint32_t *drow = (uint32_t *) (d + (size_t) dy * dst->stride[0]);
+		for (uint32_t dx = 0; dx < dw; dx++) {
+			uint32_t sx, sy;
+			switch (degrees) {
+			case 90:
+				sx = sw - 1 - dy;
+				sy = dx;
+				break;
+			case 180:
+				sx = sw - 1 - dx;
+				sy = sh - 1 - dy;
+				break;
+			default: /* 270 */
+				sx = dy;
+				sy = sh - 1 - dx;
+				break;
+			}
+			const uint32_t *srow = (const uint32_t *)
+				(s + (size_t) sy * src->stride[0]);
+			drow[dx] = srow[sx];
+		}
+	}
+
+	munmap((void *) s, src_size);
+	munmap(d, dst_size);
+	return true;
+}
+
 enum wl_shm_format xdpw_format_wl_shm_from_drm_fourcc(uint32_t format) {
 	switch (format) {
 	case DRM_FORMAT_ARGB8888:
